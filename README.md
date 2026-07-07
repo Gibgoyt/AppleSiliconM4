@@ -102,10 +102,12 @@ command-line flag: `_start` is always the first byte of
 `kernel.bin`, so `-E 0` is correct by construction of the linker
 script.
 
-## What's deliberately absent
+## What The Fuck We Don't Want
 
 - No MMU, so all memory access is Device-nGnRE or unmarked
   (whatever m1n1 left behind). Fine for polled UART.
+  The **POESES** at apple make it so fucking hard to probe LPDDR, or maybe the problem is elsewhere
+  also, fuck EL0! we can do everything at El1, EL0 only for bootloader m1n1, which does hardware bringup
 - No IRQs. AIC is not touched. `vec_*_irq` handlers treat every
   interrupt as fatal.
 - No `printf`. Hex/decimal helpers only; a formatter is easy to
@@ -115,14 +117,3 @@ script.
   chainload; `kmutil configure-boot` (Phase A of the plan) needs a
   Mach-O wrapper we haven't written yet.
 
-Each of those is a deliberate scope cut, tracked in `PLAN.md`.
-
-## Debugging tips
-
-- Any unexpected fault will print through the vector dumper. The EC
-  field is what to read first (`ESR_EL2[31:26]`, also decoded).
-- `objdump -d build/kernel.elf` cross-references addresses in the
-  ELR against source.
-- Kernel is position-independent by construction (`adrp`/`:lo12:`
-  everywhere), so the load base is not baked in — `chainload.py`
-  can drop it wherever its heap lands.
