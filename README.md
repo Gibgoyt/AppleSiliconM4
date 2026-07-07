@@ -1,5 +1,8 @@
 # Long Term Goals
 
+by the way this is not currently bare metal, logic sits in EL2, as right now m1n1 boot loader needs fast iteration
+will eventually cut down to EL0
+
 because Ahmed loves his databases we will make this bare metal kernel into a database
 TCP for SQL, only one thread, either queuing like epoll or cqe/sqe like uring
 IO Uring style for dispatching I/O, we only need NVME to work, PCIE drivers I think on this mac mini
