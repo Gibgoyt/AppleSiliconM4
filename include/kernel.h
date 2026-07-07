@@ -2,12 +2,11 @@
 #define KERNEL_H
 
 #include "types.h"
-#include "boot_args.h"
 
-#define KERNEL_NAME     "hello-t8132"
-#define KERNEL_VERSION  "0.1"
+#define KERNEL_NAME     "m4-payload"
+#define KERNEL_VERSION  "0.2"
 
-void kmain(struct boot_args *ba);
+int  kmain(u64 nic_mmio, u64 dma_iova, u64 ba);
 
 __attribute__((noreturn))
 void panic(const char *msg);
