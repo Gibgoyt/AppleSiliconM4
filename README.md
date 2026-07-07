@@ -1,3 +1,15 @@
+# Long Term Goals
+
+because Ahmed loves his databases we will make this bare metal kernel into a database
+TCP for SQL, only one thread, either queuing like epoll or cqe/sqe like uring
+IO Uring style for dispatching I/O, we only need NVME to work, PCIE drivers I think on this mac mini
+having a few threads for dedicated I/O if we want an approach like libmdbx B+Tree, maybe even BεTree
+Look at this paper https://www3.cs.stonybrook.edu/~bender/newpub/2015-BenderFaJa-login-wods.pdf
+and dedicated compute for write heavy workloads with a stripped-down RocksDB approach might be nice
+read workloads must be single producer single consumer but must support multiple consumer for MVCC just as bustub does
+
+yeeeee, if i needs add more i will addz more
+
 # hello-t8132 — bare-metal "Hello World" kernel for the Apple M4
 
 Minimal AArch64 kernel that boots at EL2 on an Apple M4 Mac mini
