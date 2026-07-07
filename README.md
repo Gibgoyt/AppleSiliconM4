@@ -1,99 +1,134 @@
-# m4-payload — bare-metal AArch64 kernel for Apple M4 (Mac16,10 / T8132)
+# Long Term Goals
 
-Minimal payload that runs under a live m1n1 session on an M4 Mac mini
-via `chainload.py -c` (call mode). It prints a banner + the three
-`p.call()` arguments through the dockchannel UART and returns; m1n1
-resumes its uartproxy loop, and iteration continues without a power
-cycle. See `PLAN_2.md` for the road map to a TCP hello-world server
-on the LAN.
+by the way this is not currently bare metal, logic sits in EL2, as right now m1n1 boot loader needs fast iteration
+will eventually cut down to EL0
 
-## Model
+because Ahmed loves his databases we will make this bare metal kernel into a database
+TCP for SQL, only one thread, either queuing like epoll or cqe/sqe like uring
+IO Uring style for dispatching I/O, we only need NVME to work, PCIE drivers I think on this mac mini
+having a few threads for dedicated I/O if we want an approach like libmdbx B+Tree, maybe even BεTree
+Look at this paper https://www3.cs.stonybrook.edu/~bender/newpub/2015-BenderFaJa-login-wods.pdf
+and dedicated compute for write heavy workloads with a stripped-down RocksDB approach might be nice
+read workloads must be single producer single consumer but must support multiple consumer for MVCC just as bustub does
 
-`p.call()` payload. m1n1 stays resident:
+yeeeee, if i needs add more i will addz more
 
-- Uploaded and invoked over USB-CDC-ACM (`/dev/m1n1`).
-- m1n1 has already flushed caches and shut its own MMU down before
-  the call; we run identity-mapped, physical.
-- `_kentry` is a plain AAPCS leaf function pinned at file offset 0.
-  Args land in `x0-x2`; return in `x0`.
-- No MMU, no VBAR install, no BSS zero, no SMP release. m1n1 owns
-  all of that.
+# hello-t8132 — bare-metal "Hello World" kernel for the Apple M4
+
+Minimal AArch64 kernel that boots at EL2 on an Apple M4 Mac mini
+(Mac16,10 / T8132), initializes the on-board debug UART, and prints
+a banner plus a dump of `boot_args`. No MMU, no PMM, no interrupts,
+no networking — that is all future phases described in `PLAN.md`.
+
+This is the first executable milestone of the plan: proof that our
+own code can take control on the machine and speak back over the
+serial line.
+
+## What it does
+
+On entry (from `chainload.py -r -E 0` under a live m1n1 session, or
+eventually from `kmutil configure-boot` once we produce a Mach-O):
+
+1. Parks every non-primary CPU in a `wfe` loop.
+2. Installs a debug exception vector table at `VBAR_EL2`.
+3. Sets up a 64 KiB stack and zeroes `.bss`.
+4. Calls `kmain(boot_args*)`, which prints:
+
+   ```
+   ================================================
+     Hello World from bare-metal T8132!
+     hello-t8132 v0.1
+   ================================================
+
+   [cpu]
+     CurrentEL  = EL2
+     MPIDR_EL1  = 0x...
+
+   [boot_args]
+     ptr        = 0x...
+     revision   = 0x...
+     version    = 0x...
+     virt_base  = 0x...
+     phys_base  = 0x800000000
+     mem_size   = 0x400000000 (16384 MiB)
+     ...
+   ```
+
+5. Halts on `wfe`. Any exception before the halt prints the
+   ESR/ELR/FAR/SPSR and a decoded EC name.
 
 ## Layout
 
 ```
 AppleSiliconM4/
-├── Makefile            top-level build + `make deploy`
-├── linker.ld           _kentry pinned at file offset 0
-├── PLAN_2.md           live plan (M2..M8)
-├── PLAN.md             historical, do not modify
-├── README.md           this file
+├── Makefile         top-level build (cross-gcc + ld + objcopy)
+├── linker.ld        payload layout; _start at file offset 0
 ├── include/
-│   ├── types.h
-│   ├── kernel.h        kmain, panic, hang, sysreg + mmio helpers
-│   ├── boot_args.h     xnu-style boot_args (unused at M2; kept for later)
-│   └── dockchannel.h   dockchannel UART API
+│   ├── types.h      u8..u64, NULL, size_t
+│   ├── boot_args.h  xnu-style boot_args (mirrors m1n1 xnuboot.h)
+│   ├── uart.h       Samsung S3C UART API
+│   └── kernel.h     kmain, panic, hang, sysreg accessors, mmio
 └── src/
-    ├── start.S         _kentry leaf (stp/bl kmain/ldp/ret)
-    ├── panic.c         panic() over dockchannel
-    ├── dockchannel.c   polled TX driver at 0x388128000
-    └── main.c          kmain: banner + call args + return
+    ├── start.S      EL2 entry: park secondaries, set VBAR, stack,
+    │                zero BSS, call kmain
+    ├── vectors.S    16-entry EL2 vector table (all fatal for now)
+    ├── uart.c       polling UART driver at 0x3ad200000
+    ├── panic.c      exception dumper + panic()
+    └── main.c       kmain: banner + boot_args dump + halt
 ```
 
 ## Build
 
 ```
-make                    # -> build/kernel.{elf,bin,dump}
+make
 ```
 
-Requires the `aarch64-linux-gnu-*` cross toolchain.
-
-## Deploy (versioned staging under /tmp/m4-serve)
+Outputs:
 
 ```
-make deploy
-# -> /tmp/m4-serve/kernel-<git-sha>.bin
-# -> /tmp/m4-serve/kernel-latest.bin -> kernel-<git-sha>.bin
+build/kernel.elf   linked ELF with debug info
+build/kernel.bin   flat binary for chainload.py -r
+build/kernel.dump  disassembly
 ```
 
-`/tmp/m4-serve/` is a staging/archival location on the Comet Lake
-host. It is *not* the runtime transport — see `PLAN_2.md §2.6`. The
-Mac mini receives kernels over USB-CDC via `chainload.py -c`, not
-HTTP.
+Requires the `aarch64-linux-gnu-*` cross-toolchain (Arch package
+`aarch64-linux-gnu-gcc`).
 
-## Run on the M4
+## Deploy
 
-With m1n1 running (LEDs blinking, `/dev/m1n1` present):
+Assumes Phase A is complete — that is, m1n1 is enrolled as fuOS on
+the M4 mini, the USB-C proxy cable is connected to the Comet Lake
+dev host, and `proxyclient/tools/shell.py` responds. See
+`PLAN.md §3` for how to reach that state.
 
-```
-cd $M1N1/proxyclient
-./tools/chainload.py -c $KERNEL/build/kernel.bin
-```
-
-Expected on `/dev/m1n1-raw` (dockchannel):
+From the Comet Lake host, with the M4 booted into m1n1:
 
 ```
-================================================
-  m4-payload v0.2 (p.call payload)
-================================================
-
-[kernel] hello from bare-metal M4 payload
-[kernel] nic_mmio = 0x0000000000000000
-[kernel] dma_iova = 0x0000000000000000
-[kernel] ba       = 0x0000000000000000
-[kernel] CurrentEL = EL2
-[kernel] MPIDR_EL1 = 0x...
-[kernel] returning to m1n1 proxy
+cd /home/ahmed/Projects/AsahiLinux/m4/m1n1/proxyclient
+./tools/chainload.py -r -E 0 \
+    /home/ahmed/Projects/C/embedded/AppleSiliconM4/build/kernel.bin
 ```
 
-Iteration cycle after the first upload: edit C → `make` →
-`chainload.py -c` → observe. ~2–5 s per cycle.
+The banner should appear on the same serial port (`/dev/ttyACM0`)
+within a second.
 
-## Deliberately absent
+If the raw entry point 0 causes trouble, the offset is a
+command-line flag: `_start` is always the first byte of
+`kernel.bin`, so `-E 0` is correct by construction of the linker
+script.
 
-Everything past M2 is future work in `PLAN_2.md`:
+## What The Fuck We Don't Want
 
-- PCIe reach (§7), DART for NIC DMA (§8)
-- NIC driver (§9), ARP responder (§10)
-- lwIP raw-API TCP stack (§11)
-- Port-3333 hello-world server (§12)
+- No MMU, so all memory access is Device-nGnRE or unmarked
+  (whatever m1n1 left behind). Fine for polled UART.
+  The **POESES** at apple make it so fucking hard to probe LPDDR, or maybe the problem is elsewhere
+  also, fuck EL0! we can do everything at El1, EL0 only for bootloader m1n1, which does hardware bringup
+- No IRQs. AIC is not touched. `vec_*_irq` handlers treat every
+  interrupt as fatal.
+- No `printf`. Hex/decimal helpers only; a formatter is easy to
+  add later.
+- No SMP. Secondaries are parked, never released.
+- No Mach-O output. The raw binary path is enough to run under
+  chainload; `kmutil configure-boot` (Phase A of the plan) needs a
+  Mach-O wrapper we haven't written yet.
+
