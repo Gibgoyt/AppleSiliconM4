@@ -1,82 +1,46 @@
 /*
- * main.c -- kmain entry from start.S.
+ * main.c -- kmain entry from _kentry (start.S).
  *
- * Responsibilities in this bring-up-only build:
- *   1. Bring the UART up in software (m1n1 already programmed the
- *      hardware; we just latch the base address).
- *   2. Print a banner so a human on the serial line can tell that
- *      *our* kernel got control (as opposed to m1n1 hanging, or
- *      iBoot silently faulting).
- *   3. Dump a few fields from boot_args as a sanity check that the
- *      loader's calling convention is what we assumed.
- *   4. Spin. There is no scheduler, no MMU, no IRQs -- everything
- *      after this is future phases in PLAN.md.
+ * PLAN_2 M2: print a banner + the three call args via the
+ * dockchannel UART and return. m1n1 stays alive; the Python driver
+ * on the Comet Lake host observes the return value and can re-call.
+ *
+ * Args come from p.call(addr, x0, x1, x2, x3):
+ *   x0 = nic_mmio  (Phase 3 will populate; 0 for now)
+ *   x1 = dma_iova  (Phase 4 will populate; 0 for now)
+ *   x2 = ba        (boot_args pointer if we ever want it; 0 for now)
  */
 
 #include "kernel.h"
-#include "uart.h"
-#include "boot_args.h"
+#include "dockchannel.h"
 
 static void banner(void)
 {
-    uart_puts("\n\n");
-    uart_puts("================================================\n");
-    uart_puts("  Hello World from bare-metal T8132!\n");
-    uart_puts("  " KERNEL_NAME " v" KERNEL_VERSION "\n");
-    uart_puts("================================================\n");
+    dc_puts("\n\n");
+    dc_puts("================================================\n");
+    dc_puts("  " KERNEL_NAME " v" KERNEL_VERSION " (p.call payload)\n");
+    dc_puts("================================================\n");
 }
 
-static void dump_boot_args(struct boot_args *ba)
+static void dump_call_args(u64 nic_mmio, u64 dma_iova, u64 ba)
 {
-    uart_puts("\n[boot_args]\n");
-    uart_puts("  ptr        = ");
-    uart_put_hex64((u64)ba);
-    uart_puts("\n  revision   = ");
-    uart_put_hex32(ba->revision);
-    uart_puts("\n  version    = ");
-    uart_put_hex32(ba->version);
-    uart_puts("\n  virt_base  = ");
-    uart_put_hex64(ba->virt_base);
-    uart_puts("\n  phys_base  = ");
-    uart_put_hex64(ba->phys_base);
-    uart_puts("\n  mem_size   = ");
-    uart_put_hex64(ba->mem_size);
-    uart_puts(" (");
-    uart_put_dec(ba->mem_size >> 20);
-    uart_puts(" MiB)\n  top_of_kd  = ");
-    uart_put_hex64(ba->top_of_kernel_data);
-    uart_puts("\n  devtree    = ");
-    uart_put_hex64((u64)ba->devtree);
-    uart_puts("\n  dt_size    = ");
-    uart_put_hex32(ba->devtree_size);
-    uart_puts("\n  machine    = ");
-    uart_put_hex32(ba->machine_type);
-    uart_puts("\n");
+    dc_puts("\n[kernel] hello from bare-metal M4 payload\n");
+    dc_puts("[kernel] nic_mmio = "); dc_puthex64(nic_mmio); dc_putc('\n');
+    dc_puts("[kernel] dma_iova = "); dc_puthex64(dma_iova); dc_putc('\n');
+    dc_puts("[kernel] ba       = "); dc_puthex64(ba); dc_putc('\n');
 }
 
 static void dump_cpu_state(void)
 {
-    uart_puts("\n[cpu]\n  CurrentEL  = EL");
-    uart_put_dec(read_currentel());
-    uart_puts("\n  MPIDR_EL1  = ");
-    uart_put_hex64(read_mpidr());
-    uart_puts("\n");
+    dc_puts("[kernel] CurrentEL = EL"); dc_putdec(read_currentel()); dc_putc('\n');
+    dc_puts("[kernel] MPIDR_EL1 = "); dc_puthex64(read_mpidr()); dc_putc('\n');
 }
 
-void kmain(struct boot_args *ba)
+int kmain(u64 nic_mmio, u64 dma_iova, u64 ba)
 {
-    /* The UART hardware is already configured by m1n1/iBoot; we
-     * only need to remember its base. */
-    uart_init(UART_BASE_T8132);
-
     banner();
+    dump_call_args(nic_mmio, dma_iova, ba);
     dump_cpu_state();
-
-    if (ba)
-        dump_boot_args(ba);
-    else
-        uart_puts("\n[boot_args] pointer was NULL -- skipping dump\n");
-
-    uart_puts("\nkmain: done. Halting on WFE.\n");
-    hang();
+    dc_puts("[kernel] returning to m1n1 proxy\n");
+    return 0;
 }
