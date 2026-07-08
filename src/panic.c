@@ -1,20 +1,20 @@
 /*
  * panic.c -- Kernel panic message + halt.
  *
- * In call mode m1n1 owns VBAR_EL2, so any real fault vectors into
- * m1n1's exception dumper. This file is just for C-level asserts
- * that want a clean message + hang before returning to m1n1.
+ * m1n1 owns VBAR_EL2 in p.call() mode, so real faults go through
+ * m1n1's exception dumper. This file is just for C-level asserts.
+ * The message is appended to the log buffer if one was supplied.
  */
 
 #include "kernel.h"
-#include "dockchannel.h"
+#include "log.h"
 
 __attribute__((noreturn))
 void panic(const char *msg)
 {
-    dc_puts("\n\n*** KERNEL PANIC ***\n  ");
-    dc_puts(msg ? msg : "(no message)");
-    dc_puts("\nSystem halted.\n");
+    log_puts("\n*** KERNEL PANIC ***\n  ");
+    log_puts(msg ? msg : "(no message)");
+    log_puts("\nSystem halted.\n");
     hang();
     __builtin_unreachable();
 }
