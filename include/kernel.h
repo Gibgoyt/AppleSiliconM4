@@ -4,9 +4,16 @@
 #include "types.h"
 
 #define KERNEL_NAME     "m4-payload"
-#define KERNEL_VERSION  "0.2"
+#define KERNEL_VERSION  "0.3"
 
-int  kmain(u64 nic_mmio, u64 dma_iova, u64 ba);
+/*
+ * kmain -- payload entry, invoked by p.call() from Python.
+ *
+ * The current M2 signature is (log_buf, log_size, ba). Later phases
+ * (NIC bring-up, TCP server, ...) will change the trailing args as
+ * needed; log_buf/log_size stay because we always want output.
+ */
+int  kmain(u64 log_buf, u64 log_size, u64 ba);
 
 __attribute__((noreturn))
 void panic(const char *msg);
