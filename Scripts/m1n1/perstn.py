@@ -121,22 +121,24 @@ def smc_power(buf):
 
 # ---------------------------------------------------------------- PERSTN GPIO
 
-# gpio0 controller (AAPL,phandle=120 in the t8132 ADT) lives at 0x19a000000,
-# 224 pins. Each pin has one 32-bit register at (gpio_base + pin*4).
+# gpio0 controller (AAPL,phandle=120) has ADT reg 0x19a000000 -- but that is
+# a BUS address in /arm-io space, not a physical address. On t8132
+# /arm-io/ranges[0] is a non-identity relocation
+# (bus 0..0x3a0000000 -> parent 0x200000000..0x59a000000), so the real
+# physical base is 0x39a000000. proxyclient's ADTNode.get_reg() does the
+# translation for us; that PA lands inside m1n1's mmu_map_mmio identity
+# window (0..0x3a0000000), so plain p.read32/write32 reach the device with
+# no 0xf-alias trick.
 #
-# The physical address 0x19a000000 is NOT in m1n1's direct MMU map on
-# t8132: mmu_remap_ranges only adds the ADT `pmap-io-ranges` entries
-# (ECAM, DART carveouts, ...), and gpio0 is not in that list. Reading
-# 0x19a000000 directly triggers an "Exception: SYNC" and wedges m1n1.
-#
-# m1n1 does provide full 32 GB MMIO aliases at 0xc/d/e/f000000000
-# (see src/memory.c: mmu_add_default_mappings). Use the 0xf alias
-# (Device-nGnRE) — same memory type gpio0 needs — so no m1n1 change
-# is required.
-GPIO0_BASE_PHYS = 0x19a000000
-GPIO0_MMIO_ALIAS = 0xf000000000
-GPIO0_BASE = GPIO0_MMIO_ALIAS | GPIO0_BASE_PHYS
+# Previous iteration ("Exception: SYNC") computed 0xf000000000 | 0x19a000000
+# = 0xf19a000000 -- via m1n1's 0xf alias that lands on PA 0x19a000000, which
+# is a dead hole on t8132. Same reason SMC's ADT reg 0x18c600000 works only
+# after get_reg() translates it to PA 0x38c600000.
 GPIO0_PIN_COUNT = 224
+
+
+def _gpio0_base():
+    return u.adt["arm-io/gpio0"].get_reg(0)[0]
 
 # Bit layout of the per-pin register, verbatim from Linux
 # drivers/pinctrl/pinctrl-apple-gpio.c.
@@ -156,7 +158,7 @@ PERSTN_PIN = 165
 
 
 def _gpio_reg_addr(pin):
-    return GPIO0_BASE + pin * 4
+    return _gpio0_base() + pin * 4
 
 
 def gpio_read(pin):
@@ -180,9 +182,8 @@ def gpio_set_output(pin, value, buf=None):
     p.write32(addr, new)
     read_back = p.read32(addr)
     if buf is not None:
-        phys = GPIO0_BASE_PHYS + pin * 4
-        buf.write(f"gpio0[{pin}] @ phys 0x{phys:x} (via alias 0x{addr:x}): "
-                  f"0x{old:08x} -> 0x{new:08x} (read-back 0x{read_back:08x})\n")
+        buf.write(f"gpio0[{pin}] @ 0x{addr:x}: 0x{old:08x} -> 0x{new:08x} "
+                  f"(read-back 0x{read_back:08x})\n")
     return old, new, read_back
 
 
@@ -195,6 +196,15 @@ def deassert_perstn(buf, pin=PERSTN_PIN, cold_reset_us=10000, settle_ms=100):
     this handles the external endpoint reset.
     """
     buf.write(f"=== PERSTN deassert (gpio0 pin {pin}) ===\n")
+
+    # Safety probe: read pin 0's reg before touching pin 165. If gpio0
+    # addressing is wrong, this fails cleanly (Python exception, wrapped by
+    # try_() in main) leaving nic-runtime.txt behind instead of wedging m1n1.
+    probe = _gpio_reg_addr(0)
+    buf.write(f"gpio0 probe: read32(0x{probe:x}) = ")
+    v = p.read32(probe)
+    buf.write(f"0x{v:08x}\n")
+
     log(f"PERSTN cold reset: drive gpio0[{pin}] low")
     gpio_set_output(pin, 0, buf)
     time.sleep(cold_reset_us / 1e6)
