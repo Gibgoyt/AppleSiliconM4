@@ -1,0 +1,217 @@
+[ahmed@admin AppleSiliconM4]$ ls -al /dev/ttyACM0
+crw-rw---- 1 root uucp 166, 0 Jul  9 05:53 /dev/ttyACM0
+[ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/recon.sh --dart-dump
+TTY> Initialized dockchannel UART at 0x388128000
+TTY> Device info:
+TTY>   Model: Mac16,10
+TTY>   Target: J773g
+TTY>   Board-ID: 0x2a
+TTY>   Chip-ID: 0x8132
+TTY> 
+TTY> CPU init (MIDR: 0x611f0531 smp_id:0x6)...
+TTY>   CPU part: 0x53 rev: 0x11
+TTY>   CPU: M4 Donan (P core)
+TTY> 
+TTY> boot_args at 0x10002ec8000
+TTY>   revision:     3
+TTY>   version:      2
+TTY>   virt_base:    0xffffffffff0f0000
+TTY>   phys_base:    0x100010f0000
+TTY>   mem_size:     0x3df834000
+TTY>   top_of_kdata: 0x10002ed8000
+TTY>   video:
+TTY>     base:       0x103e5234000
+TTY>     display:    0x1
+TTY>     stride:     0xa00
+TTY>     width:      640
+TTY>     height:     1136
+TTY>     depth:      32bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0x67c000
+TTY>   devtree_size: 0x68000
+TTY>   cmdline:      
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x400000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 ed03c49-dirty
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the MIT license
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: 15.1 (iBoot-11881.41.5)
+TTY> System FW version: 15.1 (iBoot-11881.41.5)
+TTY> Heap base: 0x10002ed8000
+TTY> MCC: Unsupported version:mcc,t8132
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x103e0924000
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c50000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c60000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c70000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c80000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1cb0000000 (0x14000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff1c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe6c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe4c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffddc000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffdbc000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffd4c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30000180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 3 @ 0x381000000
+TTY> AIC: AIC3 with 1/2 dies, 2048/4096 IRQs, reg_size:40004, config:10000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> WDT registers @ 0x3882b0000
+TTY> WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: initialized, 392 devices on 1 dies found.
+TTY> display: Display is external
+TTY> display: Dummy framebuffer found, initializing display
+TTY> dart: dart /arm-io/dart-dcp at 0x30a340000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0 at 0x30a300000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0.0.0 L1 0 is real-time at 0x103fff1c000
+TTY> dart: allocating L2 tbl at 0, 1 to 0x103fff24000
+TTY> dcp: Mapping segment #2 1000284c000 -> 1000284c000 [24000]
+TTY> rtkit(dcp): booting with version 12
+TTY> rtkit(dcp): unknown system endpoint 0x0a
+TTY> rtkit(dcp): pre-allocated buffer (ep 0x1, dva 0x100025eb000, phys 0x103e51a3000)
+TTY> rtkit(dcp): unknown oslog message 105ff8010002604
+TTY> rtkit(dcp): unknown oslog message 3010042100000a1
+TTY> rtkit(dcp): unknown oslog message 4000020d51e4021
+TTY> rtkit(dcp): unknown oslog message 4000040d28078a1
+TTY> rtkit(dcp): unknown oslog message 4000060d51e4001
+TTY> AFK: ring buffer size mismatch
+TTY> AFK: ring buffer size mismatch
+TTY> dcp-iboot: failed to initialize disp0 service
+TTY> display: failed to initialize DCP iBoot interface
+TTY> rtkit(dcp): IOP crashed!
+TTY> rtkit(dcp): == CRASH INFO ==
+TTY> rtkit(dcp):   Message 1: ASSERT!Messenger.c:299 0xc0000000000000 0x7 
+TTY> rtkit(dcp):   0x43766572
+TTY> rtkit(dcp):   0x4374696d
+TTY> rtkit(dcp):   0x43637374
+TTY> rtkit(dcp):   0x4372746b
+TTY> rtkit(dcp):   0x43617343
+TTY> rtkit(dcp):   0x436d6278
+TTY> rtkit(dcp):   0x43636470
+TTY> rtkit(dcp):   0x43706374
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp): IOP died during shutdown
+TTY> fb init: 640x1136 (32) [s=640] @0x103e5234000
+TTY> fb console: max rows 35, max cols 40
+TTY> fb: display logo
+TTY> cpufreq: Chip 0x8132 is unsupported
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j773g
+TTY> Unknown payload at 0x1000284c000 (magic: 5b41464b)
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x402f80000 is a t8110
+TTY> USB0: initialized at 0x100032c6030
+TTY> dart: dart /arm-io/dart-usb1 at 0x40af80000 is a t8110
+TTY> USB1: initialized at 0x100032c6360
+TTY> dart: dart /arm-io/dart-usb2 at 0x412f80000 is a t8110
+TTY> USB2: initialized at 0x100032c6690
+TTY> dart: dart /arm-io/dart-usb3 at 0x41af80000 is a t8110
+TTY> USB3: initialized at 0x100032c69c0
+TTY> Running proxy...
+m1n1 base: 0x10002740000
+Fetching ADT (0x00068000 bytes)...
+[recon] output dir: /tmp/m4-recon
+[recon] === Phase A: ADT read (safe, no side effects) ===
+[recon] wrote /tmp/m4-recon/adt.txt (963704 chars)
+[recon] wrote /tmp/m4-recon/adt.bin (419392 bytes)
+[recon] wrote /tmp/m4-recon/arm-io-children.txt (1309 chars)
+[recon] wrote /tmp/m4-recon/pcie-nodes.txt (6181 chars)
+[recon] wrote /tmp/m4-recon/mac-address.txt (477 chars)
+[recon] wrote /tmp/m4-recon/darts.txt (1505 chars)
+[recon] Phase B skipped (pass --pcie to enable)
+[recon] === Phase C: DART table dumps ===
+
+[recon] WARN DART dump arm-io/dart-apcie2: UartTimeout: Expected 1 bytes, got 0 bytes
+Traceback (most recent call last):
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 40, in try_
+    return fn()
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 215, in do_dump
+    dart = DART.from_adt(u, path)
+  File "/home/ahmed/Projects/AsahiLinux/m4/m1n1/proxyclient/m1n1/hw/dart.py", line 37, in from_adt
+    return cls(u.iface, regs, u, compat, **kwargs)
+m1n1.proxy.UartTimeout: Expected 1 bytes, got 0 bytes
+[recon] WARN DART dump arm-io/dart-apcie0: UartTimeout: Expected 1 bytes, got 0 bytes
+Traceback (most recent call last):
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 40, in try_
+    return fn()
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 215, in do_dump
+    dart = DART.from_adt(u, path)
+  File "/home/ahmed/Projects/AsahiLinux/m4/m1n1/proxyclient/m1n1/hw/dart.py", line 37, in from_adt
+    return cls(u.iface, regs, u, compat, **kwargs)
+m1n1.proxy.UartTimeout: Expected 1 bytes, got 0 bytes
+[recon] WARN DART dump arm-io/dart-apciec0: SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
+Traceback (most recent call last):
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 40, in try_
+    return fn()
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 215, in do_dump
+    dart = DART.from_adt(u, path)
+  File "/home/ahmed/Projects/AsahiLinux/m4/m1n1/proxyclient/m1n1/hw/dart.py", line 37, in from_adt
+    return cls(u.iface, regs, u, compat, **kwargs)
+serial.serialutil.SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
+[recon] WARN DART dump arm-io/dart-apciec1: SerialException: write failed: [Errno 5] Input/output error
+Traceback (most recent call last):
+  File "/home/ahmed/.local/lib/python3.14/site-packages/serial/serialposix.py", line 621, in write
+    n = os.write(self.fd, d)
+OSError: [Errno 5] Input/output error
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 40, in try_
+    return fn()
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 215, in do_dump
+    dart = DART.from_adt(u, path)
+  File "/home/ahmed/Projects/AsahiLinux/m4/m1n1/proxyclient/m1n1/hw/dart.py", line 37, in from_adt
+    return cls(u.iface, regs, u, compat, **kwargs)
+serial.serialutil.SerialException: write failed: [Errno 5] Input/output error
+[recon] WARN DART dump arm-io/dart-apciec3: SerialException: write failed: [Errno 5] Input/output error
+Traceback (most recent call last):
+  File "/home/ahmed/.local/lib/python3.14/site-packages/serial/serialposix.py", line 621, in write
+    n = os.write(self.fd, d)
+OSError: [Errno 5] Input/output error
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 40, in try_
+    return fn()
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/recon.py", line 215, in do_dump
+    dart = DART.from_adt(u, path)
+  File "/home/ahmed/Projects/AsahiLinux/m4/m1n1/proxyclient/m1n1/hw/dart.py", line 37, in from_adt
+    return cls(u.iface, regs, u, compat, **kwargs)
+serial.serialutil.SerialException: write failed: [Errno 5] Input/output error
+[recon] wrote /tmp/m4-recon/recon-summary.md
+[recon] done
+
+--- /tmp/m4-recon/ ---
+total 1392
+drwxr-xr-x  2 ahmed ahmed    240 Jul  9 05:54 .
+drwxrwxrwt 25 root  root    3800 Jul  9 05:53 ..
+-rw-r--r--  1 root  root  419392 Jul  9 05:53 adt.bin
+-rw-r--r--  1 root  root  963704 Jul  9 05:53 adt.txt
+-rw-r--r--  1 root  root    1309 Jul  9 05:53 arm-io-children.txt
+-rw-r--r--  1 root  root    1505 Jul  9 05:53 darts.txt
+-rw-r--r--  1 root  root     477 Jul  9 05:53 mac-address.txt
+-rw-r--r--  1 root  root      43 Jul  8 19:49 pcie-config-space-apcie.txt
+-rw-r--r--  1 root  root      19 Jul  8 19:49 pcie-init.txt
+-rw-r--r--  1 root  root    6181 Jul  9 05:53 pcie-nodes.txt
+-rw-r--r--  1 root  root    2572 Jul  9 05:54 recon-summary.md
+-rw-r--r--  1 root  root      83 Jul  8 19:49 smc-power.txt
+
+Read /tmp/m4-recon/recon-summary.md and paste it back.
+[ahmed@admin AppleSiliconM4]$ 
+[ahmed@admin AppleSiliconM4]$ 
+
