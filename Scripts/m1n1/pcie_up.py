@@ -374,17 +374,24 @@ def main():
     try_(lambda: smc_power(buf), "SMC power")
 
     log("p.pcie_init()...")
+    pcie_init_ok = False
     try:
         rc = p.pcie_init()
         buf.write(f"\np.pcie_init() -> {rc!r}\n\n")
         log(f"p.pcie_init returned {rc!r}")
+        pcie_init_ok = True
     except Exception as e:
         buf.write(f"\np.pcie_init raised: {e.__class__.__name__}: {e}\n\n")
         log(f"p.pcie_init raised: {e.__class__.__name__}: {e}")
         traceback.print_exc(limit=5)
 
-    log("dumping PCIe controller registers...")
-    try_(lambda: dump_pcie_regs(buf), "dump_pcie_regs")
+    if pcie_init_ok:
+        log("dumping PCIe controller registers...")
+        try_(lambda: dump_pcie_regs(buf), "dump_pcie_regs")
+    else:
+        log("skipping PCIe register dump (m1n1 is wedged, reads would time out)")
+        buf.write("=== PCIe controller register dump ===\n"
+                  "SKIPPED: p.pcie_init() raised — m1n1 is not responding.\n\n")
 
     log(f"ECAM walk @ 0x{args.ecam_base:x} ...")
     devices = try_(lambda: ecam_walk(args.ecam_base, buf), "ecam_walk") or []
