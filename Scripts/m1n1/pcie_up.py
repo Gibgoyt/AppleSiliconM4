@@ -270,6 +270,57 @@ def enable_nic(base, nic, buf):
         buf.write(f"BAR0 read failed: {e.__class__.__name__}: {e}\n")
 
 
+# ---------------------------------------------------------------- diagnostics
+
+# t8132 /arm-io/apcie register map, derived from the ADT dump in
+# m4_recon/pcie-nodes.txt. Kept in Python for post-init inspection so we do
+# not need to re-read the ADT on every run.
+#
+# Shared regs (indices 0..6):
+#   [0] ECAM         0x1cb0000000
+#   [1] RC           0x494000000
+#   [2] PHY (packed) 0x497000000   (phy_common = +0x4000, phy[0] = +0x8000)
+#   [3] PHY IP       0x497040000
+#   [4] AXI          0x496000000
+#   [5] ???          0x495046200
+#   [6] ???          0x495044000
+#
+# Per-port (6 regs each):
+#   [ 7..12] port 0  port_base=0x490028000  ltssm=0x49003c000  phy=0x497020000
+#   [13..18] port 1  port_base=0x491028000  ltssm=0x49103c000  phy=0x497024000
+#   [19..24] port 2  port_base=0x492028000  ltssm=0x49203c000  phy=0x497028000
+PHY_COMMON_BASE = 0x497000000 + 0x4000
+PORTS = [
+    {"name": "port0", "port_base": 0x490028000, "phy_base": 0x497020000},
+    {"name": "port1", "port_base": 0x491028000, "phy_base": 0x497024000},
+    {"name": "port2", "port_base": 0x492028000, "phy_base": 0x497028000},
+]
+
+
+def _safe_read32(addr):
+    try:
+        return f"0x{p.read32(addr):08x}"
+    except Exception as e:
+        return f"<{e.__class__.__name__}: {e}>"
+
+
+def dump_pcie_regs(buf):
+    buf.write("=== PCIe controller register dump ===\n")
+    buf.write(f"PHYCMN_CLK        @ 0x{PHY_COMMON_BASE:x} + 0x000 = "
+              f"{_safe_read32(PHY_COMMON_BASE + 0x000)}\n\n")
+
+    for p_ in PORTS:
+        pb = p_["port_base"]
+        phy = p_["phy_base"]
+        buf.write(f"--- {p_['name']} (port_base=0x{pb:x}, phy_base=0x{phy:x}) ---\n")
+        buf.write(f"  APPCLK      @ +0x800 = {_safe_read32(pb + 0x800)}\n")
+        buf.write(f"  STATUS      @ +0x804 = {_safe_read32(pb + 0x804)}\n")
+        buf.write(f"  LINKSTS     @ +0x208 = {_safe_read32(pb + 0x208)}\n")
+        buf.write(f"  T602X_RESET @ +0x82c = {_safe_read32(pb + 0x82c)}\n")
+        buf.write(f"  +0x104              = {_safe_read32(pb + 0x104)}\n")
+        buf.write(f"  PHY_CTRL    @ phy+0 = {_safe_read32(phy + 0x000)}\n\n")
+
+
 # ---------------------------------------------------------------- summary
 
 def summarize(out_path, buf, devices, nic):
@@ -331,6 +382,9 @@ def main():
         buf.write(f"\np.pcie_init raised: {e.__class__.__name__}: {e}\n\n")
         log(f"p.pcie_init raised: {e.__class__.__name__}: {e}")
         traceback.print_exc(limit=5)
+
+    log("dumping PCIe controller registers...")
+    try_(lambda: dump_pcie_regs(buf), "dump_pcie_regs")
 
     log(f"ECAM walk @ 0x{args.ecam_base:x} ...")
     devices = try_(lambda: ecam_walk(args.ecam_base, buf), "ecam_walk") or []
