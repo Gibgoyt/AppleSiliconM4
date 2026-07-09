@@ -409,27 +409,38 @@ def enable_nic(base, nic, buf):
 # ---------------------------------------------------------------- diagnostics
 
 # t8132 /arm-io/apcie register map, derived from the ADT dump in
-# m4_recon/pcie-nodes.txt. Kept in Python for post-init inspection so we do
-# not need to re-read the ADT on every run.
+# m4_recon/pcie-nodes.txt.  Total 25 reg entries: 7 shared + 6 per port * 3.
 #
 # Shared regs (indices 0..6):
-#   [0] ECAM         0x1cb0000000
-#   [1] RC           0x494000000
-#   [2] PHY (packed) 0x497000000   (phy_common = +0x4000, phy[0] = +0x8000)
-#   [3] PHY IP       0x497040000
-#   [4] AXI          0x496000000
-#   [5] ???          0x495046200
-#   [6] ???          0x495044000
+#   [0] ECAM         0x1cb0000000  sz 0x10000000
+#   [1] RC           0x494000000   sz 0x4000
+#   [2] PHY (packed) 0x497000000   sz 0x40000  (phy_common = +0x4000, phy[0] = +0x8000)
+#   [3] PHY IP       0x497040000   sz 0x20000
+#   [4] AXI          0x496000000   sz 0x1000000
+#   [5] ???          0x495046200   sz 0x4000
+#   [6] ???          0x495044000   sz 0x4000
 #
-# Per-port (6 regs each):
-#   [ 7..12] port 0  port_base=0x490028000  ltssm=0x49003c000  phy=0x497020000
-#   [13..18] port 1  port_base=0x491028000  ltssm=0x49103c000  phy=0x497024000
-#   [19..24] port 2  port_base=0x492028000  ltssm=0x49203c000  phy=0x497028000
+# Per-port (6 regs each) -- **t8132-specific 6-tuple**:
+#   [0]  0x49x028000  sz 0x8000   port_base                (m1n1 uses)
+#   [1]  0x49x03c000  sz 0x4000   port_ltssm_base          (m1n1 uses)
+#   [2]  0x497020000+ sz 0x4000   port_phy_base            (m1n1 uses)
+#   [3]  0x497048000+ sz 0x8000   ??? per-port PHY extra   (m1n1 IGNORES) NEW
+#   [4]  0x49x024000  sz 0x4000   port_intr2axi_base       (m1n1 uses)
+#   [5]  0x49x000000  sz 0xc000   ??? per-port ctrl block  (m1n1 IGNORES) NEW
+#
+# Ports 0/1/2 substitute x = 0/1/2 in the leading nibble for their block.
+RC_BASE = 0x494000000
 PHY_COMMON_BASE = 0x497000000 + 0x4000
 PORTS = [
-    {"name": "port0", "port_base": 0x490028000, "phy_base": 0x497020000},
-    {"name": "port1", "port_base": 0x491028000, "phy_base": 0x497024000},
-    {"name": "port2", "port_base": 0x492028000, "phy_base": 0x497028000},
+    {"name": "port0", "port_base": 0x490028000, "ltssm_base": 0x49003c000,
+     "phy_base": 0x497020000, "phy_extra": 0x497048000,
+     "intr2axi": 0x490024000, "ctrl_lo": 0x490000000},
+    {"name": "port1", "port_base": 0x491028000, "ltssm_base": 0x49103c000,
+     "phy_base": 0x497024000, "phy_extra": 0x497050000,
+     "intr2axi": 0x491024000, "ctrl_lo": 0x491000000},
+    {"name": "port2", "port_base": 0x492028000, "ltssm_base": 0x49203c000,
+     "phy_base": 0x497028000, "phy_extra": 0x497058000,
+     "intr2axi": 0x492024000, "ctrl_lo": 0x492000000},
 ]
 
 
@@ -440,21 +451,140 @@ def _safe_read32(addr):
         return f"<{e.__class__.__name__}: {e}>"
 
 
-def dump_pcie_regs(buf):
-    buf.write("=== PCIe controller register dump ===\n")
-    buf.write(f"PHYCMN_CLK        @ 0x{PHY_COMMON_BASE:x} + 0x000 = "
-              f"{_safe_read32(PHY_COMMON_BASE + 0x000)}\n\n")
+def dump_pcie_regs(buf, tag="post-init"):
+    buf.write(f"=== PCIe controller register dump ({tag}) ===\n")
+    buf.write(f"PHYCMN_CLK    @ 0x{PHY_COMMON_BASE:x} + 0x000 = "
+              f"{_safe_read32(PHY_COMMON_BASE + 0x000)}\n")
+    buf.write(f"RC_BASE       @ 0x{RC_BASE:x} + 0x03c = "
+              f"{_safe_read32(RC_BASE + 0x03c)}   "
+              f"(T602X APCIE sets to 0x1)\n\n")
 
     for p_ in PORTS:
         pb = p_["port_base"]
+        lt = p_["ltssm_base"]
         phy = p_["phy_base"]
-        buf.write(f"--- {p_['name']} (port_base=0x{pb:x}, phy_base=0x{phy:x}) ---\n")
-        buf.write(f"  APPCLK      @ +0x800 = {_safe_read32(pb + 0x800)}\n")
-        buf.write(f"  STATUS      @ +0x804 = {_safe_read32(pb + 0x804)}\n")
-        buf.write(f"  LINKSTS     @ +0x208 = {_safe_read32(pb + 0x208)}\n")
-        buf.write(f"  T602X_RESET @ +0x82c = {_safe_read32(pb + 0x82c)}\n")
-        buf.write(f"  +0x104              = {_safe_read32(pb + 0x104)}\n")
-        buf.write(f"  PHY_CTRL    @ phy+0 = {_safe_read32(phy + 0x000)}\n\n")
+        phyx = p_["phy_extra"]
+        ctrl = p_["ctrl_lo"]
+        buf.write(f"--- {p_['name']} port_base=0x{pb:x} ltssm=0x{lt:x} "
+                  f"phy=0x{phy:x} phy_extra=0x{phyx:x} ctrl_lo=0x{ctrl:x} ---\n")
+        # Known port_base registers.
+        buf.write(f"  APPCLK      @ port+0x800 = {_safe_read32(pb + 0x800)}\n")
+        buf.write(f"  STATUS      @ port+0x804 = {_safe_read32(pb + 0x804)}\n")
+        buf.write(f"  LINKSTS     @ port+0x208 = {_safe_read32(pb + 0x208)}\n")
+        buf.write(f"  T602X_RESET @ port+0x82c = {_safe_read32(pb + 0x82c)}\n")
+        buf.write(f"  +0x010                   = {_safe_read32(pb + 0x010)}   "
+                  f"(T602X APCIE writes 0x2)\n")
+        buf.write(f"  +0x104                   = {_safe_read32(pb + 0x104)}\n")
+        # PHY.
+        buf.write(f"  PHY_CTRL    @ phy+0x000  = {_safe_read32(phy + 0x000)}\n")
+        # LTSSM debug block (16 KB).
+        buf.write(f"  LTSSM +0x10              = {_safe_read32(lt + 0x10)}   "
+                  f"(T602X non-APCIE writes 0x2)\n")
+        buf.write(f"  LTSSM +0x14              = {_safe_read32(lt + 0x14)}   "
+                  f"(T602X non-APCIE writes 0x1)\n")
+        buf.write(f"  LTSSM +0x1c              = {_safe_read32(lt + 0x1c)}   "
+                  f"(T602X non-APCIE writes 0x4)\n")
+        buf.write(f"  LTSSM +0x20              = {_safe_read32(lt + 0x20)}   "
+                  f"(T602X non-APCIE sets bit 1)\n")
+        # NEW/UNKNOWN blocks -- READ ONLY, first few words.
+        buf.write(f"  phy_extra +0x000         = {_safe_read32(phyx + 0x000)}\n")
+        buf.write(f"  phy_extra +0x004         = {_safe_read32(phyx + 0x004)}\n")
+        buf.write(f"  phy_extra +0x008         = {_safe_read32(phyx + 0x008)}\n")
+        buf.write(f"  ctrl_lo   +0x000         = {_safe_read32(ctrl + 0x000)}\n")
+        buf.write(f"  ctrl_lo   +0x004         = {_safe_read32(ctrl + 0x004)}\n")
+        buf.write(f"  ctrl_lo   +0x008         = {_safe_read32(ctrl + 0x008)}\n")
+        buf.write(f"  ctrl_lo   +0x100         = {_safe_read32(ctrl + 0x100)}\n")
+        buf.write("\n")
+
+
+# ---------------------------------------------------------------- LTSSM kick
+
+def _linksts_decode(v):
+    """Human-readable decode of APCIE_PORT_LINKSTS bits we know about."""
+    bits = []
+    if v & (1 << 0):  bits.append("UP")
+    if v & (1 << 2):  bits.append("BUSY")
+    if v & (1 << 3):  bits.append("bit3")
+    if v & (1 << 6):  bits.append("L2")
+    if v & (1 << 9):  bits.append("bit9")
+    if v & (1 << 24): bits.append("bit24")
+    if v & (1 << 25): bits.append("bit25")
+    if v & (1 << 31): bits.append("bit31")
+    return "|".join(bits) if bits else "none"
+
+
+def try_ltssm_kick(buf, port_indices=(0, 2)):
+    """After p.pcie_init() has returned (with ports stuck at LINKSTS_BUSY),
+    try the LTSSM kick sequences that the T602X code paths use but the
+    T8140/t8132 path skips. Read LINKSTS before and after each write so we
+    can tell which one (if any) changed hardware state.
+
+    Sequences tried in order per port:
+      A) T602X APCIE:  rc_base+0x3c |= 0x1;  port_base+0x10 <- 0x2
+      B) T602X non-APCIE LTSSM kick + APPCLK bit8 clear
+    """
+    buf.write("\n=== LTSSM kick experiment (post-init) ===\n")
+    for i in port_indices:
+        p_ = PORTS[i]
+        pb = p_["port_base"]
+        lt = p_["ltssm_base"]
+        name = p_["name"]
+
+        def snap(label):
+            v = None
+            try:
+                v = p.read32(pb + 0x208)
+            except Exception as e:
+                buf.write(f"  {name} {label:22s} LINKSTS: <{e.__class__.__name__}: {e}>\n")
+                return
+            buf.write(f"  {name} {label:22s} LINKSTS = 0x{v:08x}  [{_linksts_decode(v)}]\n")
+
+        buf.write(f"\n--- {name} @ port_base=0x{pb:x} ltssm=0x{lt:x} ---\n")
+        snap("baseline")
+
+        # Sequence A: T602X APCIE-branch kick.
+        try:
+            buf.write(f"  seq A: set32(rc_base+0x3c, 0x1)  # 0x{RC_BASE + 0x3c:x}\n")
+            p.set32(RC_BASE + 0x3c, 0x1)
+            buf.write(f"  seq A: write32(port_base+0x10, 0x2)\n")
+            p.write32(pb + 0x10, 0x2)
+        except Exception as e:
+            buf.write(f"  seq A FAILED: {e.__class__.__name__}: {e}\n")
+        time.sleep(0.01)
+        snap("after seq A")
+
+        # Sequence B: T602X non-APCIE LTSSM kick.
+        try:
+            buf.write(f"  seq B: write32(ltssm+0x10, 0x2)\n")
+            p.write32(lt + 0x10, 0x2)
+            buf.write(f"  seq B: write32(ltssm+0x1c, 0x4)\n")
+            p.write32(lt + 0x1c, 0x4)
+            buf.write(f"  seq B: set32(ltssm+0x20, 0x2)\n")
+            p.set32(lt + 0x20, 0x2)
+            buf.write(f"  seq B: write32(ltssm+0x14, 0x1)\n")
+            p.write32(lt + 0x14, 0x1)
+            buf.write(f"  seq B: clear32(port_base+0x800, 0x100)  (APPCLK bit 8)\n")
+            p.clear32(pb + 0x800, 0x100)
+        except Exception as e:
+            buf.write(f"  seq B FAILED: {e.__class__.__name__}: {e}\n")
+        time.sleep(0.05)
+        snap("after seq B")
+
+        # Sequence C: cycle T602X_PORT_RESET (deassert, reassert, deassert)
+        # -- copies what m1n1 does for T602X APCIE at line 752-754.
+        try:
+            buf.write(f"  seq C: clear+set T602X_RESET (port_base+0x82c)\n")
+            p.clear32(pb + 0x82c, 0x1)
+            time.sleep(0.001)
+            p.set32(pb + 0x82c, 0x1)
+        except Exception as e:
+            buf.write(f"  seq C FAILED: {e.__class__.__name__}: {e}\n")
+        time.sleep(0.05)
+        snap("after seq C")
+
+        # Extended settle in case training is slow.
+        time.sleep(0.2)
+        snap("after 200ms settle")
 
 
 # ---------------------------------------------------------------- summary
@@ -505,6 +635,8 @@ def main():
                     help="skip the CLKREQ GPIO assert (A/B: matches previous run)")
     ap.add_argument("--clkreq-pin", type=int, default=CLKREQ_PIN,
                     help=f"gpio0 pin for NIC CLKREQ (default: {CLKREQ_PIN})")
+    ap.add_argument("--no-ltssm-kick", action="store_true",
+                    help="skip the post-init LTSSM kick experiment")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -546,8 +678,19 @@ def main():
         traceback.print_exc(limit=5)
 
     if pcie_init_ok:
-        log("dumping PCIe controller registers...")
-        try_(lambda: dump_pcie_regs(buf), "dump_pcie_regs")
+        log("dumping PCIe controller registers (post-init)...")
+        try_(lambda: dump_pcie_regs(buf, "post-init"), "dump_pcie_regs")
+
+        if args.no_ltssm_kick:
+            log("LTSSM kick skipped (--no-ltssm-kick)")
+            buf.write("\n=== LTSSM kick experiment (skipped) ===\n\n")
+        else:
+            log("trying LTSSM kick sequences on ports 0 and 2...")
+            try_(lambda: try_ltssm_kick(buf, port_indices=(0, 2)),
+                 "try_ltssm_kick")
+
+            log("dumping PCIe controller registers (post-kick)...")
+            try_(lambda: dump_pcie_regs(buf, "post-kick"), "dump_pcie_regs")
     else:
         log("skipping PCIe register dump (m1n1 is wedged, reads would time out)")
         buf.write("=== PCIe controller register dump ===\n"
