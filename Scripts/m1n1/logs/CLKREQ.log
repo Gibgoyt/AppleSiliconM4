@@ -1,0 +1,143 @@
+the commit after 7211b3a
+[ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/perstn.sh
+[sudo] password for ahmed: 
+m1n1 base: 0x100035e0000
+Fetching ADT (0x00068000 bytes)...
+[pcie_up] === Phase 3.3 pcie_up ===
+[pcie_up] SMC power on apcie fabric...
+[mgmt] Starting via message
+[mgmt] Supported versions 12 .. 12
+[mgmt] Adding endpoint 0x0
+[mgmt] Adding endpoint 0x1
+[mgmt] Adding endpoint 0x2
+[mgmt] Adding endpoint 0x3
+[mgmt] Adding endpoint 0x4
+[mgmt] Adding endpoint 0x8
+[mgmt] Adding endpoint 0x20
+Starting endpoint #0x1 (crash)
+Starting endpoint #0x2 (syslog)
+Starting endpoint #0x3 (kdebug)
+Starting endpoint #0x4 (iorep)
+Starting endpoint #0x8 (iorep)
+[crash] buf prealloc at dva 0x38de5c000
+[iorep] buf prealloc 0x38de61000 / 0x38de61000
+[iorep] start
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[mgmt] IOP power state is now 0x20
+[syslog] count 32, entrysize 96
+[syslog] buf prealloc at dva 0x38de60000
+[iorep] buf prealloc 0xff800038de66000 / 0xff800038de66000
+unknown message: 0x31f10428986d339 / 0x408c0000000008 (EP=0x8)
+unknown message: 0x40000209630790a / 0x309c0000000008 (EP=0x8)
+unknown message: 0x40000402572ab9b / 0x20ac0000000008 (EP=0x8)
+unknown message: 0x400006003168728 / 0x10bc0000000008 (EP=0x8)
+[mgmt] AP power state is now 0x20
+[mgmt] Startup complete
+Starting endpoint #0x20 (smcep)
+[smcep] Starting up
+[mgmt] Stopping via message
+[mgmt] AP power state is now 0x10
+[mgmt] IOP power state is now 0x10
+[pcie_up] CLKREQ assert on gpio0 pin 162...
+[pcie_up] CLKREQ: drive gpio0[162] low (assert)
+[pcie_up] PERSTN deassert on gpio0 pin 165...
+[pcie_up] PERSTN cold reset: drive gpio0[165] low
+[pcie_up] PERSTN: drive gpio0[165] high
+[pcie_up] p.pcie_init()...
+TTY> pcie: Initializing t8132 PCIe controller
+TTY> pcie: ADT uses 6 reg entries per port
+TTY> pcie: No common tunables
+TTY> pcie: Initializing port 0
+TTY> pcie: Port failed to become idle on /arm-io/apcie/pci-bridge0
+TTY> pcie: Initializing port 2
+TTY> pcie: Port failed to become idle on /arm-io/apcie/pci-bridge2
+TTY> pcie: Initialized controller 0
+TTY> pcie: Error getting node /arm-io/apcie0
+TTY> pcie: Error getting node /arm-io/apcie-ge0
+TTY> pcie: Error getting node /arm-io/apcie-ge1
+[pcie_up] p.pcie_init returned 0
+[pcie_up] dumping PCIe controller registers...
+[pcie_up] ECAM walk @ 0x1cb0000000 ...
+[pcie_up] wrote /tmp/m4-recon/nic-runtime.txt
+[pcie_up] done. Copy /tmp/m4-recon/nic-runtime.txt into m4_recon/ if it looks sane.
+
+--- /tmp/m4-recon/nic-runtime.txt ---
+# Phase 3 PCIe runtime dump
+
+**NIC not found** in the ECAM walk. Check the log below.
+
+## Full walk log
+
+```
+SMC smc_addr = 0x38c600000
+gP0d <- 0x800001  (apcie power)
+gP1a <- 1         (apcie-ge power)
+=== CLKREQ assert (gpio0 pin 162) ===
+gpio0[162] @ 0x39a000288: 0x00074a10 -> 0x00074a12 (read-back 0x00074a12)
+settled 1 ms after CLKREQ assert
+
+=== PERSTN deassert (gpio0 pin 165) ===
+gpio0 probe: read32(0x39a000000) = 0x008742c0
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a02 (read-back 0x00074a02)
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a03 (read-back 0x00074a03)
+settled 100 ms after deassert
+
+
+p.pcie_init() -> 0
+
+=== PCIe controller register dump ===
+PHYCMN_CLK        @ 0x497004000 + 0x000 = 0x80300001
+
+--- port0 (port_base=0x490028000, phy_base=0x497020000) ---
+  APPCLK      @ +0x800 = 0x00100101
+  STATUS      @ +0x804 = 0x00000005
+  LINKSTS     @ +0x208 = 0x8300020c
+  T602X_RESET @ +0x82c = 0x00000001
+  +0x104              = 0xfffffff0
+  PHY_CTRL    @ phy+0 = 0x2300066f
+
+--- port1 (port_base=0x491028000, phy_base=0x497024000) ---
+  APPCLK      @ +0x800 = 0x00100100
+  STATUS      @ +0x804 = 0x00000006
+  LINKSTS     @ +0x208 = 0x83000204
+  T602X_RESET @ +0x82c = 0x00000000
+  +0x104              = 0xfffffff0
+  PHY_CTRL    @ phy+0 = 0x23000070
+
+--- port2 (port_base=0x492028000, phy_base=0x497028000) ---
+  APPCLK      @ +0x800 = 0x00100101
+  STATUS      @ +0x804 = 0x00000005
+  LINKSTS     @ +0x208 = 0x83000204
+  T602X_RESET @ +0x82c = 0x00000001
+  +0x104              = 0xfffffff0
+  PHY_CTRL    @ phy+0 = 0x2300066f
+
+=== ECAM walk ===
+ecam_base = 0x1cb0000000
+
+--- root bus 0 ---
+  00:00.0: vacant (VID:DID = 0xffffffff)
+  00:01.0: vacant (VID:DID = 0xffffffff)
+  00:02.0: vacant (VID:DID = 0xffffffff)
+  00:03.0: vacant (VID:DID = 0xffffffff)
+  00:04.0: vacant (VID:DID = 0xffffffff)
+  00:05.0: vacant (VID:DID = 0xffffffff)
+  00:06.0: vacant (VID:DID = 0xffffffff)
+  00:07.0: vacant (VID:DID = 0xffffffff)
+
+=== enable NIC ===
+No class-0x02 device found.
+```
+[ahmed@admin AppleSiliconM4]$ 
+

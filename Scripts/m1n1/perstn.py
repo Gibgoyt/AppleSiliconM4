@@ -156,6 +156,16 @@ REG_GPIOx_LOCK          = 1 << 21
 #   function_perst = GPIO(phandle=120 -> gpio0, args=[165, 0])
 PERSTN_PIN = 165
 
+# NIC CLKREQ pin, from m4_recon/nic-adt.txt:
+#   function_clkreq = GPIO(phandle=120 -> gpio0, args=[162, 2])
+# args[1]=2 in the ADT would normally mean "peripheral function alt-2" (the
+# PCIe controller drives CLKREQ# itself). For this experiment we drive it as
+# a manual GPIO output LOW throughout the reset dance so the endpoint sees
+# CLKREQ# asserted (== refclk request active) before/during/after PERSTN
+# deassert. If this un-sticks port 2's LINKSTS BUSY, we know CLKREQ was the
+# missing piece; either way, the runtime dump lets us iterate.
+CLKREQ_PIN = 162
+
 
 def _gpio_reg_addr(pin):
     return _gpio0_base() + pin * 4
@@ -213,6 +223,21 @@ def deassert_perstn(buf, pin=PERSTN_PIN, cold_reset_us=10000, settle_ms=100):
     gpio_set_output(pin, 1, buf)
     time.sleep(settle_ms / 1e3)
     buf.write(f"settled {settle_ms} ms after deassert\n\n")
+
+
+def assert_clkreq(buf, pin=CLKREQ_PIN, settle_ms=1):
+    """Drive CLKREQ# (gpio0 pin `pin`) low so the endpoint has a valid refclk
+    request asserted before we release PERSTN#. Called BEFORE deassert_perstn.
+
+    Left in this state through pcie_init() so the endpoint continues to see
+    CLKREQ# asserted while LTSSM trains. If iteration N+1 needs the pin muxed
+    back to peripheral function, we'll do that after link-up.
+    """
+    buf.write(f"=== CLKREQ assert (gpio0 pin {pin}) ===\n")
+    log(f"CLKREQ: drive gpio0[{pin}] low (assert)")
+    gpio_set_output(pin, 0, buf)
+    time.sleep(settle_ms / 1e3)
+    buf.write(f"settled {settle_ms} ms after CLKREQ assert\n\n")
 
 
 # ---------------------------------------------------------------- ECAM walk
@@ -476,6 +501,10 @@ def main():
                     help="skip the PERSTN GPIO toggle (debug: matches pcie_up.py)")
     ap.add_argument("--perstn-pin", type=int, default=PERSTN_PIN,
                     help=f"gpio0 pin for NIC PERSTN (default: {PERSTN_PIN})")
+    ap.add_argument("--no-clkreq", action="store_true",
+                    help="skip the CLKREQ GPIO assert (A/B: matches previous run)")
+    ap.add_argument("--clkreq-pin", type=int, default=CLKREQ_PIN,
+                    help=f"gpio0 pin for NIC CLKREQ (default: {CLKREQ_PIN})")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -487,6 +516,14 @@ def main():
 
     log("SMC power on apcie fabric...")
     try_(lambda: smc_power(buf), "SMC power")
+
+    if args.no_clkreq:
+        log("CLKREQ assert skipped (--no-clkreq)")
+        buf.write("=== CLKREQ assert (skipped) ===\n\n")
+    else:
+        log(f"CLKREQ assert on gpio0 pin {args.clkreq_pin}...")
+        try_(lambda: assert_clkreq(buf, pin=args.clkreq_pin),
+             "assert_clkreq")
 
     if args.no_perstn:
         log("PERSTN toggle skipped (--no-perstn)")
