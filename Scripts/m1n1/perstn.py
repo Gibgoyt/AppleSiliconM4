@@ -121,9 +121,21 @@ def smc_power(buf):
 
 # ---------------------------------------------------------------- PERSTN GPIO
 
-# gpio0 controller (AAPL,phandle=120 in the t8132 ADT) lives at 0x19A000000,
+# gpio0 controller (AAPL,phandle=120 in the t8132 ADT) lives at 0x19a000000,
 # 224 pins. Each pin has one 32-bit register at (gpio_base + pin*4).
-GPIO0_BASE = 0x19a000000
+#
+# The physical address 0x19a000000 is NOT in m1n1's direct MMU map on
+# t8132: mmu_remap_ranges only adds the ADT `pmap-io-ranges` entries
+# (ECAM, DART carveouts, ...), and gpio0 is not in that list. Reading
+# 0x19a000000 directly triggers an "Exception: SYNC" and wedges m1n1.
+#
+# m1n1 does provide full 32 GB MMIO aliases at 0xc/d/e/f000000000
+# (see src/memory.c: mmu_add_default_mappings). Use the 0xf alias
+# (Device-nGnRE) — same memory type gpio0 needs — so no m1n1 change
+# is required.
+GPIO0_BASE_PHYS = 0x19a000000
+GPIO0_MMIO_ALIAS = 0xf000000000
+GPIO0_BASE = GPIO0_MMIO_ALIAS | GPIO0_BASE_PHYS
 GPIO0_PIN_COUNT = 224
 
 # Bit layout of the per-pin register, verbatim from Linux
@@ -168,8 +180,9 @@ def gpio_set_output(pin, value, buf=None):
     p.write32(addr, new)
     read_back = p.read32(addr)
     if buf is not None:
-        buf.write(f"gpio0[{pin}] @ 0x{addr:x}: 0x{old:08x} -> 0x{new:08x} "
-                  f"(read-back 0x{read_back:08x})\n")
+        phys = GPIO0_BASE_PHYS + pin * 4
+        buf.write(f"gpio0[{pin}] @ phys 0x{phys:x} (via alias 0x{addr:x}): "
+                  f"0x{old:08x} -> 0x{new:08x} (read-back 0x{read_back:08x})\n")
     return old, new, read_back
 
 
