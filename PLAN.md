@@ -81,77 +81,99 @@ and burns a full power-cycle.
 ## Phase 3 — PCIe reach (Session 2)
 
 **Determined by Phase 1: we are on the §7B branch** (m1n1 needs
-patching before `pcie_init` can bring up the M4's PCIe). The scope
-is now concrete.
+patching before `pcie_init` can bring up the M4's PCIe).
 
-### 3.1 Patch m1n1's src/pcie.c
+**Backport strategy: wholesale replace.** The sibling fork
+`~/Projects/AsahiLinux/m4n1/` diverges from `m4/m1n1` in 30
+source files. Rather than cherry-pick the T8122 slice out of
+`pcie.c` and hope we caught every quirk, we lift the entire files
+`pcie.c` + `pmgr.c` verbatim from `m4n1`, then add just the
+`apcie,t8132` clause. Rationale:
 
-Reference: `~/Projects/AsahiLinux/m4n1/src/pcie.c` — the sibling
-fork of `m4/m1n1` already has T8122/T6030/T6031 support. Our tree
-`~/Projects/AsahiLinux/m4/m1n1/` does NOT. Backport, then extend.
+- `m4n1`'s tree is a known-boots superset — copying whole files
+  removes the chance of a missed quirk gate.
+- The T6031 code paths that come along are inert on T8132 (the
+  compat string never matches).
+- `pmgr.c` **must** come along: T8132's ADT uses the new
+  `ps-groups` format handled by `pmgr_use_group_and_offset`,
+  which `pcie_init_controller` reaches through
+  `pmgr_adt_power_enable`. Without the pmgr backport, PCIe
+  bring-up fails even with a correct `pcie.c`.
 
-Concrete additions to `~/Projects/AsahiLinux/m4/m1n1/src/pcie.c`:
+### 3.1 File-level backports
 
-1. **New enum values** in `enum apcie_type`:
-   `APCIE_T8122 = 2, APCIE_T6031 = 3`.
-2. **New field** in `struct reg_info`: `enum apcie_type compat;`
-   (m4n1's fork uses this to gate T8122-specific quirks).
-3. **New `regs_t8122` struct**: `shared_reg_count = 7,
-   config_idx = 0, rc_idx = 1, phy_common_idx = 2, phy_idx = 2,
-   phy_ip_idx = 3, axi_idx = 4, fuse_idx = 5.` (Also add
-   `regs_t6031` for completeness even though we don't hit it —
-   copy verbatim from m4n1.)
-4. **New else-if clauses** in `pcie_init_controller` for
-   `apcie,t8122`, `apcie,t6030`, `apcie,t6031`, `apcie,t8132`. All
-   four point at `regs_t8122` (t6031 points at `regs_t6031`).
-   `fuse_bits = NULL` for all four.
-5. **Any T8122-specific behavior** guarded by `state->pcie_regs->
-   compat == APCIE_T8122` (search m4n1's pcie.c for
-   `APCIE_T8122` — copy every such block).
+1. **`src/pcie.c`** — copy `~/Projects/AsahiLinux/m4n1/src/pcie.c`
+   over `~/Projects/AsahiLinux/m4/m1n1/src/pcie.c` verbatim.
+2. **`src/pmgr.c`** — copy `~/Projects/AsahiLinux/m4n1/src/pmgr.c`
+   over `~/Projects/AsahiLinux/m4/m1n1/src/pmgr.c` verbatim.
+3. **Add `apcie,t8132` clause** to the freshly-copied pcie.c,
+   after the `apcie,t8122` else-if:
 
-Phase 1 recon proved the fit: M4's `/arm-io/apcie` has 25 reg
-entries and `#ports = 3`, matching `regs_t8122`'s shared=7 + 3×6.
+   ```c
+   } else if (adt_is_compatible(adt, adt_offset, "apcie,t8132")) {
+       fuse_bits = NULL;
+       state->pcie_regs = &regs_t8122;
+       printf("pcie: Initializing t8132 PCIe controller\n");
+   ```
 
-**Out of scope for this patch:** `apciec,t8132` (the per-slot
-Thunderbolt RCs). The NIC lives on `apcie`, not `apciec`. Adding
-apciec support is deferred until we actually need Thunderbolt.
+   Phase 1 recon proved the fit: M4's `/arm-io/apcie` has 25 reg
+   entries and `#ports = 3`, matching `regs_t8122`'s
+   `shared_reg_count = 7` + 3×6.
+
+**Dependency check (verified 2026-07-09):**
+- `pcie.h`, `pmgr.h` — identical between the two trees.
+- `adt.h` — m4n1 only *adds* `ADT_FOREACH_PROPERTY` + helpers
+  (additive); pcie.c/pmgr.c don't use them.
+- `utils.h` — one struct field renamed (`cyc_ovrd` →
+  `apple_sysregs_unlocked`); pcie.c/pmgr.c don't reference it.
+
+**Out of scope for this patch:** `apciec,t8132` (per-slot
+Thunderbolt RCs). The NIC lives on `apcie`, not `apciec`.
 
 ### 3.2 Rebuild + re-enroll
 
 ```bash
 cd ~/Projects/AsahiLinux/m4/m1n1
-make -j$(nproc)                     # produces build/m1n1.macho
-# Re-enroll per your Notes/3.md pattern:
-#   sudo kmutil configure-boot -c build/m1n1.macho \
-#       --volume-root /Volumes/<M4-target> ...
+cp build/m1n1.macho build/m1n1.macho.prepatch     # rollback binary
+PATH="$HOME/.cargo/bin:$PATH" make -j$(nproc)     # -> build/m1n1.macho
+cp build/m1n1.macho /tmp/m4-serve/m1n1.macho      # for HTTP fetch
 ```
 
-You (Ahmed) execute the enrollment on the M4 side per your
-established workflow. Boot the M4; observe:
+Ahmed executes the M4-side enrollment per Notes/3.md:200-221:
+`curl` the macho, `kmutil configure-boot -c /tmp/m1n1.macho -v
+/Volumes/Macintosh\ HD`, reboot.
+
+Success signal on the next boot log:
 
     TTY> pcie: Initializing t8132 PCIe controller
     (instead of "Unsupported compatible")
 
-### 3.3 pcie_up.py — the actual PCIe bring-up
+### 3.3 pcie_up.py — actual PCIe bring-up
 
 - `Scripts/m1n1/pcie_up.py` — SMC power (same three writes as
-  recon `--pcie`), `p.pcie_init()`, ECAM walk of
-  `/arm-io/apcie` reg[0] = `0x1cb0000000` looking for class-0x02.
-- Enable MEM+BM in the NIC's `+0x04` command register.
-- Write `/tmp/m4-recon/nic-runtime.txt` with BDF, VID:DID, BAR0.
+  `recon.py --pcie`), `p.pcie_init()`, then a **full ECAM walk**
+  of `/arm-io/apcie` (reg[0] = `0x1cb0000000`) covering BDF
+  `00:00.0` and each of the three `pci-bridge{0,1,2}` downstream
+  buses. Logs every non-`0xffffffff` VID:DID and class code.
+- For the class-0x02 device on `pci-bridge2`'s downstream bus:
+  enable MEM+BM (config+0x04 |= 0x6), read BAR0.
+- Every ECAM read wrapped in try/except so a partial link-up
+  leaves `/tmp/m4-recon/nic-runtime.txt` behind instead of a
+  silent SLVERR reboot.
 
 **M3:** `p.read32(bar0)` returns a plausible non-`0xffffffff`
 value. `nic-runtime.txt` committed to `m4_recon/` closes out
-PLAN.md Phase 1's deferred Q2/Q3.
+`m4_recon/recon-summary.md` Q2/Q3.
 
 ### 3.4 Rollback path
 
-If the m1n1 patch breaks the boot (unlikely — the patch adds
-compat clauses, doesn't change existing paths):
+If the patched m1n1 breaks boot:
 
-- Long-press power off, boot recovery.
-- Re-enroll the previous m1n1.macho binary (keep a copy before
-  overwriting).
+- Long-press power off → 1TR.
+- `curl -o /tmp/m1n1.macho.prepatch http://192.168.0.251:8080/…`
+  and `kmutil configure-boot -c /tmp/m1n1.macho.prepatch -v
+  /Volumes/Macintosh\ HD`.
+- Reboot into the previous known-good m1n1.
 
 ---
 
