@@ -893,6 +893,81 @@ def probe_phase0_pmgr_state(apcie, buf):
     buf.write("\n")
 
 
+def _walk_pmgr_parents(dev_by_idx, dev, visited, depth, buf, indent):
+    """Recursively read PS state for each parent of `dev`.
+
+    ZERO apcie MMIO. Only reads PMGR PS registers via
+    _read_pmgr_gate_state, which is safe on all boots. Cycle-guarded via
+    `visited` (set of gate IDs already walked in this chain) and
+    depth-bounded to 10 to survive malformed ADTs.
+    """
+    if depth > 10:
+        buf.write(f"{indent}(depth limit reached)\n")
+        return
+    try:
+        parents = u.adt.pmgr_dev_get_parents(dev)
+    except Exception as e:
+        buf.write(f"{indent}<parents accessor failed: "
+                  f"{e.__class__.__name__}: {e}>\n")
+        return
+    any_parent = False
+    for pid in parents:
+        pid = int(pid)
+        if pid == 0:
+            continue
+        any_parent = True
+        if pid in visited:
+            buf.write(f"{indent}parent {pid}: <cycle -- already visited>\n")
+            continue
+        visited.add(pid)
+        pdev = dev_by_idx.get(pid)
+        if pdev is None:
+            buf.write(f"{indent}parent {pid}: <NOT FOUND in pmgr.devices>\n")
+            continue
+        _read_pmgr_gate_state(dev_by_idx, pid, buf, indent=indent)
+        _walk_pmgr_parents(dev_by_idx, pdev, visited, depth + 1, buf,
+                           indent=indent + "  ")
+    if not any_parent and depth == 1:
+        buf.write(f"{indent}(no parents)\n")
+
+
+def probe_phase0_5_parents(apcie, buf):
+    """Phase 0.5 -- PMGR parent-chain readout for every apcie gate.
+
+    ZERO apcie MMIO. Only touches /arm-io/pmgr registers. Explains why
+    m1n1's pmgr_set_mode_recursive() may wedge inside
+    pmgr_adt_power_enable('/arm-io/apcie'): the recursive walk RMWs
+    every ancestor's PS register. If any ancestor is in a state where
+    the RMW-then-poll blocks (e.g. an unclocked PMGR clock domain that
+    only a downstream helper knows how to raise), m1n1 hangs inside
+    poll32() -- exactly the "TTY> Exception: SYNC" wedge we see.
+
+    Output layout: for each apcie gate, dump its state (already covered
+    in Phase 0) then walk each parent chain, printing PS state at every
+    level with increasing indent.
+    """
+    buf.write("=== Phase 0.5: PMGR parent-chain readout ===\n")
+    dev_by_idx = getattr(apcie, "phase0_dev_by_idx", None)
+    if dev_by_idx is None:
+        buf.write("  ERROR: Phase 0 did not populate dev_by_idx; skipping\n\n")
+        return
+    for gate in apcie.power_gates:
+        dev = dev_by_idx.get(int(gate))
+        if dev is None:
+            buf.write(f"  gate {gate}: not found in pmgr.devices; skipping\n")
+            continue
+        name = _decode_pmgr_name(dev)
+        buf.write(f"  --- gate {gate} ({name!r}) parent chain ---\n")
+        visited = {int(gate)}
+        try:
+            _walk_pmgr_parents(dev_by_idx, dev, visited, 1, buf,
+                               indent="    ")
+        except Exception as e:
+            buf.write(f"    ERROR: parent walk failed: "
+                      f"{e.__class__.__name__}: {e}\n")
+    buf.write("\n")
+
+
 def probe_phaseA_preinit_single(apcie, buf, timeout=0.2):
     """Phase A -- pre-PMGR MMIO reachability INFERENCE (no MMIO).
 
@@ -2250,10 +2325,35 @@ def main():
              "probe_phase0_pmgr_state")
         flush("phase0-pmgr-state")
 
+        log("Phase 0.5: PMGR parent-chain readout (no apcie MMIO)...")
+        try_(lambda: probe_phase0_5_parents(apcie, buf),
+             "probe_phase0_5_parents")
+        flush("phase0.5-parents")
+
         log("Phase A: single pre-PMGR probe at phy_ip_base+0...")
         try_(lambda: probe_phaseA_preinit_single(apcie, buf, timeout=timeout),
              "probe_phaseA_preinit_single")
         flush("phaseA-preinit-single")
+
+        # Phase D/E run BEFORE Phase B/C so the direct poke can bypass
+        # a wedge in m1n1's own pmgr_adt_power_enable helper. If both
+        # --gate-poke and --pmgr-enable are set we still get D+E's
+        # output even if B subsequently wedges m1n1.
+        if args.gate_poke:
+            log("Phase D: direct PS-register poke for gate 151...")
+            try_(lambda: probe_phaseD_gate151_poke(apcie, buf),
+                 "probe_phaseD_gate151_poke")
+            flush("phaseD-gate151-poke")
+
+            if args.phy_ip_probe:
+                log("Phase E: shared-PLL + port-1 slice probe...")
+                try_(lambda: probe_phaseE_port1_slice(apcie, buf, timeout=timeout),
+                     "probe_phaseE_port1_slice")
+                flush("phaseE-port1-slice")
+        elif args.phy_ip_probe:
+            log("--phy-ip-probe requested without --gate-poke; skipping Phase E")
+            buf.write("\n=== Phase E: skipped (--phy-ip-probe needs "
+                      "--gate-poke) ===\n\n")
 
         if args.pmgr_enable:
             log("Phase B: p.pmgr_adt_power_enable('/arm-io/apcie') + shared MMIO...")
@@ -2270,22 +2370,6 @@ def main():
             log("--pmgr-per-port requested without --pmgr-enable; skipping Phase C")
             buf.write("\n=== Phase C: skipped (--pmgr-per-port needs "
                       "--pmgr-enable) ===\n\n")
-
-        if args.gate_poke:
-            log("Phase D: direct PS-register poke for gate 151...")
-            try_(lambda: probe_phaseD_gate151_poke(apcie, buf),
-                 "probe_phaseD_gate151_poke")
-            flush("phaseD-gate151-poke")
-
-            if args.phy_ip_probe:
-                log("Phase E: shared-PLL + port-1 slice probe...")
-                try_(lambda: probe_phaseE_port1_slice(apcie, buf, timeout=timeout),
-                     "probe_phaseE_port1_slice")
-                flush("phaseE-port1-slice")
-        elif args.phy_ip_probe:
-            log("--phy-ip-probe requested without --gate-poke; skipping Phase E")
-            buf.write("\n=== Phase E: skipped (--phy-ip-probe needs "
-                      "--gate-poke) ===\n\n")
 
     pcie_init_ok = False
     if args.no_pcie_init:
