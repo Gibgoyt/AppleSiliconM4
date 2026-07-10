@@ -1304,55 +1304,211 @@ def _poll_ps_actual(ps_addr, want, timeout_ms=100):
             return False, final, (time.monotonic() - started) * 1000.0
 
 
-def probe_phaseD_gate151_poke(apcie, buf, timeout_ms=100):
-    """Phase D -- direct PS-register poke for APCIE_PHY_SW (gate 151).
+def _pmgr_direct_poke_gate(dev_by_idx, gate_idx, buf, indent="  ",
+                            timeout_ms=100):
+    """Poke ONE PMGR gate's PS register to ACTIVE. Idempotent.
 
-    Mirrors m1n1's `pmgr_set_mode()` in src/pmgr.c:84-96 verbatim: clear
-    AUTO_ENABLE + WAS_CLKGATED + WAS_PWRGATED + PS_TARGET, then set
-    PS_TARGET = 0xf (ACTIVE), poll PS_ACTUAL until 0xf.
+    Mirrors m1n1's `pmgr_set_mode()` in src/pmgr.c:84-96: clear
+    AUTO_ENABLE + sticky bits + PS_TARGET, set PS_TARGET=0xf, poll
+    PS_ACTUAL. If that doesn't lift ACTUAL, escalate by raising the
+    PS_AUTO floor to 0xf.
 
-    If gate 151 is already fully ACTIVE (actual == 0xf), we skip the
-    write and just log confirmation -- this is the common warm-path case
-    after m1n1's boot-time cleanup already brought the gate up.
-
-    Otherwise we do two escalating writes:
-      1. mask32(mask, PS_TARGET=0xf) -- same as m1n1's pmgr_set_mode.
-      2. Additionally clear PS_AUTO (bits 27:24 <- 0xf i.e. auto-target
-         ACTIVE) as belt-and-braces for the MIN-lockout case where
-         PS_AUTO is holding ACTUAL below TARGET.
-    Each write is followed by a bounded poll. Reports first-hit
-    convergence and full final decoded state.
-
-    Sets `apcie.phaseD_gate151_active` (bool) for Phase E gating.
+    Fast-return (True, 0) on virtual gates (nothing to poke) and gates
+    that are already ACTIVE (actual==0xf). Returns (converged, exc_delta)
+    on real gates we actually wrote to; exc_delta is None if the
+    exc_count read failed.
     """
-    buf.write("=== Phase D: direct PS-register poke for gate 151 "
+    dev = dev_by_idx.get(int(gate_idx))
+    if dev is None:
+        buf.write(f"{indent}gate {gate_idx}: NOT FOUND in pmgr.devices\n")
+        return False, None
+    name = _decode_pmgr_name(dev)
+
+    if dev.flags.no_ps:
+        buf.write(f"{indent}gate {gate_idx} ({name!r}): VIRTUAL, no PS "
+                  f"reg to poke; skipping\n")
+        return True, 0
+
+    try:
+        ps_addr = u.adt.pmgr_dev_get_addr(dev)
+    except Exception as e:
+        buf.write(f"{indent}gate {gate_idx} ({name!r}): pmgr_dev_get_addr "
+                  f"failed: {e.__class__.__name__}: {e}\n")
+        return False, None
+
+    try:
+        raw = p.read32(ps_addr)
+    except Exception as e:
+        buf.write(f"{indent}gate {gate_idx} ({name!r}) ps@0x{ps_addr:x}: "
+                  f"initial read failed: {e.__class__.__name__}: {e}\n")
+        return False, None
+    actual = (raw & PMGR_PS_ACTUAL_MASK) >> 4
+    if actual == PMGR_PS_ACTIVE:
+        buf.write(f"{indent}gate {gate_idx} ({name!r}) ps@0x{ps_addr:x}: "
+                  f"already ACTIVE (raw=0x{raw:08x})\n")
+        return True, 0
+
+    buf.write(f"{indent}gate {gate_idx} ({name!r}) ps@0x{ps_addr:x}: "
+              f"initial raw=0x{raw:08x} ({_decode_ps_state(raw)})\n")
+
+    try:
+        exc_before = p.get_exc_count()
+    except Exception:
+        exc_before = None
+
+    # Write #1: mirror m1n1/src/pmgr.c pmgr_set_mode() exactly.
+    clear1 = PMGR_AUTO_ENABLE | PMGR_WAS_CLKGATED | PMGR_WAS_PWRGATED | \
+             PMGR_PS_TARGET_MASK
+    set1 = PMGR_PS_ACTIVE
+    buf.write(f"{indent}  write #1 (pmgr_set_mode): "
+              f"mask32(0x{ps_addr:x}, clear=0x{clear1:08x}, "
+              f"set=0x{set1:08x})\n")
+    try:
+        p.mask32(ps_addr, clear1, set1)
+    except Exception as e:
+        buf.write(f"{indent}  ERROR: mask32 #1 failed: "
+                  f"{e.__class__.__name__}: {e}\n")
+        return False, None
+
+    converged, final, elapsed_ms = _poll_ps_actual(
+        ps_addr, PMGR_PS_ACTIVE, timeout_ms=timeout_ms)
+    buf.write(f"{indent}  after #1: raw=0x{final:08x} "
+              f"({_decode_ps_state(final)}) "
+              f"[{elapsed_ms:.1f} ms, "
+              f"{'converged' if converged else 'TIMEOUT'}]\n")
+
+    if not converged:
+        # Write #2: raise PS_AUTO floor to ACTIVE. Some blocks refuse to
+        # lift ACTUAL above PS_AUTO regardless of TARGET.
+        clear2 = PMGR_PS_AUTO_MASK
+        set2 = (PMGR_PS_ACTIVE << 24)
+        buf.write(f"{indent}  write #2 (raise PS_AUTO floor): "
+                  f"mask32(0x{ps_addr:x}, clear=0x{clear2:08x}, "
+                  f"set=0x{set2:08x})\n")
+        try:
+            p.mask32(ps_addr, clear2, set2)
+        except Exception as e:
+            buf.write(f"{indent}  ERROR: mask32 #2 failed: "
+                      f"{e.__class__.__name__}: {e}\n")
+            return False, None
+        converged, final, elapsed_ms = _poll_ps_actual(
+            ps_addr, PMGR_PS_ACTIVE, timeout_ms=timeout_ms)
+        buf.write(f"{indent}  after #2: raw=0x{final:08x} "
+                  f"({_decode_ps_state(final)}) "
+                  f"[{elapsed_ms:.1f} ms, "
+                  f"{'converged' if converged else 'TIMEOUT'}]\n")
+
+    delta = None
+    if exc_before is not None:
+        try:
+            delta = p.get_exc_count() - exc_before
+        except Exception:
+            pass
+    return converged, delta
+
+
+def _pmgr_direct_poke_chain(dev_by_idx, gate_idx, buf, indent="  ",
+                             timeout_ms=100, _visited=None, _depth=0):
+    """Parents-first PMGR poke: bring every ancestor of `gate_idx` (and
+    `gate_idx` itself) to PS_ACTUAL=0xf.
+
+    Recurses parents-first so a real gate is only poked after every
+    ancestor is confirmed ACTIVE. Cycle-guarded via _visited; depth
+    bounded to 10. Uses the same fast-path as m1n1's pmgr helpers: if a
+    real gate already reads actual=0xf, assume its parents are up too
+    and skip the parent walk.
+
+    Returns (all_active, failing_gate_or_None). On the first ancestor
+    that refuses to converge, returns immediately -- the child is never
+    poked (its parent is off, poking the child is unsafe or pointless).
+    """
+    if _visited is None:
+        _visited = set()
+    if _depth > 10:
+        buf.write(f"{indent}(depth limit reached at gate {gate_idx})\n")
+        return False, int(gate_idx)
+    if int(gate_idx) in _visited:
+        return True, None
+    _visited.add(int(gate_idx))
+
+    dev = dev_by_idx.get(int(gate_idx))
+    if dev is None:
+        buf.write(f"{indent}gate {gate_idx}: NOT FOUND in pmgr.devices\n")
+        return False, int(gate_idx)
+
+    # Fast path: real, non-virtual, already ACTIVE -> parents are up too.
+    if not dev.flags.no_ps:
+        try:
+            ps_addr = u.adt.pmgr_dev_get_addr(dev)
+            raw = p.read32(ps_addr)
+            if ((raw & PMGR_PS_ACTUAL_MASK) >> 4) == PMGR_PS_ACTIVE:
+                return True, None
+        except Exception:
+            # Fall through and try the poke path anyway; the write will
+            # fail loudly if the PS reg genuinely can't be reached.
+            pass
+
+    # Walk parents first.
+    try:
+        parents = u.adt.pmgr_dev_get_parents(dev)
+    except Exception as e:
+        buf.write(f"{indent}gate {gate_idx}: parents accessor failed: "
+                  f"{e.__class__.__name__}: {e}\n")
+        return False, int(gate_idx)
+    for pid in parents:
+        pid = int(pid)
+        if pid == 0 or pid == int(gate_idx):
+            continue
+        ok, failing = _pmgr_direct_poke_chain(
+            dev_by_idx, pid, buf, indent + "  ", timeout_ms,
+            _visited, _depth + 1)
+        if not ok:
+            return False, failing
+
+    # Now poke this gate; its parents are all confirmed ACTIVE above.
+    converged, _delta = _pmgr_direct_poke_gate(
+        dev_by_idx, gate_idx, buf, indent, timeout_ms)
+    if not converged:
+        return False, int(gate_idx)
+    return True, None
+
+
+def probe_phaseD_gate151_poke(apcie, buf, timeout_ms=100):
+    """Phase D -- parents-first PS-register poke ending at APCIE_PHY_SW
+    (gate 151).
+
+    Previous versions only poked gate 151 itself. On the Mac16,10 J773g
+    cold-boot handoff we observed, gate 151 came up fine (actual 0x4 ->
+    0xf in 0.4 ms) but the very first phy_ip MMIO read in Phase E
+    SYNC-aborted and wedged m1n1 with no recovery. Phase 0.5's parent
+    chain readout showed the root cause: gate 151's parent
+    APCIE_SYS_ST (150) was stuck OFF with target=0xf, actual=0x0,
+    auto_enable=1, ps_auto=0x0. The shared apcie phy_ip window lives
+    behind the ST-side power domain that gate 150 gates, so any read
+    into it AXI-stalled until m1n1 gave up.
+
+    Fix: walk gate 151's parent chain via u.adt.pmgr_dev_get_parents(),
+    parents-first, and apply the same two-write escalation
+    (pmgr_set_mode + raise PS_AUTO floor) to any ancestor whose
+    PS_ACTUAL != 0xf. gate 151 itself is only touched after every
+    ancestor is confirmed ACTIVE.
+
+    apcie.phaseD_gate151_active is only set True if the ENTIRE chain
+    converged. apcie.phaseD_failing_gate holds the id of the first
+    refusing gate (None on success) so Phase E can log why it bailed.
+    """
+    buf.write("=== Phase D: parents-first PS poke ending at gate 151 "
               "(APCIE_PHY_SW) ===\n")
     apcie.phaseD_gate151_active = False
+    apcie.phaseD_failing_gate = None
 
     dev_by_idx = getattr(apcie, "phase0_dev_by_idx", None)
     if dev_by_idx is None:
         _pmgr, dev_by_idx = _load_pmgr_devices(buf)
         if dev_by_idx is None:
-            buf.write("  ERROR: cannot load pmgr devices; bailing Phase D\n\n")
+            buf.write("  ERROR: cannot load pmgr devices; "
+                      "bailing Phase D\n\n")
             return
-
-    dev = dev_by_idx.get(_GATE_APCIE_PHY_SW)
-    if dev is None:
-        buf.write(f"  ERROR: gate {_GATE_APCIE_PHY_SW} not present in "
-                  f"pmgr.devices; bailing Phase D\n\n")
-        return
-    if dev.flags.no_ps:
-        buf.write(f"  ERROR: gate {_GATE_APCIE_PHY_SW} is VIRTUAL "
-                  f"(unexpected); bailing Phase D\n\n")
-        return
-
-    try:
-        ps_addr = u.adt.pmgr_dev_get_addr(dev)
-    except Exception as e:
-        buf.write(f"  ERROR: pmgr_dev_get_addr failed: "
-                  f"{e.__class__.__name__}: {e}\n\n")
-        return
-    buf.write(f"  ps_addr = 0x{ps_addr:x}\n")
 
     try:
         exc_before = p.get_exc_count()
@@ -1361,81 +1517,30 @@ def probe_phaseD_gate151_poke(apcie, buf, timeout_ms=100):
                   f"{e.__class__.__name__}: {e}\n\n")
         return
 
-    try:
-        raw = p.read32(ps_addr)
-    except Exception as e:
-        buf.write(f"  ERROR: initial ps read failed: "
-                  f"{e.__class__.__name__}: {e}\n\n")
-        return
-    target = raw & PMGR_PS_TARGET_MASK
-    actual = (raw & PMGR_PS_ACTUAL_MASK) >> 4
-    buf.write(f"  initial: raw=0x{raw:08x} target=0x{target:x} "
-              f"actual=0x{actual:x} ({_decode_ps_state(raw)})\n")
-
-    if actual == PMGR_PS_ACTIVE:
-        buf.write("  gate already fully ACTIVE; skipping poke.\n\n")
-        apcie.phaseD_gate151_active = True
-        return
-
-    # Write #1: mirror m1n1/src/pmgr.c pmgr_set_mode() exactly.
-    clear1 = PMGR_AUTO_ENABLE | PMGR_WAS_CLKGATED | PMGR_WAS_PWRGATED | \
-             PMGR_PS_TARGET_MASK
-    set1 = PMGR_PS_ACTIVE
-    buf.write(f"  write #1 (pmgr_set_mode): mask32(0x{ps_addr:x}, "
-              f"clear=0x{clear1:08x}, set=0x{set1:08x})\n")
-    try:
-        p.mask32(ps_addr, clear1, set1)
-    except Exception as e:
-        buf.write(f"  ERROR: mask32 #1 failed: "
-                  f"{e.__class__.__name__}: {e}\n\n")
-        return
-
-    converged, final, elapsed_ms = _poll_ps_actual(
-        ps_addr, PMGR_PS_ACTIVE, timeout_ms=timeout_ms)
-    target = final & PMGR_PS_TARGET_MASK
-    actual = (final & PMGR_PS_ACTUAL_MASK) >> 4
-    buf.write(f"  after #1: raw=0x{final:08x} target=0x{target:x} "
-              f"actual=0x{actual:x} ({_decode_ps_state(final)}) "
-              f"[{elapsed_ms:.1f} ms, {'converged' if converged else 'TIMEOUT'}]\n")
-
-    if not converged:
-        # Write #2: also clear the PS_AUTO lockout (bits 27:24 -> 0xf
-        # i.e. auto-floor at ACTIVE). Some blocks refuse to raise ACTUAL
-        # above PS_AUTO regardless of TARGET.
-        clear2 = PMGR_PS_AUTO_MASK
-        set2 = (PMGR_PS_ACTIVE << 24)
-        buf.write(f"  write #2 (raise PS_AUTO floor): mask32(0x{ps_addr:x}, "
-                  f"clear=0x{clear2:08x}, set=0x{set2:08x})\n")
-        try:
-            p.mask32(ps_addr, clear2, set2)
-        except Exception as e:
-            buf.write(f"  ERROR: mask32 #2 failed: "
-                      f"{e.__class__.__name__}: {e}\n\n")
-            return
-        converged, final, elapsed_ms = _poll_ps_actual(
-            ps_addr, PMGR_PS_ACTIVE, timeout_ms=timeout_ms)
-        target = final & PMGR_PS_TARGET_MASK
-        actual = (final & PMGR_PS_ACTUAL_MASK) >> 4
-        buf.write(f"  after #2: raw=0x{final:08x} target=0x{target:x} "
-                  f"actual=0x{actual:x} ({_decode_ps_state(final)}) "
-                  f"[{elapsed_ms:.1f} ms, {'converged' if converged else 'TIMEOUT'}]\n")
+    ok, failing = _pmgr_direct_poke_chain(
+        dev_by_idx, _GATE_APCIE_PHY_SW, buf, indent="  ",
+        timeout_ms=timeout_ms)
 
     try:
         exc_after = p.get_exc_count()
-        buf.write(f"  exc_count during poke: {exc_before} -> {exc_after} "
-                  f"(delta={exc_after - exc_before})\n")
+        buf.write(f"  exc_count during chain poke: {exc_before} -> "
+                  f"{exc_after} (delta={exc_after - exc_before})\n")
     except Exception as e:
         buf.write(f"  WARN: post-poke exc_count failed: "
                   f"{e.__class__.__name__}: {e}\n")
 
-    if converged:
-        buf.write("  gate 151 (APCIE_PHY_SW) is now ACTIVE; Phase E may run.\n\n")
+    if ok:
+        buf.write("  entire gate 151 parent chain is ACTIVE; "
+                  "Phase E may run.\n\n")
         apcie.phaseD_gate151_active = True
     else:
-        buf.write("  gate 151 (APCIE_PHY_SW) refuses to reach ACTIVE.\n"
-                  "  This is a genuine hardware/firmware handshake issue --\n"
-                  "  likely phy_common MMIO or SMC needs a poke before the\n"
-                  "  gate will honor TARGET. Phase E will be skipped.\n\n")
+        apcie.phaseD_failing_gate = failing
+        buf.write(f"  gate {failing} refuses to reach ACTUAL=0xf.\n"
+                  f"  This is a genuine firmware handshake issue -- an\n"
+                  f"  SMC key or phy_common MMIO write we haven't\n"
+                  f"  identified is required to release gate {failing}.\n"
+                  f"  Phase E will be SKIPPED to avoid wedging m1n1 on\n"
+                  f"  the shared phy_ip fabric that lives behind it.\n\n")
 
 
 def probe_phaseE_port1_slice(apcie, buf, timeout=0.3):
@@ -1455,8 +1560,62 @@ def probe_phaseE_port1_slice(apcie, buf, timeout=0.3):
     """
     buf.write("=== Phase E: shared-PLL + port-1 slice probe ===\n")
     if not getattr(apcie, "phaseD_gate151_active", False):
-        buf.write("  skipped (Phase D did not confirm gate 151 ACTIVE)\n\n")
+        failing = getattr(apcie, "phaseD_failing_gate", None)
+        if failing is not None:
+            buf.write(f"  SKIPPED: Phase D reported gate {failing} refused "
+                      f"to reach ACTIVE. Reading phy_ip while an\n"
+                      f"  ancestor of gate 151 is off would AXI-stall\n"
+                      f"  the fabric and wedge m1n1 with no recovery.\n\n")
+        else:
+            buf.write("  SKIPPED: Phase D did not confirm gate 151 ACTIVE.\n\n")
         return
+
+    # Final safeguard: re-verify every real apcie power gate right
+    # before we touch phy_ip MMIO. Between Phase D and here we did
+    # PMGR-only reads which shouldn't disturb PMGR state, but a
+    # stale phaseD_gate151_active flag from an earlier attempt would
+    # be fatal (AXI stall, no exception recovery). Re-reading the PS
+    # regs takes microseconds and is guaranteed safe.
+    dev_by_idx = getattr(apcie, "phase0_dev_by_idx", None)
+    if dev_by_idx is not None:
+        # Include gate 151's parent gates so we notice if 150 drifted.
+        gates_to_check = set(int(g) for g in apcie.power_gates)
+        gates_to_check.add(_GATE_APCIE_PHY_SW)
+        try:
+            phy_sw = dev_by_idx.get(_GATE_APCIE_PHY_SW)
+            if phy_sw is not None:
+                for pid in u.adt.pmgr_dev_get_parents(phy_sw):
+                    pid = int(pid)
+                    if pid != 0:
+                        gates_to_check.add(pid)
+        except Exception:
+            pass
+        buf.write("  re-verifying real apcie PMGR gates before phy_ip MMIO:\n")
+        off_gates = []
+        for gate_idx in sorted(gates_to_check):
+            dev = dev_by_idx.get(int(gate_idx))
+            if dev is None or dev.flags.no_ps:
+                continue
+            try:
+                ps_addr = u.adt.pmgr_dev_get_addr(dev)
+                raw = p.read32(ps_addr)
+            except Exception as e:
+                buf.write(f"    gate {gate_idx}: PS read failed "
+                          f"({e.__class__.__name__}: {e})\n")
+                off_gates.append(gate_idx)
+                continue
+            actual = (raw & PMGR_PS_ACTUAL_MASK) >> 4
+            name = _decode_pmgr_name(dev)
+            if actual != PMGR_PS_ACTIVE:
+                buf.write(f"    gate {gate_idx} ({name!r}) "
+                          f"raw=0x{raw:08x} actual=0x{actual:x} -- NOT ACTIVE\n")
+                off_gates.append(gate_idx)
+            else:
+                buf.write(f"    gate {gate_idx} ({name!r}) ACTIVE\n")
+        if off_gates:
+            buf.write(f"  ABORT Phase E: gates {off_gates} not ACTIVE; "
+                      f"phy_ip read would wedge m1n1.\n\n")
+            return
 
     probes = [
         (apcie.phy_ip_base + 0x00000, "phy_ip +0x00000 shared head"),
