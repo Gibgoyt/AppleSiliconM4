@@ -1,0 +1,10 @@
+Standard keys under /chosen:
+    mac-address-ethernet0: d0:11:e5:71:81:dc  (raw=b'\xd0\x11\xe5q\x81\xdc')
+    mac-address-ethernet1: (missing)
+    mac-address-wifi0: d0:11:e5:88:15:f0  (raw=b'\xd0\x11\xe5\x88\x15\xf0')
+    mac-address-bluetooth0: d0:11:e5:8b:3c:30  (raw=b'\xd0\x11\xe5\x8b<0')
+
+All /chosen properties whose name mentions 'mac':
+    mac-address-wifi0: d0:11:e5:88:15:f0
+    mac-address-bluetooth0: d0:11:e5:8b:3c:30
+    mac-address-ethernet0: d0:11:e5:71:81:dc

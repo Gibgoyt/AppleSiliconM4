@@ -1,0 +1,96 @@
+# Phase 3 PCIe runtime dump
+
+**NIC not found** in the ECAM walk. Check the log below.
+
+## Full walk log
+
+```
+=== apcie ADT map ===
+compatible   = apcie,t8132
+power_gates  = [379, 380, 381, 382, 383, 151]
+active ports = [0, 2]
+
+-- shared --
+  ecam_base       = 0x1cb0000000 sz 0x10000000
+  rc_base         = 0x494000000 sz 0x4000
+  phy_packed_base = 0x497000000 sz 0x40000   (phy_common = +0x4000)
+  phy_common_base = 0x497004000
+  phy_ip_base     = 0x497040000 sz 0x20000
+  axi_base        = 0x496000000 sz 0x1000000
+  axi_sub5        = 0x495046200 sz 0x4000   (inside AXI window; purpose unknown)
+  axi_sub6        = 0x495044000 sz 0x4000   (inside AXI window; purpose unknown)
+
+--- port0 ---
+  exists in ADT: True
+  port_base       = 0x490028000 sz 0x8000
+  ltssm_base      = 0x49003c000 sz 0x4000
+  phy_base        = 0x497020000 sz 0x4000
+  phy_extra_base  = 0x497048000 sz 0x8000   (inside shared PHY IP)
+  intr2axi_base   = 0x490024000 sz 0x4000
+  ctrl_lo_base    = 0x490000000 sz 0xc000   (overlaps dart-apcie0)
+  bridge          = /arm-io/apcie/pci-bridge0
+  PERSTN pin      = gpio0[163] (mode 0)
+  CLKREQ pin      = gpio0[160] (mode 2)
+  max_link_speed  = 2
+  #apcie_config_tunables       = 1
+  #pcie_rc_tunables            = 3
+  #pcie_rc_gen3_shadow_tunables= 3
+  #pcie_rc_gen4_shadow_tunables= 3
+
+--- port1 ---
+  exists in ADT: False (pci-bridge missing)
+  port_base       = 0x491028000 sz 0x8000
+  ltssm_base      = 0x49103c000 sz 0x4000
+  phy_base        = 0x497024000 sz 0x4000
+  phy_extra_base  = 0x497050000 sz 0x8000   (inside shared PHY IP)
+  intr2axi_base   = 0x491024000 sz 0x4000
+  ctrl_lo_base    = 0x491000000 sz 0xc000   (overlaps dart-apcie1)
+
+--- port2 ---
+  exists in ADT: True
+  port_base       = 0x492028000 sz 0x8000
+  ltssm_base      = 0x49203c000 sz 0x4000
+  phy_base        = 0x497028000 sz 0x4000
+  phy_extra_base  = 0x497058000 sz 0x8000   (inside shared PHY IP)
+  intr2axi_base   = 0x492024000 sz 0x4000
+  ctrl_lo_base    = 0x492000000 sz 0xc000   (overlaps dart-apcie2)
+  bridge          = /arm-io/apcie/pci-bridge2
+  PERSTN pin      = gpio0[165] (mode 0)
+  CLKREQ pin      = gpio0[162] (mode 2)
+  max_link_speed  = 1
+  #apcie_config_tunables       = 1
+  #pcie_rc_tunables            = 3
+  #pcie_rc_gen3_shadow_tunables= 3
+  #pcie_rc_gen4_shadow_tunables= 3
+
+-- darts --
+  dart[port 0]: /arm-io/dart-apcie0  base=0x490000000 sz=0x20000  page_size=16384  sid_count=17
+  dart[port 2]: /arm-io/dart-apcie2  base=0x492000000 sz=0x20000  page_size=16384  sid_count=17
+
+
+NIC GPIO pins: PERSTN=gpio0[165] CLKREQ=gpio0[162]
+
+SMC smc_addr = 0x38c600000
+gP0d <- 0x800001  (apcie power)
+gP1a <- 1         (apcie-ge power)
+=== CLKREQ assert (gpio0 pin 162) ===
+gpio0[162] @ 0x39a000288: 0x00074a10 -> 0x00074a12 (read-back 0x00074a12)
+settled 1 ms after CLKREQ assert
+
+=== PERSTN deassert (gpio0 pin 165) ===
+gpio0 probe: read32(0x39a000000) = 0x008742c0
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a02 (read-back 0x00074a02)
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a03 (read-back 0x00074a03)
+settled 100 ms after deassert
+
+
+p.pcie_init raised: UartTimeout: Expected 1 bytes, got 0 bytes
+
+=== PCIe controller register dump ===
+SKIPPED: p.pcie_init() raised -- m1n1 is not responding.
+
+[liveness] ECAM walk: m1n1 not responding, skipping
+
+=== enable NIC ===
+No class-0x02 device found.
+```

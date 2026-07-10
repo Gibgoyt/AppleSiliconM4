@@ -1,0 +1,881 @@
+[ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/perstn.sh --tier2 --t602x-init --t602x-do-again --t602x-aggressive --t602x-msimap
+[sudo] password for ahmed: 
+m1n1 base: 0x1000321c000
+Fetching ADT (0x00068000 bytes)...
+[pcie_up] === Phase 3.3 pcie_up ===
+[pcie_up] building ApcieMap from ADT...
+[pcie_up] SMC power on apcie fabric...
+[mgmt] Starting via message
+[mgmt] Supported versions 12 .. 12
+[mgmt] Adding endpoint 0x0
+[mgmt] Adding endpoint 0x1
+[mgmt] Adding endpoint 0x2
+[mgmt] Adding endpoint 0x3
+[mgmt] Adding endpoint 0x4
+[mgmt] Adding endpoint 0x8
+[mgmt] Adding endpoint 0x20
+Starting endpoint #0x1 (crash)
+Starting endpoint #0x2 (syslog)
+Starting endpoint #0x3 (kdebug)
+Starting endpoint #0x4 (iorep)
+Starting endpoint #0x8 (iorep)
+[crash] buf prealloc at dva 0x38de5c000
+[iorep] buf prealloc 0x38de61000 / 0x38de61000
+[iorep] start
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[mgmt] IOP power state is now 0x20
+[syslog] count 32, entrysize 96
+[syslog] buf prealloc at dva 0x38de60000
+[iorep] buf prealloc 0xff800038de66000 / 0xff800038de66000
+unknown message: 0x31f10428986d339 / 0x408c0000000008 (EP=0x8)
+unknown message: 0x40000209630790a / 0x309c0000000008 (EP=0x8)
+unknown message: 0x40000402572ab9b / 0x20ac0000000008 (EP=0x8)
+unknown message: 0x400006003168728 / 0x10bc0000000008 (EP=0x8)
+[mgmt] AP power state is now 0x20
+[mgmt] Startup complete
+Starting endpoint #0x20 (smcep)
+[smcep] Starting up
+[mgmt] Stopping via message
+[mgmt] AP power state is now 0x10
+[mgmt] IOP power state is now 0x10
+[pcie_up] CLKREQ assert on gpio0 pin 162...
+[pcie_up] CLKREQ: drive gpio0[162] low (assert)
+[pcie_up] PERSTN deassert on gpio0 pin 165...
+[pcie_up] PERSTN cold reset: drive gpio0[165] low
+[pcie_up] PERSTN: drive gpio0[165] high
+[pcie_up] p.pcie_init()...
+[pcie_up] p.pcie_init returned 0
+[pcie_up] active ports (per ADT): [0, 2]
+[pcie_up] dumping PCIe controller registers (post-init, tier=2)...
+[pcie_up]   dump_pcie_regs tier=2 tag=post-init active_ports=[0, 2]
+[pcie_up]     read32(0x49400003c) [rc_base + 0x03c]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 1 (port_base=0x490028000) ===
+[pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100101
+[pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x490028010) [port0 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028088) [port0 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028100) [port0 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028104) [port0 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x490028124) [port0 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x490028140) [port0 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x490028144) [port0 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x490028148) [port0 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028210) [port0 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028808) [port0 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49002b97c) [port0 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port2 Tier 1 (port_base=0x492028000) ===
+[pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100101
+[pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x492028010) [port2 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028088) [port2 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028100) [port2 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028104) [port2 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x492028124) [port2 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x492028140) [port2 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x492028144) [port2 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x492028148) [port2 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028210) [port2 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028808) [port2 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49202b97c) [port2 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === Tier 2 (phy_common + phy_base) ===
+[pcie_up]     read32(0x497004000) [PHYCMN_CLK (phy_common+0x000)]...
+[pcie_up]       -> 0x80300001
+[pcie_up]     read32(0x494000024) [PHYIF_CTRL (rc_base+0x024)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 2 (phy_base=0x497020000) ===
+[pcie_up]     read32(0x497020000) [port0 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497020004) [port0 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up]   === port2 Tier 2 (phy_base=0x497028000) ===
+[pcie_up]     read32(0x497028000) [port2 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497028004) [port2 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up] trying LTSSM kick sequences on ports [0, 2] (aggressive=False)...
+[pcie_up]   try_ltssm_kick ports=[0, 2] aggressive=False
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (baseline)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     seq A on port0
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A post-set)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028010) [port0 +0x10 (seq A pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028010) [port0 +0x10 (seq A post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after seq A)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     seq C on port0
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after seq C)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after 200ms settle)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (baseline)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     seq A on port2
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A post-set)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028010) [port2 +0x10 (seq A pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028010) [port2 +0x10 (seq A post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after seq A)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     seq C on port2
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after seq C)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after 200ms settle)]...
+[pcie_up]       -> 0x83000204
+[pcie_up] dumping PCIe controller registers (post-kick, tier=2)...
+[pcie_up]   dump_pcie_regs tier=2 tag=post-kick active_ports=[0, 2]
+[pcie_up]     read32(0x49400003c) [rc_base + 0x03c]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 1 (port_base=0x490028000) ===
+[pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100101
+[pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x490028010) [port0 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028088) [port0 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028100) [port0 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028104) [port0 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x490028124) [port0 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x490028140) [port0 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x490028144) [port0 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x490028148) [port0 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028210) [port0 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028808) [port0 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49002b97c) [port0 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port2 Tier 1 (port_base=0x492028000) ===
+[pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100101
+[pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x492028010) [port2 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028088) [port2 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028100) [port2 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028104) [port2 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x492028124) [port2 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x492028140) [port2 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x492028144) [port2 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x492028148) [port2 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028210) [port2 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028808) [port2 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49202b97c) [port2 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === Tier 2 (phy_common + phy_base) ===
+[pcie_up]     read32(0x497004000) [PHYCMN_CLK (phy_common+0x000)]...
+[pcie_up]       -> 0x80300001
+[pcie_up]     read32(0x494000024) [PHYIF_CTRL (rc_base+0x024)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 2 (phy_base=0x497020000) ===
+[pcie_up]     read32(0x497020000) [port0 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497020004) [port0 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up]   === port2 Tier 2 (phy_base=0x497028000) ===
+[pcie_up]     read32(0x497028000) [port2 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497028004) [port2 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up] replaying T602X APCIE port init on ports [0, 2] (aggressive=True, do_again=True, msimap=True)...
+[pcie_up]   t602x_port_init_replay ports=[0, 2] aggressive=True do_again=True do_msimap=True
+[pcie_up]     port0 port_base=0x490028000 phy_base=0x497020000 ltssm=0x49003c000
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (pre-replay baseline)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (post-set)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028010) [port0 +0x10 (pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028010) [port0 +0x10 (post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028104) [port0 +0x104 (pre)]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x490028104) [port0 +0x104 (post)]...
+[pcie_up]       -> 0x7ffffff0
+[pcie_up]     read32(0x49002b97c) [port0 +0x397c (pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49002b97c) [port0 +0x397c (post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x497020000) [port0 PHY_CTRL (pre)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497020000) [port0 PHY_CTRL (post-clear-0x4000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after T602X-only writes)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     LTSSM debug writes on ltssm_base=0x49003c000
+[pcie_up]     read32(0x490028800) [port0 APPCLK (post-clear-bit8)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after L737-742 LTSSM kick)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     T602X_PORT_RESET cycle on port0
+[pcie_up]     read32(0x49002882c) [port0 T602X_RESET (reasserted)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49002882c) [port0 T602X_RESET (deasserted)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after T602X_PORT_RESET cycle)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     second LTSSM debug writes on ltssm_base=0x49003c000
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after do-again LTSSM kick)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     MSIMAP populate on port0
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after MSIMAP populate)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x49002c020) [port0 +0x4020 (post-write)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490024080) [port0 intr2axi+0x80 (post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (before final clear)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (post-clear)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after full T602X replay)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     port2 port_base=0x492028000 phy_base=0x497028000 ltssm=0x49203c000
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (pre-replay baseline)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (post-set)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028010) [port2 +0x10 (pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028010) [port2 +0x10 (post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028104) [port2 +0x104 (pre)]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x492028104) [port2 +0x104 (post)]...
+[pcie_up]       -> 0x7ffffff0
+[pcie_up]     read32(0x49202b97c) [port2 +0x397c (pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49202b97c) [port2 +0x397c (post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x497028000) [port2 PHY_CTRL (pre)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497028000) [port2 PHY_CTRL (post-clear-0x4000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after T602X-only writes)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     LTSSM debug writes on ltssm_base=0x49203c000
+[pcie_up]     read32(0x492028800) [port2 APPCLK (post-clear-bit8)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after L737-742 LTSSM kick)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     T602X_PORT_RESET cycle on port2
+[pcie_up]     read32(0x49202882c) [port2 T602X_RESET (reasserted)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49202882c) [port2 T602X_RESET (deasserted)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after T602X_PORT_RESET cycle)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     second LTSSM debug writes on ltssm_base=0x49203c000
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after do-again LTSSM kick)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     MSIMAP populate on port2
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after MSIMAP populate)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x49202c020) [port2 +0x4020 (post-write)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492024080) [port2 intr2axi+0x80 (post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (before final clear)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (post-clear)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after full T602X replay)]...
+[pcie_up]       -> 0x83000204
+[pcie_up] dumping PCIe controller registers (post-t602x, tier=2)...
+[pcie_up]   dump_pcie_regs tier=2 tag=post-t602x active_ports=[0, 2]
+[pcie_up]     read32(0x49400003c) [rc_base + 0x03c]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 1 (port_base=0x490028000) ===
+[pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x490028010) [port0 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028088) [port0 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028100) [port0 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028104) [port0 +0x104]...
+[pcie_up]       -> 0x7ffffff0
+[pcie_up]     read32(0x490028124) [port0 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x490028140) [port0 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x490028144) [port0 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x490028148) [port0 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028210) [port0 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028808) [port0 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49002b97c) [port0 +0x397c (T602X only)]...
+[pcie_up]       -> 0x8000005f
+[pcie_up]   === port2 Tier 1 (port_base=0x492028000) ===
+[pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x492028010) [port2 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028088) [port2 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028100) [port2 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028104) [port2 +0x104]...
+[pcie_up]       -> 0x7ffffff0
+[pcie_up]     read32(0x492028124) [port2 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x492028140) [port2 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x492028144) [port2 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x492028148) [port2 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028210) [port2 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028808) [port2 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49202b97c) [port2 +0x397c (T602X only)]...
+[pcie_up]       -> 0x8000005f
+[pcie_up]   === Tier 2 (phy_common + phy_base) ===
+[pcie_up]     read32(0x497004000) [PHYCMN_CLK (phy_common+0x000)]...
+[pcie_up]       -> 0x80300001
+[pcie_up]     read32(0x494000024) [PHYIF_CTRL (rc_base+0x024)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 2 (phy_base=0x497020000) ===
+[pcie_up]     read32(0x497020000) [port0 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497020004) [port0 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up]   === port2 Tier 2 (phy_base=0x497028000) ===
+[pcie_up]     read32(0x497028000) [port2 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497028004) [port2 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up] ECAM walk @ 0x1cb0000000 ...
+[pcie_up] wrote /tmp/m4-recon/nic-runtime.txt
+[pcie_up] done. Copy /tmp/m4-recon/nic-runtime.txt into m4_recon/ if it looks sane.
+
+--- /tmp/m4-recon/nic-runtime.txt ---
+# Phase 3 PCIe runtime dump
+
+**NIC not found** in the ECAM walk. Check the log below.
+
+## Full walk log
+
+```
+=== apcie ADT map ===
+compatible   = apcie,t8132
+power_gates  = [379, 380, 381, 382, 383, 151]
+active ports = [0, 2]
+
+-- shared --
+  ecam_base       = 0x1cb0000000 sz 0x10000000
+  rc_base         = 0x494000000 sz 0x4000
+  phy_packed_base = 0x497000000 sz 0x40000   (phy_common = +0x4000)
+  phy_common_base = 0x497004000
+  phy_ip_base     = 0x497040000 sz 0x20000
+  axi_base        = 0x496000000 sz 0x1000000
+  axi_sub5        = 0x495046200 sz 0x4000   (inside AXI window; purpose unknown)
+  axi_sub6        = 0x495044000 sz 0x4000   (inside AXI window; purpose unknown)
+
+--- port0 ---
+  exists in ADT: True
+  port_base       = 0x490028000 sz 0x8000
+  ltssm_base      = 0x49003c000 sz 0x4000
+  phy_base        = 0x497020000 sz 0x4000
+  phy_extra_base  = 0x497048000 sz 0x8000   (inside shared PHY IP)
+  intr2axi_base   = 0x490024000 sz 0x4000
+  ctrl_lo_base    = 0x490000000 sz 0xc000   (overlaps dart-apcie0)
+  bridge          = /arm-io/apcie/pci-bridge0
+  PERSTN pin      = gpio0[163] (mode 0)
+  CLKREQ pin      = gpio0[160] (mode 2)
+  max_link_speed  = 2
+  #apcie_config_tunables       = 1
+  #pcie_rc_tunables            = 3
+  #pcie_rc_gen3_shadow_tunables= 3
+  #pcie_rc_gen4_shadow_tunables= 3
+
+--- port1 ---
+  exists in ADT: False (pci-bridge missing)
+  port_base       = 0x491028000 sz 0x8000
+  ltssm_base      = 0x49103c000 sz 0x4000
+  phy_base        = 0x497024000 sz 0x4000
+  phy_extra_base  = 0x497050000 sz 0x8000   (inside shared PHY IP)
+  intr2axi_base   = 0x491024000 sz 0x4000
+  ctrl_lo_base    = 0x491000000 sz 0xc000   (overlaps dart-apcie1)
+
+--- port2 ---
+  exists in ADT: True
+  port_base       = 0x492028000 sz 0x8000
+  ltssm_base      = 0x49203c000 sz 0x4000
+  phy_base        = 0x497028000 sz 0x4000
+  phy_extra_base  = 0x497058000 sz 0x8000   (inside shared PHY IP)
+  intr2axi_base   = 0x492024000 sz 0x4000
+  ctrl_lo_base    = 0x492000000 sz 0xc000   (overlaps dart-apcie2)
+  bridge          = /arm-io/apcie/pci-bridge2
+  PERSTN pin      = gpio0[165] (mode 0)
+  CLKREQ pin      = gpio0[162] (mode 2)
+  max_link_speed  = 1
+  #apcie_config_tunables       = 1
+  #pcie_rc_tunables            = 3
+  #pcie_rc_gen3_shadow_tunables= 3
+  #pcie_rc_gen4_shadow_tunables= 3
+
+-- darts --
+  dart[port 0]: /arm-io/dart-apcie0  base=0x490000000 sz=0x20000  page_size=16384  sid_count=17
+  dart[port 2]: /arm-io/dart-apcie2  base=0x492000000 sz=0x20000  page_size=16384  sid_count=17
+
+
+NIC GPIO pins: PERSTN=gpio0[165] CLKREQ=gpio0[162]
+
+SMC smc_addr = 0x38c600000
+gP0d <- 0x800001  (apcie power)
+gP1a <- 1         (apcie-ge power)
+=== CLKREQ assert (gpio0 pin 162) ===
+gpio0[162] @ 0x39a000288: 0x00074a12 -> 0x00074a12 (read-back 0x00074a12)
+settled 1 ms after CLKREQ assert
+
+=== PERSTN deassert (gpio0 pin 165) ===
+gpio0 probe: read32(0x39a000000) = 0x008742c0
+gpio0[165] @ 0x39a000294: 0x00074a03 -> 0x00074a02 (read-back 0x00074a02)
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a03 (read-back 0x00074a03)
+settled 100 ms after deassert
+
+
+p.pcie_init() -> 0
+
+=== PCIe controller register dump (post-init, tier=2) ===
+  rc_base + 0x03c            @ 0x49400003c = 0x00000000
+
+--- port0 (T1) port_base=0x490028000 ---
+  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100101
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
+  port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
+  port0 +0x010               @ 0x490028010 = 0x00000000
+  port0 +0x088               @ 0x490028088 = 0x00000000
+  port0 +0x100               @ 0x490028100 = 0x00000000
+  port0 +0x104               @ 0x490028104 = 0xfffffff0
+  port0 +0x124               @ 0x490028124 = 0x00000100
+  port0 +0x140               @ 0x490028140 = 0x00000011
+  port0 +0x144               @ 0x490028144 = 0x00253770
+  port0 +0x148               @ 0x490028148 = 0x00000000
+  port0 +0x210               @ 0x490028210 = 0x00000000
+  port0 +0x808               @ 0x490028808 = 0x001000ff
+  port0 +0x397c (T602X only) @ 0x49002b97c = 0x00000000
+
+--- port2 (T1) port_base=0x492028000 ---
+  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100101
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
+  port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
+  port2 +0x010               @ 0x492028010 = 0x00000000
+  port2 +0x088               @ 0x492028088 = 0x00000000
+  port2 +0x100               @ 0x492028100 = 0x00000000
+  port2 +0x104               @ 0x492028104 = 0xfffffff0
+  port2 +0x124               @ 0x492028124 = 0x00000100
+  port2 +0x140               @ 0x492028140 = 0x00000011
+  port2 +0x144               @ 0x492028144 = 0x00253770
+  port2 +0x148               @ 0x492028148 = 0x00000000
+  port2 +0x210               @ 0x492028210 = 0x00000000
+  port2 +0x808               @ 0x492028808 = 0x001000ff
+  port2 +0x397c (T602X only) @ 0x49202b97c = 0x00000000
+
+=== Tier 2 (--tier2) ===
+  PHYCMN_CLK (phy_common+0x000) @ 0x497004000 = 0x80300001
+  PHYIF_CTRL (rc_base+0x024) @ 0x494000024 = 0x00000000
+
+--- port0 (T2) phy_base=0x497020000 ---
+  port0 PHY_CTRL (+0x000)    @ 0x497020000 = 0x2300066f
+  port0 PHY      (+0x004)    @ 0x497020004 = 0x00000030
+
+--- port2 (T2) phy_base=0x497028000 ---
+  port2 PHY_CTRL (+0x000)    @ 0x497028000 = 0x2300066f
+  port2 PHY      (+0x004)    @ 0x497028004 = 0x00000030
+[guard] dump_pcie_regs(post-init): exc_count delta = 0 (before=0, after=0)
+
+=== LTSSM kick experiment (post-init) ===
+
+--- port0 @ port_base=0x490028000 ltssm=0x49003c000 ---
+  port0 LINKSTS (baseline)   @ 0x490028208 = 0x8300020c
+  port0 baseline               LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  rc_base+0x3c (seq A pre)   @ 0x49400003c = 0x00000000
+  seq A: set32(rc_base+0x3c, 0x1)  # 0x49400003c
+  rc_base+0x3c (seq A post-set) @ 0x49400003c = 0x00000000
+  port0 +0x10 (seq A pre)    @ 0x490028010 = 0x00000000
+  seq A: write32(port_base+0x10, 0x2)
+  port0 +0x10 (seq A post)   @ 0x490028010 = 0x00000000
+  port0 LINKSTS (after seq A) @ 0x490028208 = 0x8300020c
+  port0 after seq A            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  seq B: skipped (--ltssm-kick-aggressive to enable; writes ltssm_base which may AXI-stall)
+  seq C: clear+set T602X_RESET (port_base+0x82c)
+  port0 LINKSTS (after seq C) @ 0x490028208 = 0x8300020c
+  port0 after seq C            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (after 200ms settle) @ 0x490028208 = 0x8300020c
+  port0 after 200ms settle     LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+--- port2 @ port_base=0x492028000 ltssm=0x49203c000 ---
+  port2 LINKSTS (baseline)   @ 0x492028208 = 0x83000204
+  port2 baseline               LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  rc_base+0x3c (seq A pre)   @ 0x49400003c = 0x00000000
+  seq A: set32(rc_base+0x3c, 0x1)  # 0x49400003c
+  rc_base+0x3c (seq A post-set) @ 0x49400003c = 0x00000000
+  port2 +0x10 (seq A pre)    @ 0x492028010 = 0x00000000
+  seq A: write32(port_base+0x10, 0x2)
+  port2 +0x10 (seq A post)   @ 0x492028010 = 0x00000000
+  port2 LINKSTS (after seq A) @ 0x492028208 = 0x83000204
+  port2 after seq A            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  seq B: skipped (--ltssm-kick-aggressive to enable; writes ltssm_base which may AXI-stall)
+  seq C: clear+set T602X_RESET (port_base+0x82c)
+  port2 LINKSTS (after seq C) @ 0x492028208 = 0x83000204
+  port2 after seq C            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (after 200ms settle) @ 0x492028208 = 0x83000204
+  port2 after 200ms settle     LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+[guard] try_ltssm_kick: exc_count delta = 0 (before=0, after=0)
+=== PCIe controller register dump (post-kick, tier=2) ===
+  rc_base + 0x03c            @ 0x49400003c = 0x00000000
+
+--- port0 (T1) port_base=0x490028000 ---
+  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100101
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
+  port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
+  port0 +0x010               @ 0x490028010 = 0x00000000
+  port0 +0x088               @ 0x490028088 = 0x00000000
+  port0 +0x100               @ 0x490028100 = 0x00000000
+  port0 +0x104               @ 0x490028104 = 0xfffffff0
+  port0 +0x124               @ 0x490028124 = 0x00000100
+  port0 +0x140               @ 0x490028140 = 0x00000011
+  port0 +0x144               @ 0x490028144 = 0x00253770
+  port0 +0x148               @ 0x490028148 = 0x00000000
+  port0 +0x210               @ 0x490028210 = 0x00000000
+  port0 +0x808               @ 0x490028808 = 0x001000ff
+  port0 +0x397c (T602X only) @ 0x49002b97c = 0x00000000
+
+--- port2 (T1) port_base=0x492028000 ---
+  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100101
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
+  port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
+  port2 +0x010               @ 0x492028010 = 0x00000000
+  port2 +0x088               @ 0x492028088 = 0x00000000
+  port2 +0x100               @ 0x492028100 = 0x00000000
+  port2 +0x104               @ 0x492028104 = 0xfffffff0
+  port2 +0x124               @ 0x492028124 = 0x00000100
+  port2 +0x140               @ 0x492028140 = 0x00000011
+  port2 +0x144               @ 0x492028144 = 0x00253770
+  port2 +0x148               @ 0x492028148 = 0x00000000
+  port2 +0x210               @ 0x492028210 = 0x00000000
+  port2 +0x808               @ 0x492028808 = 0x001000ff
+  port2 +0x397c (T602X only) @ 0x49202b97c = 0x00000000
+
+=== Tier 2 (--tier2) ===
+  PHYCMN_CLK (phy_common+0x000) @ 0x497004000 = 0x80300001
+  PHYIF_CTRL (rc_base+0x024) @ 0x494000024 = 0x00000000
+
+--- port0 (T2) phy_base=0x497020000 ---
+  port0 PHY_CTRL (+0x000)    @ 0x497020000 = 0x2300066f
+  port0 PHY      (+0x004)    @ 0x497020004 = 0x00000030
+
+--- port2 (T2) phy_base=0x497028000 ---
+  port2 PHY_CTRL (+0x000)    @ 0x497028000 = 0x2300066f
+  port2 PHY      (+0x004)    @ 0x497028004 = 0x00000030
+[guard] dump_pcie_regs(post-kick): exc_count delta = 0 (before=0, after=0)
+
+=== T602X init replay (aggressive=True, do_again=True, do_msimap=True) ===
+
+--- port0 T602X replay ---
+  port0 LINKSTS (pre-replay baseline) @ 0x490028208 = 0x8300020c
+  port0 pre-replay baseline          LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+  L633: set32(rc_base+0x3c, 0x1)
+  rc_base+0x3c (pre)         @ 0x49400003c = 0x00000000
+  rc_base+0x3c (post-set)    @ 0x49400003c = 0x00000000
+  L637: write32(port_base+0x10, 0x2)
+  port0 +0x10 (pre)          @ 0x490028010 = 0x00000000
+  port0 +0x10 (post)         @ 0x490028010 = 0x00000000
+  L653: write32(port_base+0x104, 0x7fffffff) (overriding T8140 0xfffffff0)
+  port0 +0x104 (pre)         @ 0x490028104 = 0xfffffff0
+  port0 +0x104 (post)        @ 0x490028104 = 0x7ffffff0
+  L674: write32(port_base+0x397c, 0x0)
+  port0 +0x397c (pre)        @ 0x49002b97c = 0x00000000
+  port0 +0x397c (post)       @ 0x49002b97c = 0x00000000
+  L716: clear32(port_phy_base+0x000, 0x4000)
+  port0 PHY_CTRL (pre)       @ 0x497020000 = 0x2300066f
+  port0 PHY_CTRL (post-clear-0x4000) @ 0x497020000 = 0x2300066f
+  port0 LINKSTS (after T602X-only writes) @ 0x490028208 = 0x8300020c
+  port0 after T602X-only writes      LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+  L737: LTSSM debug (Tier 3 -- ltssm_base may AXI-stall)
+    write to ltssm+0x10 = 0x2
+    write to ltssm+0x1c = 0x4
+    write to ltssm+0x20 |= 0x2
+    write to ltssm+0x14 = 0x1
+  L742: clear32(port_base+0x800, 0x100)
+  port0 APPCLK (post-clear-bit8) @ 0x490028800 = 0x00100001
+  port0 LINKSTS (after L737-742 LTSSM kick) @ 0x490028208 = 0x8300020c
+  port0 after L737-742 LTSSM kick    LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+  L752: cycle T602X_PORT_RESET (reassert + deassert)
+  port0 T602X_RESET (reasserted) @ 0x49002882c = 0x00000000
+  port0 T602X_RESET (deasserted) @ 0x49002882c = 0x00000001
+  port0 LINKSTS (after T602X_PORT_RESET cycle) @ 0x490028208 = 0x8300020c
+  port0 after T602X_PORT_RESET cycle LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  L764: LTSSM debug (Tier 3)
+    write to ltssm+0x10 = 0x2
+    write to ltssm+0x1c = 0x4
+    write to ltssm+0x20 |= 0x2
+    write to ltssm+0x14 = 0x1
+  port0 LINKSTS (after do-again LTSSM kick) @ 0x490028208 = 0x8300020c
+  port0 after do-again LTSSM kick    LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+  L845: MSIMAP populate 512 entries
+  port0 LINKSTS (after MSIMAP populate) @ 0x490028208 = 0x8300020c
+  port0 after MSIMAP populate        LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+  L839: write32(port_base+0x4020, 0x3)
+  port0 +0x4020 (post-write) @ 0x49002c020 = 0x00000000
+  L841: write32(intr2axi_base+0x80, 0x1)
+  port0 intr2axi+0x80 (post) @ 0x490024080 = 0x00000000
+  L843: clear32(rc_base+0x3c, 0x1)  (disarm config-write mode)
+  rc_base+0x3c (before final clear) @ 0x49400003c = 0x00000000
+  rc_base+0x3c (post-clear)  @ 0x49400003c = 0x00000000
+  port0 LINKSTS (after full T602X replay) @ 0x490028208 = 0x8300020c
+  port0 after full T602X replay      LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+--- port2 T602X replay ---
+  port2 LINKSTS (pre-replay baseline) @ 0x492028208 = 0x83000204
+  port2 pre-replay baseline          LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+
+  L633: set32(rc_base+0x3c, 0x1)
+  rc_base+0x3c (pre)         @ 0x49400003c = 0x00000000
+  rc_base+0x3c (post-set)    @ 0x49400003c = 0x00000000
+  L637: write32(port_base+0x10, 0x2)
+  port2 +0x10 (pre)          @ 0x492028010 = 0x00000000
+  port2 +0x10 (post)         @ 0x492028010 = 0x00000000
+  L653: write32(port_base+0x104, 0x7fffffff) (overriding T8140 0xfffffff0)
+  port2 +0x104 (pre)         @ 0x492028104 = 0xfffffff0
+  port2 +0x104 (post)        @ 0x492028104 = 0x7ffffff0
+  L674: write32(port_base+0x397c, 0x0)
+  port2 +0x397c (pre)        @ 0x49202b97c = 0x00000000
+  port2 +0x397c (post)       @ 0x49202b97c = 0x00000000
+  L716: clear32(port_phy_base+0x000, 0x4000)
+  port2 PHY_CTRL (pre)       @ 0x497028000 = 0x2300066f
+  port2 PHY_CTRL (post-clear-0x4000) @ 0x497028000 = 0x2300066f
+  port2 LINKSTS (after T602X-only writes) @ 0x492028208 = 0x83000204
+  port2 after T602X-only writes      LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+
+  L737: LTSSM debug (Tier 3 -- ltssm_base may AXI-stall)
+    write to ltssm+0x10 = 0x2
+    write to ltssm+0x1c = 0x4
+    write to ltssm+0x20 |= 0x2
+    write to ltssm+0x14 = 0x1
+  L742: clear32(port_base+0x800, 0x100)
+  port2 APPCLK (post-clear-bit8) @ 0x492028800 = 0x00100001
+  port2 LINKSTS (after L737-742 LTSSM kick) @ 0x492028208 = 0x83000204
+  port2 after L737-742 LTSSM kick    LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+
+  L752: cycle T602X_PORT_RESET (reassert + deassert)
+  port2 T602X_RESET (reasserted) @ 0x49202882c = 0x00000000
+  port2 T602X_RESET (deasserted) @ 0x49202882c = 0x00000001
+  port2 LINKSTS (after T602X_PORT_RESET cycle) @ 0x492028208 = 0x83000204
+  port2 after T602X_PORT_RESET cycle LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  L764: LTSSM debug (Tier 3)
+    write to ltssm+0x10 = 0x2
+    write to ltssm+0x1c = 0x4
+    write to ltssm+0x20 |= 0x2
+    write to ltssm+0x14 = 0x1
+  port2 LINKSTS (after do-again LTSSM kick) @ 0x492028208 = 0x83000204
+  port2 after do-again LTSSM kick    LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+
+  L845: MSIMAP populate 512 entries
+  port2 LINKSTS (after MSIMAP populate) @ 0x492028208 = 0x83000204
+  port2 after MSIMAP populate        LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+
+  L839: write32(port_base+0x4020, 0x3)
+  port2 +0x4020 (post-write) @ 0x49202c020 = 0x00000000
+  L841: write32(intr2axi_base+0x80, 0x1)
+  port2 intr2axi+0x80 (post) @ 0x492024080 = 0x00000000
+  L843: clear32(rc_base+0x3c, 0x1)  (disarm config-write mode)
+  rc_base+0x3c (before final clear) @ 0x49400003c = 0x00000000
+  rc_base+0x3c (post-clear)  @ 0x49400003c = 0x00000000
+  port2 LINKSTS (after full T602X replay) @ 0x492028208 = 0x83000204
+  port2 after full T602X replay      LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+[guard] t602x_port_init_replay: exc_count delta = 0 (before=0, after=0)
+=== PCIe controller register dump (post-t602x, tier=2) ===
+  rc_base + 0x03c            @ 0x49400003c = 0x00000000
+
+--- port0 (T1) port_base=0x490028000 ---
+  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100001
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
+  port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
+  port0 +0x010               @ 0x490028010 = 0x00000000
+  port0 +0x088               @ 0x490028088 = 0x00000000
+  port0 +0x100               @ 0x490028100 = 0x00000000
+  port0 +0x104               @ 0x490028104 = 0x7ffffff0
+  port0 +0x124               @ 0x490028124 = 0x00000100
+  port0 +0x140               @ 0x490028140 = 0x00000011
+  port0 +0x144               @ 0x490028144 = 0x00253770
+  port0 +0x148               @ 0x490028148 = 0x00000000
+  port0 +0x210               @ 0x490028210 = 0x00000000
+  port0 +0x808               @ 0x490028808 = 0x001000ff
+  port0 +0x397c (T602X only) @ 0x49002b97c = 0x8000005f
+
+--- port2 (T1) port_base=0x492028000 ---
+  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100001
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
+  port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
+  port2 +0x010               @ 0x492028010 = 0x00000000
+  port2 +0x088               @ 0x492028088 = 0x00000000
+  port2 +0x100               @ 0x492028100 = 0x00000000
+  port2 +0x104               @ 0x492028104 = 0x7ffffff0
+  port2 +0x124               @ 0x492028124 = 0x00000100
+  port2 +0x140               @ 0x492028140 = 0x00000011
+  port2 +0x144               @ 0x492028144 = 0x00253770
+  port2 +0x148               @ 0x492028148 = 0x00000000
+  port2 +0x210               @ 0x492028210 = 0x00000000
+  port2 +0x808               @ 0x492028808 = 0x001000ff
+  port2 +0x397c (T602X only) @ 0x49202b97c = 0x8000005f
+
+=== Tier 2 (--tier2) ===
+  PHYCMN_CLK (phy_common+0x000) @ 0x497004000 = 0x80300001
+  PHYIF_CTRL (rc_base+0x024) @ 0x494000024 = 0x00000000
+
+--- port0 (T2) phy_base=0x497020000 ---
+  port0 PHY_CTRL (+0x000)    @ 0x497020000 = 0x2300066f
+  port0 PHY      (+0x004)    @ 0x497020004 = 0x00000030
+
+--- port2 (T2) phy_base=0x497028000 ---
+  port2 PHY_CTRL (+0x000)    @ 0x497028000 = 0x2300066f
+  port2 PHY      (+0x004)    @ 0x497028004 = 0x00000030
+[guard] dump_pcie_regs(post-t602x): exc_count delta = 0 (before=0, after=0)
+=== ECAM walk ===
+ecam_base = 0x1cb0000000
+
+active ports: [0, 2]
+
+--- root bus 0 ---
+  00:00.0: vacant (VID:DID = 0xffffffff)
+  00:01.0: skipped (port 1 inactive)
+  00:02.0: vacant (VID:DID = 0xffffffff)
+[guard] ecam_walk: exc_count delta = 0 (before=0, after=0)
+
+=== enable NIC ===
+No class-0x02 device found.
+```
+[ahmed@admin AppleSiliconM4]$ 

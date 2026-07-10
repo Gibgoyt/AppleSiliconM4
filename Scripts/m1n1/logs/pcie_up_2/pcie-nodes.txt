@@ -1,0 +1,165 @@
+=== /arm-io/apcie ===
+compatible: ListContainer(['apcie,t8132'])
+reg[0]: addr=0x1cb0000000 size=0x10000000
+reg[0] translated: base=0x1cb0000000 size=0x10000000
+reg[1]: addr=0x494000000 size=0x4000
+reg[1] translated: base=0x494000000 size=0x4000
+reg[2]: addr=0x497000000 size=0x40000
+reg[2] translated: base=0x497000000 size=0x40000
+reg[3]: addr=0x497040000 size=0x20000
+reg[3] translated: base=0x497040000 size=0x20000
+reg[4]: addr=0x496000000 size=0x1000000
+reg[4] translated: base=0x496000000 size=0x1000000
+reg[5]: addr=0x495046200 size=0x4000
+reg[5] translated: base=0x495046200 size=0x4000
+reg[6]: addr=0x495044000 size=0x4000
+reg[6] translated: base=0x495044000 size=0x4000
+reg[7]: addr=0x490028000 size=0x8000
+reg[7] translated: base=0x490028000 size=0x8000
+reg[8]: addr=0x49003c000 size=0x4000
+reg[8] translated: base=0x49003c000 size=0x4000
+reg[9]: addr=0x497020000 size=0x4000
+reg[9] translated: base=0x497020000 size=0x4000
+reg[10]: addr=0x497048000 size=0x8000
+reg[10] translated: base=0x497048000 size=0x8000
+reg[11]: addr=0x490024000 size=0x4000
+reg[11] translated: base=0x490024000 size=0x4000
+reg[12]: addr=0x490000000 size=0xc000
+reg[12] translated: base=0x490000000 size=0xc000
+reg[13]: addr=0x491028000 size=0x8000
+reg[13] translated: base=0x491028000 size=0x8000
+reg[14]: addr=0x49103c000 size=0x4000
+reg[14] translated: base=0x49103c000 size=0x4000
+reg[15]: addr=0x497024000 size=0x4000
+reg[15] translated: base=0x497024000 size=0x4000
+reg[16]: addr=0x497050000 size=0x8000
+reg[16] translated: base=0x497050000 size=0x8000
+reg[17]: addr=0x491024000 size=0x4000
+reg[17] translated: base=0x491024000 size=0x4000
+reg[18]: addr=0x491000000 size=0xc000
+reg[18] translated: base=0x491000000 size=0xc000
+reg[19]: addr=0x492028000 size=0x8000
+reg[19] translated: base=0x492028000 size=0x8000
+reg[20]: addr=0x49203c000 size=0x4000
+reg[20] translated: base=0x49203c000 size=0x4000
+reg[21]: addr=0x497028000 size=0x4000
+reg[21] translated: base=0x497028000 size=0x4000
+reg[22]: addr=0x497058000 size=0x8000
+reg[22] translated: base=0x497058000 size=0x8000
+reg[23]: addr=0x492024000 size=0x4000
+reg[23] translated: base=0x492024000 size=0x4000
+reg[24]: addr=0x492000000 size=0xc000
+reg[24] translated: base=0x492000000 size=0xc000
+lane-cfg: 0
+device_type: 'pci'
+#address-cells: 3
+#size-cells: 2
+
+=== /arm-io/apcie-ge0 ===
+NOT PRESENT
+
+=== /arm-io/apcie-ge1 ===
+NOT PRESENT
+
+=== /arm-io/apciec0 ===
+compatible: ListContainer(['apciec,t8132'])
+reg[0]: addr=0x1c50000000 size=0x10000000
+reg[0] translated: base=0x1c50000000 size=0x10000000
+reg[1]: addr=0x404034000 size=0x4000
+reg[1] translated: base=0x404034000 size=0x4000
+reg[2]: addr=0x404020000 size=0x8000
+reg[2] translated: base=0x404020000 size=0x8000
+reg[3]: addr=0x404038000 size=0x4000
+reg[3] translated: base=0x404038000 size=0x4000
+reg[4]: addr=0x404060000 size=0x4000
+reg[4] translated: base=0x404060000 size=0x4000
+reg[5]: addr=0x400020000 size=0x4000
+reg[5] translated: base=0x400020000 size=0x4000
+reg[6]: addr=0x40402c000 size=0x4000
+reg[6] translated: base=0x40402c000 size=0x4000
+reg[7]: addr=0x404028000 size=0x4000
+reg[7] translated: base=0x404028000 size=0x4000
+device_type: 'pci-c'
+#address-cells: 3
+#size-cells: 2
+
+=== /arm-io/apciec0-piodma ===
+compatible: ListContainer(['pciec-apiodma,t8103'])
+reg[0]: addr=0x404068000 size=0x4000
+reg[0] translated: base=0x404068000 size=0x4000
+reg[1]: addr=0x40406c000 size=0x4000
+reg[1] translated: base=0x40406c000 size=0x4000
+reg[2]: addr=0x404070000 size=0x4000
+reg[2] translated: base=0x404070000 size=0x4000
+reg[3]: addr=0x40403c000 size=0x4000
+reg[3] translated: base=0x40403c000 size=0x4000
+device_type: 'apciec0-piodma'
+
+=== /arm-io/apciec1 ===
+compatible: ListContainer(['apciec,t8132'])
+reg[0]: addr=0x1c60000000 size=0x10000000
+reg[0] translated: base=0x1c60000000 size=0x10000000
+reg[1]: addr=0x40c034000 size=0x4000
+reg[1] translated: base=0x40c034000 size=0x4000
+reg[2]: addr=0x40c020000 size=0x8000
+reg[2] translated: base=0x40c020000 size=0x8000
+reg[3]: addr=0x40c038000 size=0x4000
+reg[3] translated: base=0x40c038000 size=0x4000
+reg[4]: addr=0x40c060000 size=0x4000
+reg[4] translated: base=0x40c060000 size=0x4000
+reg[5]: addr=0x408020000 size=0x4000
+reg[5] translated: base=0x408020000 size=0x4000
+reg[6]: addr=0x40c02c000 size=0x4000
+reg[6] translated: base=0x40c02c000 size=0x4000
+reg[7]: addr=0x40c028000 size=0x4000
+reg[7] translated: base=0x40c028000 size=0x4000
+device_type: 'pci-c'
+#address-cells: 3
+#size-cells: 2
+
+=== /arm-io/apciec1-piodma ===
+compatible: ListContainer(['pciec-apiodma,t8103'])
+reg[0]: addr=0x40c068000 size=0x4000
+reg[0] translated: base=0x40c068000 size=0x4000
+reg[1]: addr=0x40c06c000 size=0x4000
+reg[1] translated: base=0x40c06c000 size=0x4000
+reg[2]: addr=0x40c070000 size=0x4000
+reg[2] translated: base=0x40c070000 size=0x4000
+reg[3]: addr=0x40c03c000 size=0x4000
+reg[3] translated: base=0x40c03c000 size=0x4000
+device_type: 'apciec1-piodma'
+
+=== /arm-io/apciec3 ===
+compatible: ListContainer(['apciec,t8132'])
+reg[0]: addr=0x1c80000000 size=0x10000000
+reg[0] translated: base=0x1c80000000 size=0x10000000
+reg[1]: addr=0x41c034000 size=0x4000
+reg[1] translated: base=0x41c034000 size=0x4000
+reg[2]: addr=0x41c020000 size=0x8000
+reg[2] translated: base=0x41c020000 size=0x8000
+reg[3]: addr=0x41c038000 size=0x4000
+reg[3] translated: base=0x41c038000 size=0x4000
+reg[4]: addr=0x41c060000 size=0x4000
+reg[4] translated: base=0x41c060000 size=0x4000
+reg[5]: addr=0x418020000 size=0x4000
+reg[5] translated: base=0x418020000 size=0x4000
+reg[6]: addr=0x41c02c000 size=0x4000
+reg[6] translated: base=0x41c02c000 size=0x4000
+reg[7]: addr=0x41c028000 size=0x4000
+reg[7] translated: base=0x41c028000 size=0x4000
+device_type: 'pci-c'
+#address-cells: 3
+#size-cells: 2
+
+=== /arm-io/apciec3-piodma ===
+compatible: ListContainer(['pciec-apiodma,t8103'])
+reg[0]: addr=0x41c068000 size=0x4000
+reg[0] translated: base=0x41c068000 size=0x4000
+reg[1]: addr=0x41c06c000 size=0x4000
+reg[1] translated: base=0x41c06c000 size=0x4000
+reg[2]: addr=0x41c070000 size=0x4000
+reg[2] translated: base=0x41c070000 size=0x4000
+reg[3]: addr=0x41c03c000 size=0x4000
+reg[3] translated: base=0x41c03c000 size=0x4000
+device_type: 'apciec3-piodma'
+
