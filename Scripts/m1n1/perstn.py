@@ -623,11 +623,26 @@ def dump_pcie_regs(apcie, buf, tag="post-init", tier=1):
             pb = p_.port_base
             buf.write(f"\n--- port{i} (T1) port_base=0x{pb:x} ---\n")
             log(f"  === port{i} Tier 1 (port_base=0x{pb:x}) ===")
-            _read32_live(pb + 0x800, f"port{i} APPCLK   (+0x800)", buf)
-            _read32_live(pb + 0x804, f"port{i} STATUS   (+0x804)", buf)
-            _read32_live(pb + 0x208, f"port{i} LINKSTS  (+0x208)", buf)
+            # Bring-up + status registers.
+            _read32_live(pb + 0x800, f"port{i} APPCLK      (+0x800)", buf)
+            _read32_live(pb + 0x804, f"port{i} STATUS      (+0x804)", buf)
+            _read32_live(pb + 0x208, f"port{i} LINKSTS     (+0x208)", buf)
             _read32_live(pb + 0x82c, f"port{i} T602X_RESET (+0x82c)", buf)
+            _read32_live(pb + 0x814, f"port{i} PORT_RESET  (+0x814)", buf)
+            # T602X-style init state that m1n1's t8140 branch writes on
+            # t8132 (pcie.c:644-687 runs for type == T8140). Reading these
+            # tells us which writes stuck and which need overriding.
+            _read32_live(pb + 0x010, f"port{i} +0x010", buf)
+            _read32_live(pb + 0x088, f"port{i} +0x088", buf)
+            _read32_live(pb + 0x100, f"port{i} +0x100", buf)
             _read32_live(pb + 0x104, f"port{i} +0x104", buf)
+            _read32_live(pb + 0x124, f"port{i} +0x124", buf)
+            _read32_live(pb + 0x140, f"port{i} +0x140", buf)
+            _read32_live(pb + 0x144, f"port{i} +0x144", buf)
+            _read32_live(pb + 0x148, f"port{i} +0x148", buf)
+            _read32_live(pb + 0x210, f"port{i} +0x210", buf)
+            _read32_live(pb + 0x808, f"port{i} +0x808", buf)
+            _read32_live(pb + 0x397c, f"port{i} +0x397c (T602X only)", buf)
 
         if tier < 2:
             return
@@ -693,6 +708,300 @@ def _linksts_decode(v):
     return "|".join(bits) if bits else "none"
 
 
+# ---------------------------------------------------------------- T602X init replay
+
+# APCIE_T602X_PORT_MSIMAP offset (m1n1 src/pcie.c:71).
+T602X_PORT_MSIMAP = 0x3800
+
+
+def t602x_port_init_replay(apcie, buf, aggressive=False, do_again=False,
+                            do_msimap=False, port_indices=None):
+    """Replay the T602X APCIE branch of m1n1's pcie_init_controller
+    (src/pcie.c lines 633-767) on top of what m1n1's t8140 branch left
+    behind. Verbatim from the T602X code paths that are *disabled* by
+    `state->pcie_regs->type == APCIE_T8140` on the current t8132 clause.
+
+    What this ADDS on top of what m1n1 already did:
+      L633:  set32(rc_base + 0x3c, 0x1)          -- Tier 1
+      L637:  write32(port_base + 0x10, 0x2)      -- Tier 1
+      L653:  write32(port_base + 0x104, 0x7fffffff) -- overrides m1n1's
+             T8140 value of 0xfffffff0 for the T602X flavor
+      L674:  write32(port_base + 0x397c, 0x0)    -- Tier 1
+      L716:  clear32(port_phy_base + 0x000, 0x4000) -- Tier 2. m1n1
+             already cleared bit 0x10 instead.
+      L724:  set32(port_base + T602X_PORT_RESET, RESET_DIS) -- Tier 1
+             (m1n1 already did this since line 724 also runs on T8140)
+
+    Optional (gated flags):
+      aggressive=True   -- adds L737-742 LTSSM debug writes (Tier 3,
+                           ltssm_base; may AXI-stall if the block is
+                           un-clocked).
+      do_again=True     -- adds L752-767 "Do it again?" cycle
+                           (T602X_PORT_RESET reassert then LTSSM debug).
+                           Aggressive implies do_again == False; the
+                           two use different LTSSM sequences.
+      do_msimap=True    -- adds L845 MSIMAP populate with 0x80000000|i
+                           (writes to port_base + 0x3800 + i*4 for
+                           i=0..511). Big; wraps to Tier 3 territory
+                           via the MSI vector table.
+
+    After each phase, LINKSTS is snapshotted so a change is visible
+    immediately. Bails cleanly on m1n1 wedge via DumpAborted.
+    """
+    if port_indices is None:
+        port_indices = apcie.active_ports
+    buf.write(f"\n=== T602X init replay (aggressive={aggressive}, "
+              f"do_again={do_again}, do_msimap={do_msimap}) ===\n")
+    log(f"  t602x_port_init_replay ports={list(port_indices)} "
+        f"aggressive={aggressive} do_again={do_again} do_msimap={do_msimap}")
+
+    for i in port_indices:
+        p_ = apcie.ports[i]
+        pb = p_.port_base
+        phy = p_.phy_base
+        lt = p_.ltssm_base
+        buf.write(f"\n--- port{i} T602X replay ---\n")
+        log(f"    port{i} port_base=0x{pb:x} phy_base=0x{phy:x} "
+            f"ltssm=0x{lt:x}")
+
+        def snap(label):
+            v = _read32_live(pb + 0x208,
+                             f"port{i} LINKSTS ({label})", buf)
+            if v is not None:
+                buf.write(f"  port{i} {label:28s} LINKSTS decode: "
+                          f"[{_linksts_decode(v)}]\n")
+
+        try:
+            snap("pre-replay baseline")
+
+            # L633: set rc_base + 0x3c bit 0. Verify writeback.
+            buf.write(f"\n  L633: set32(rc_base+0x3c, 0x1)\n")
+            _read32_live(apcie.rc_base + 0x3c,
+                         "rc_base+0x3c (pre)", buf)
+            try:
+                p.set32(apcie.rc_base + 0x3c, 0x1)
+            except Exception as e:
+                buf.write(f"  L633 write FAILED: {e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            _read32_live(apcie.rc_base + 0x3c,
+                         "rc_base+0x3c (post-set)", buf)
+
+            # L637: port_base + 0x10 = 0x2 (T602X APCIE only).
+            buf.write(f"  L637: write32(port_base+0x10, 0x2)\n")
+            _read32_live(pb + 0x10, f"port{i} +0x10 (pre)", buf)
+            try:
+                p.write32(pb + 0x10, 0x2)
+            except Exception as e:
+                buf.write(f"  L637 write FAILED: {e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            _read32_live(pb + 0x10, f"port{i} +0x10 (post)", buf)
+
+            # L653: port_base + 0x104 = 0x7fffffff (T602X flavor; overrides
+            # m1n1's T8140 value 0xfffffff0).
+            buf.write(f"  L653: write32(port_base+0x104, 0x7fffffff) "
+                      f"(overriding T8140 0xfffffff0)\n")
+            _read32_live(pb + 0x104, f"port{i} +0x104 (pre)", buf)
+            try:
+                p.write32(pb + 0x104, 0x7fffffff)
+            except Exception as e:
+                buf.write(f"  L653 write FAILED: {e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            _read32_live(pb + 0x104, f"port{i} +0x104 (post)", buf)
+
+            # L674: port_base + 0x397c = 0 (T602X only).
+            buf.write(f"  L674: write32(port_base+0x397c, 0x0)\n")
+            _read32_live(pb + 0x397c, f"port{i} +0x397c (pre)", buf)
+            try:
+                p.write32(pb + 0x397c, 0x0)
+            except Exception as e:
+                buf.write(f"  L674 write FAILED: {e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            _read32_live(pb + 0x397c, f"port{i} +0x397c (post)", buf)
+
+            # L716: clear32(port_phy_base + PHY_CTRL, 0x4000).
+            # m1n1's T8140 branch cleared bit 0x10 instead. Our previous
+            # dump showed bit 14 is already 0, so this is a no-op, but
+            # replay it for parity.
+            buf.write(f"  L716: clear32(port_phy_base+0x000, 0x4000)\n")
+            _read32_live(phy + 0x0, f"port{i} PHY_CTRL (pre)", buf)
+            try:
+                p.clear32(phy + 0x0, 0x4000)
+            except Exception as e:
+                buf.write(f"  L716 write FAILED: {e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            _read32_live(phy + 0x0, f"port{i} PHY_CTRL (post-clear-0x4000)", buf)
+
+            time.sleep(0.05)
+            snap("after T602X-only writes")
+
+            if aggressive:
+                # L737-742: T602X LTSSM debug writes (non-APCIE branch --
+                # note m1n1 gates these on `controller != APCIE`, so the
+                # main APCIE path never runs them; only APCIE_GE does).
+                # Include here for A/B: on t8132 we may need them even for
+                # main APCIE.
+                buf.write(f"\n  L737: LTSSM debug (Tier 3 -- ltssm_base "
+                          f"may AXI-stall)\n")
+                log(f"    LTSSM debug writes on ltssm_base=0x{lt:x}")
+                for lbl, addr, action in [
+                    ("ltssm+0x10 = 0x2",    lt + 0x10, ("write", 0x2)),
+                    ("ltssm+0x1c = 0x4",    lt + 0x1c, ("write", 0x4)),
+                    ("ltssm+0x20 |= 0x2",   lt + 0x20, ("set",   0x2)),
+                    ("ltssm+0x14 = 0x1",    lt + 0x14, ("write", 0x1)),
+                ]:
+                    buf.write(f"    write to {lbl}\n")
+                    try:
+                        if action[0] == "set":
+                            p.set32(addr, action[1])
+                        else:
+                            p.write32(addr, action[1])
+                    except Exception as e:
+                        buf.write(f"    {lbl} write FAILED: "
+                                  f"{e.__class__.__name__}: {e}\n")
+                        if not check_alive():
+                            raise DumpAborted() from e
+                buf.write(f"  L742: clear32(port_base+0x800, 0x100)\n")
+                try:
+                    p.clear32(pb + 0x800, 0x100)
+                except Exception as e:
+                    buf.write(f"  L742 write FAILED: "
+                              f"{e.__class__.__name__}: {e}\n")
+                    if not check_alive():
+                        raise DumpAborted() from e
+                _read32_live(pb + 0x800,
+                             f"port{i} APPCLK (post-clear-bit8)", buf)
+                time.sleep(0.05)
+                snap("after L737-742 LTSSM kick")
+
+            if do_again:
+                # L752-767: "Do it again?" -- T602X APCIE branch only.
+                buf.write(f"\n  L752: cycle T602X_PORT_RESET "
+                          f"(reassert + deassert)\n")
+                log(f"    T602X_PORT_RESET cycle on port{i}")
+                try:
+                    p.clear32(pb + 0x82c, 0x1)
+                except Exception as e:
+                    buf.write(f"  L752 clear FAILED: "
+                              f"{e.__class__.__name__}: {e}\n")
+                    if not check_alive():
+                        raise DumpAborted() from e
+                _read32_live(pb + 0x82c,
+                             f"port{i} T602X_RESET (reasserted)", buf)
+                try:
+                    p.set32(pb + 0x82c, 0x1)
+                except Exception as e:
+                    buf.write(f"  L754 set FAILED: "
+                              f"{e.__class__.__name__}: {e}\n")
+                    if not check_alive():
+                        raise DumpAborted() from e
+                _read32_live(pb + 0x82c,
+                             f"port{i} T602X_RESET (deasserted)", buf)
+                # m1n1 polls LINKSTS_BUSY = 0 for 250 ms here.
+                time.sleep(0.25)
+                snap("after T602X_PORT_RESET cycle")
+
+                # udelay(1000).
+                time.sleep(0.001)
+
+                # L764-767: LTSSM debug writes again (Tier 3).
+                buf.write(f"  L764: LTSSM debug (Tier 3)\n")
+                log(f"    second LTSSM debug writes on ltssm_base=0x{lt:x}")
+                for lbl, addr, action in [
+                    ("ltssm+0x10 = 0x2",    lt + 0x10, ("write", 0x2)),
+                    ("ltssm+0x1c = 0x4",    lt + 0x1c, ("write", 0x4)),
+                    ("ltssm+0x20 |= 0x2",   lt + 0x20, ("set",   0x2)),
+                    ("ltssm+0x14 = 0x1",    lt + 0x14, ("write", 0x1)),
+                ]:
+                    buf.write(f"    write to {lbl}\n")
+                    try:
+                        if action[0] == "set":
+                            p.set32(addr, action[1])
+                        else:
+                            p.write32(addr, action[1])
+                    except Exception as e:
+                        buf.write(f"    {lbl} write FAILED: "
+                                  f"{e.__class__.__name__}: {e}\n")
+                        if not check_alive():
+                            raise DumpAborted() from e
+                time.sleep(0.05)
+                snap("after do-again LTSSM kick")
+
+            if do_msimap:
+                # L845: populate MSIMAP with 0x80000000 | i. Big loop
+                # (512 iterations); writes into port_base + 0x3800.
+                buf.write(f"\n  L845: MSIMAP populate 512 entries\n")
+                log(f"    MSIMAP populate on port{i}")
+                for j in range(512):
+                    addr = pb + T602X_PORT_MSIMAP + 4 * j
+                    try:
+                        p.write32(addr, 0x80000000 | j)
+                    except Exception as e:
+                        buf.write(f"    MSIMAP[{j}] @ 0x{addr:x} FAILED: "
+                                  f"{e.__class__.__name__}: {e}\n")
+                        if not check_alive():
+                            raise DumpAborted() from e
+                        break
+                snap("after MSIMAP populate")
+
+            # L839-843 epilogue writes we do NOT replay yet:
+            #   write32(port_base + 0x4020, 0x3)
+            #   write32(port_intr2axi_base + 0x80, 0x1)
+            #   clear32(rc_base + 0x3c, 0x1)
+            # rc_base+0x3c clear is important -- if the SET at L633 is a
+            # "config-write-enable" mode, we must clear it to arm the port
+            # for LTSSM training. Do that unconditionally here.
+            buf.write(f"\n  L839: write32(port_base+0x4020, 0x3)\n")
+            try:
+                p.write32(pb + 0x4020, 0x3)
+            except Exception as e:
+                buf.write(f"  L839 write FAILED: "
+                          f"{e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            _read32_live(pb + 0x4020,
+                         f"port{i} +0x4020 (post-write)", buf)
+
+            if p_.intr2axi_base:
+                buf.write(f"  L841: write32(intr2axi_base+0x80, 0x1)\n")
+                try:
+                    p.write32(p_.intr2axi_base + 0x80, 0x1)
+                except Exception as e:
+                    buf.write(f"  L841 write FAILED: "
+                              f"{e.__class__.__name__}: {e}\n")
+                    if not check_alive():
+                        raise DumpAborted() from e
+                _read32_live(p_.intr2axi_base + 0x80,
+                             f"port{i} intr2axi+0x80 (post)", buf)
+
+            buf.write(f"  L843: clear32(rc_base+0x3c, 0x1)  "
+                      f"(disarm config-write mode)\n")
+            _read32_live(apcie.rc_base + 0x3c,
+                         "rc_base+0x3c (before final clear)", buf)
+            try:
+                p.clear32(apcie.rc_base + 0x3c, 0x1)
+            except Exception as e:
+                buf.write(f"  L843 clear FAILED: "
+                          f"{e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            _read32_live(apcie.rc_base + 0x3c,
+                         "rc_base+0x3c (post-clear)", buf)
+
+            # Extended settle to let LTSSM converge if it will.
+            time.sleep(0.5)
+            snap("after full T602X replay")
+        except DumpAborted:
+            log(f"    t602x replay aborted (m1n1 wedged) on port{i}")
+            buf.write(f"[t602x_port_init_replay] aborted on port{i} "
+                      f"-- m1n1 not responding\n")
+            return
+
+
 def try_ltssm_kick(apcie, buf, port_indices=None, aggressive=False):
     """After p.pcie_init() has returned (with ports stuck at LINKSTS_BUSY),
     try the LTSSM kick sequences that the T602X code paths use but the
@@ -732,16 +1041,32 @@ def try_ltssm_kick(apcie, buf, port_indices=None, aggressive=False):
             snap("baseline")
 
             # Sequence A: T602X APCIE-branch kick (rc_base + port_base only).
+            # Verify each write's readback so we can tell whether the
+            # register accepted the write (previous run showed rc_base+0x3c
+            # reading back 0 after set32).
             log(f"    seq A on {name}")
+            _read32_live(apcie.rc_base + 0x3c,
+                         f"rc_base+0x3c (seq A pre)", buf)
             buf.write(f"  seq A: set32(rc_base+0x3c, 0x1)  # 0x{apcie.rc_base + 0x3c:x}\n")
             try:
                 p.set32(apcie.rc_base + 0x3c, 0x1)
-                buf.write(f"  seq A: write32(port_base+0x10, 0x2)\n")
-                p.write32(pb + 0x10, 0x2)
             except Exception as e:
-                buf.write(f"  seq A FAILED: {e.__class__.__name__}: {e}\n")
+                buf.write(f"  seq A set32 FAILED: "
+                          f"{e.__class__.__name__}: {e}\n")
                 if not check_alive():
                     raise DumpAborted() from e
+            _read32_live(apcie.rc_base + 0x3c,
+                         f"rc_base+0x3c (seq A post-set)", buf)
+            _read32_live(pb + 0x10, f"{name} +0x10 (seq A pre)", buf)
+            buf.write(f"  seq A: write32(port_base+0x10, 0x2)\n")
+            try:
+                p.write32(pb + 0x10, 0x2)
+            except Exception as e:
+                buf.write(f"  seq A write32 FAILED: "
+                          f"{e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            _read32_live(pb + 0x10, f"{name} +0x10 (seq A post)", buf)
             time.sleep(0.01)
             snap("after seq A")
 
@@ -944,6 +1269,24 @@ def main():
                          "OFF by default -- writes go through DART MMIO alias.")
     ap.add_argument("--unblock-port", type=int, default=2,
                     help="port index for --unblock-experiment (default: 2)")
+    ap.add_argument("--t602x-init", action="store_true",
+                    help="after pcie_init, replay the T602X APCIE port init "
+                         "sequence (m1n1 src/pcie.c:633-767 lines the T8140 "
+                         "branch skips). Adds rc_base+0x3c gating, "
+                         "port_base+0x10, port_base+0x104=0x7fffffff, "
+                         "port_base+0x397c, PHY_CTRL &= ~0x4000. All Tier 1/2 "
+                         "addresses. Safe to combine with --tier2 dump.")
+    ap.add_argument("--t602x-aggressive", action="store_true",
+                    help="in --t602x-init, also do the L737-742 LTSSM debug "
+                         "writes on ltssm_base (Tier 3; may AXI-stall).")
+    ap.add_argument("--t602x-do-again", action="store_true",
+                    help="in --t602x-init, also do the L752-767 'do it again' "
+                         "cycle (T602X_PORT_RESET reassert + LTSSM debug, "
+                         "Tier 3 for the debug part).")
+    ap.add_argument("--t602x-msimap", action="store_true",
+                    help="in --t602x-init, also populate the 512-entry MSIMAP "
+                         "table with 0x80000000|i. Big loop; port_base + "
+                         "0x3800 + i*4 for i in 0..511.")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -1047,6 +1390,28 @@ def main():
                 with guarded(buf, "dump_pcie_regs(post-kick)",
                              short_timeout=timeout):
                     try_(lambda: dump_pcie_regs(apcie, buf, "post-kick",
+                                                tier=args.tier),
+                         "dump_pcie_regs")
+
+        if args.t602x_init and liveness_gate("T602X init replay"):
+            log(f"replaying T602X APCIE port init on ports "
+                f"{apcie.active_ports} (aggressive="
+                f"{args.t602x_aggressive}, do_again={args.t602x_do_again}, "
+                f"msimap={args.t602x_msimap})...")
+            with guarded(buf, "t602x_port_init_replay",
+                         short_timeout=timeout):
+                try_(lambda: t602x_port_init_replay(
+                        apcie, buf,
+                        aggressive=args.t602x_aggressive,
+                        do_again=args.t602x_do_again,
+                        do_msimap=args.t602x_msimap),
+                     "t602x_port_init_replay")
+            if liveness_gate("post-T602X dump"):
+                log(f"dumping PCIe controller registers "
+                    f"(post-t602x, tier={args.tier})...")
+                with guarded(buf, "dump_pcie_regs(post-t602x)",
+                             short_timeout=timeout):
+                    try_(lambda: dump_pcie_regs(apcie, buf, "post-t602x",
                                                 tier=args.tier),
                          "dump_pcie_regs")
 
