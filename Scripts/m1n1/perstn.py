@@ -46,9 +46,12 @@ import traceback
 
 sys.path.append(str(pathlib.Path.home() /
     "Projects/AsahiLinux/m4/m1n1/proxyclient"))
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 from m1n1.setup import *          # noqa: F401,F403 -- exposes u, p, iface
 from m1n1.fw.smc import SMCClient
+
+from pcie_regs import ApcieMap
 
 
 # PCI config space offsets.
@@ -337,19 +340,35 @@ def probe_device(base, bus, dev, fn, buf):
     return dev_info
 
 
-def ecam_walk(base, buf):
-    """Walk bus 0 devs 0..3 (root + up to 3 switches), then each
-    switch's downstream bus dev 0. Returns list of dev_info dicts."""
+def ecam_walk(base, buf, active_ports=None):
+    """Walk bus 0 devs 0..3 (root + up to 3 switches), then each active
+    switch's downstream bus dev 0. Returns list of dev_info dicts.
+
+    active_ports (from ApcieMap.active_ports) filters which downstream buses
+    to touch -- reading an inactive port's ECAM range faults the fabric.
+    Bus number for downstream = m1n1's implicit "port index + 1" convention
+    when maximum-link-speed is set (root ports are 00:0N.0 -> bus N+1)."""
     devices = []
     buf.write("=== ECAM walk ===\n")
     buf.write(f"ecam_base = 0x{base:x}\n\n")
+    active_set = set(active_ports) if active_ports is not None else None
+    if active_set is not None:
+        buf.write(f"active ports: {sorted(active_set)}\n\n")
 
     buf.write("--- root bus 0 ---\n")
     root_devs = []
-    for d in range(8):
+    # On t8132 the three root complex functions live at 00:00.0/00:01.0/
+    # 00:02.0 (one per port). Probe just the port count, not 0..7.
+    for d in range(3):
+        # Skip inactive-port root functions -- their downstream config isn't
+        # backed by anything and even a header read can fault.
+        if active_set is not None and d not in active_set:
+            buf.write(f"  00:{d:02x}.0: skipped (port {d} inactive)\n")
+            continue
         info = try_(lambda d=d: probe_device(base, 0, d, 0, buf),
                     f"cfg 00:{d:02x}.0")
         if info is not None:
+            info["port"] = d
             root_devs.append(info)
             devices.append(info)
 
@@ -359,13 +378,14 @@ def ecam_walk(base, buf):
             continue
         buf.write(f"\n--- downstream bus {sec} "
                   f"(behind {bridge['bus']:02x}:{bridge['dev']:02x}."
-                  f"{bridge['fn']}) ---\n")
+                  f"{bridge['fn']}, port {bridge.get('port', '?')}) ---\n")
         # Endpoints normally at dev 0; probe dev 1 as belt-and-braces.
         for d in range(2):
             info = try_(lambda d=d, sec=sec: probe_device(base, sec, d, 0, buf),
                         f"cfg {sec:02x}:{d:02x}.0")
             if info is not None:
                 info["parent_bridge"] = f"{bridge['bus']:02x}:{bridge['dev']:02x}.{bridge['fn']}"
+                info["parent_port"] = bridge.get("port")
                 devices.append(info)
     return devices
 
@@ -408,40 +428,9 @@ def enable_nic(base, nic, buf):
 
 # ---------------------------------------------------------------- diagnostics
 
-# t8132 /arm-io/apcie register map, derived from the ADT dump in
-# m4_recon/pcie-nodes.txt.  Total 25 reg entries: 7 shared + 6 per port * 3.
-#
-# Shared regs (indices 0..6):
-#   [0] ECAM         0x1cb0000000  sz 0x10000000
-#   [1] RC           0x494000000   sz 0x4000
-#   [2] PHY (packed) 0x497000000   sz 0x40000  (phy_common = +0x4000, phy[0] = +0x8000)
-#   [3] PHY IP       0x497040000   sz 0x20000
-#   [4] AXI          0x496000000   sz 0x1000000
-#   [5] ???          0x495046200   sz 0x4000
-#   [6] ???          0x495044000   sz 0x4000
-#
-# Per-port (6 regs each) -- **t8132-specific 6-tuple**:
-#   [0]  0x49x028000  sz 0x8000   port_base                (m1n1 uses)
-#   [1]  0x49x03c000  sz 0x4000   port_ltssm_base          (m1n1 uses)
-#   [2]  0x497020000+ sz 0x4000   port_phy_base            (m1n1 uses)
-#   [3]  0x497048000+ sz 0x8000   ??? per-port PHY extra   (m1n1 IGNORES) NEW
-#   [4]  0x49x024000  sz 0x4000   port_intr2axi_base       (m1n1 uses)
-#   [5]  0x49x000000  sz 0xc000   ??? per-port ctrl block  (m1n1 IGNORES) NEW
-#
-# Ports 0/1/2 substitute x = 0/1/2 in the leading nibble for their block.
-RC_BASE = 0x494000000
-PHY_COMMON_BASE = 0x497000000 + 0x4000
-PORTS = [
-    {"name": "port0", "port_base": 0x490028000, "ltssm_base": 0x49003c000,
-     "phy_base": 0x497020000, "phy_extra": 0x497048000,
-     "intr2axi": 0x490024000, "ctrl_lo": 0x490000000},
-    {"name": "port1", "port_base": 0x491028000, "ltssm_base": 0x49103c000,
-     "phy_base": 0x497024000, "phy_extra": 0x497050000,
-     "intr2axi": 0x491024000, "ctrl_lo": 0x491000000},
-    {"name": "port2", "port_base": 0x492028000, "ltssm_base": 0x49203c000,
-     "phy_base": 0x497028000, "phy_extra": 0x497058000,
-     "intr2axi": 0x492024000, "ctrl_lo": 0x492000000},
-]
+# All addresses are pulled from the ADT via pcie_regs.ApcieMap.from_adt(u)
+# (in main()). See pcie_regs.py for the full annotated t8132 layout, port
+# GPIO wiring, and DART overlap notes.
 
 
 def _safe_read32(addr):
@@ -451,22 +440,32 @@ def _safe_read32(addr):
         return f"<{e.__class__.__name__}: {e}>"
 
 
-def dump_pcie_regs(buf, tag="post-init"):
+def dump_pcie_regs(apcie, buf, tag="post-init", include_inactive=False):
+    """Dump shared regs + per-port regs. Only iterates apcie.active_ports
+    unless include_inactive is True. IMPORTANT: reading an inactive port's
+    MMIO (its PHY was never enabled, PMGR gate is off) faults the fabric
+    and wedges m1n1 -- keep include_inactive False in normal use."""
     buf.write(f"=== PCIe controller register dump ({tag}) ===\n")
-    buf.write(f"PHYCMN_CLK    @ 0x{PHY_COMMON_BASE:x} + 0x000 = "
-              f"{_safe_read32(PHY_COMMON_BASE + 0x000)}\n")
-    buf.write(f"RC_BASE       @ 0x{RC_BASE:x} + 0x03c = "
-              f"{_safe_read32(RC_BASE + 0x03c)}   "
+    buf.write(f"PHYCMN_CLK    @ 0x{apcie.phy_common_base:x} + 0x000 = "
+              f"{_safe_read32(apcie.phy_common_base + 0x000)}\n")
+    buf.write(f"RC_BASE       @ 0x{apcie.rc_base:x} + 0x03c = "
+              f"{_safe_read32(apcie.rc_base + 0x03c)}   "
               f"(T602X APCIE sets to 0x1)\n\n")
 
-    for p_ in PORTS:
-        pb = p_["port_base"]
-        lt = p_["ltssm_base"]
-        phy = p_["phy_base"]
-        phyx = p_["phy_extra"]
-        ctrl = p_["ctrl_lo"]
-        buf.write(f"--- {p_['name']} port_base=0x{pb:x} ltssm=0x{lt:x} "
-                  f"phy=0x{phy:x} phy_extra=0x{phyx:x} ctrl_lo=0x{ctrl:x} ---\n")
+    port_indices = (range(apcie.N_PORTS) if include_inactive
+                    else apcie.active_ports)
+    for i in port_indices:
+        p_ = apcie.ports[i]
+        pb = p_.port_base
+        lt = p_.ltssm_base
+        phy = p_.phy_base
+        phyx = p_.phy_extra_base
+        ctrl = p_.ctrl_lo_base
+        tag_line = f"--- port{i} port_base=0x{pb:x} ltssm=0x{lt:x} " \
+                   f"phy=0x{phy:x} phy_extra=0x{phyx:x} ctrl_lo=0x{ctrl:x}"
+        if not p_.exists:
+            tag_line += "  [INACTIVE]"
+        buf.write(tag_line + " ---\n")
         # Known port_base registers.
         buf.write(f"  APPCLK      @ port+0x800 = {_safe_read32(pb + 0x800)}\n")
         buf.write(f"  STATUS      @ port+0x804 = {_safe_read32(pb + 0x804)}\n")
@@ -486,7 +485,8 @@ def dump_pcie_regs(buf, tag="post-init"):
                   f"(T602X non-APCIE writes 0x4)\n")
         buf.write(f"  LTSSM +0x20              = {_safe_read32(lt + 0x20)}   "
                   f"(T602X non-APCIE sets bit 1)\n")
-        # NEW/UNKNOWN blocks -- READ ONLY, first few words.
+        # phy_extra (overlaps shared PHY IP), ctrl_lo (overlaps DART) --
+        # read-only sample, first few words. See pcie_regs.py header notes.
         buf.write(f"  phy_extra +0x000         = {_safe_read32(phyx + 0x000)}\n")
         buf.write(f"  phy_extra +0x004         = {_safe_read32(phyx + 0x004)}\n")
         buf.write(f"  phy_extra +0x008         = {_safe_read32(phyx + 0x008)}\n")
@@ -513,7 +513,7 @@ def _linksts_decode(v):
     return "|".join(bits) if bits else "none"
 
 
-def try_ltssm_kick(buf, port_indices=(0, 2)):
+def try_ltssm_kick(apcie, buf, port_indices=None):
     """After p.pcie_init() has returned (with ports stuck at LINKSTS_BUSY),
     try the LTSSM kick sequences that the T602X code paths use but the
     T8140/t8132 path skips. Read LINKSTS before and after each write so we
@@ -522,13 +522,16 @@ def try_ltssm_kick(buf, port_indices=(0, 2)):
     Sequences tried in order per port:
       A) T602X APCIE:  rc_base+0x3c |= 0x1;  port_base+0x10 <- 0x2
       B) T602X non-APCIE LTSSM kick + APPCLK bit8 clear
+      C) cycle T602X_PORT_RESET (deassert, reassert, deassert)
     """
+    if port_indices is None:
+        port_indices = apcie.active_ports
     buf.write("\n=== LTSSM kick experiment (post-init) ===\n")
     for i in port_indices:
-        p_ = PORTS[i]
-        pb = p_["port_base"]
-        lt = p_["ltssm_base"]
-        name = p_["name"]
+        p_ = apcie.ports[i]
+        pb = p_.port_base
+        lt = p_.ltssm_base
+        name = f"port{i}"
 
         def snap(label):
             v = None
@@ -544,8 +547,8 @@ def try_ltssm_kick(buf, port_indices=(0, 2)):
 
         # Sequence A: T602X APCIE-branch kick.
         try:
-            buf.write(f"  seq A: set32(rc_base+0x3c, 0x1)  # 0x{RC_BASE + 0x3c:x}\n")
-            p.set32(RC_BASE + 0x3c, 0x1)
+            buf.write(f"  seq A: set32(rc_base+0x3c, 0x1)  # 0x{apcie.rc_base + 0x3c:x}\n")
+            p.set32(apcie.rc_base + 0x3c, 0x1)
             buf.write(f"  seq A: write32(port_base+0x10, 0x2)\n")
             p.write32(pb + 0x10, 0x2)
         except Exception as e:
@@ -587,6 +590,95 @@ def try_ltssm_kick(buf, port_indices=(0, 2)):
         snap("after 200ms settle")
 
 
+# ---------------------------------------------------------------- unmapped probe
+
+def probe_unmapped(apcie, buf, span_words=16):
+    """Read the first `span_words` 32-bit words of each active port's
+    phy_extra and ctrl_lo blocks. Read-only; safe as long as the port's
+    fabric is powered on (which it is post-SMC + post-pcie_init).
+
+    Purpose: reveal the initial contents of the two per-port blocks that
+    m1n1's t8140-path code does not touch. phy_extra sits inside the
+    shared PHY IP window (m1n1 does apply apcie-phy-ip-* tunables at
+    offsets that overlap here). ctrl_lo overlaps the DART MMIO for that
+    port; interesting values might be DART registers left over from
+    iBoot's own bring-up."""
+    buf.write("\n=== unmapped block probe (read-only) ===\n")
+    for i in apcie.active_ports:
+        port = apcie.ports[i]
+        buf.write(f"\n--- port{i} phy_extra @ 0x{port.phy_extra_base:x} "
+                  f"(sz 0x{port.phy_extra_size:x}) ---\n")
+        for off in range(0, span_words * 4, 4):
+            buf.write(f"  +0x{off:04x} = "
+                      f"{_safe_read32(port.phy_extra_base + off)}\n")
+        buf.write(f"\n--- port{i} ctrl_lo @ 0x{port.ctrl_lo_base:x} "
+                  f"(sz 0x{port.ctrl_lo_size:x}, overlaps dart-apcie{i}) ---\n")
+        for off in range(0, span_words * 4, 4):
+            buf.write(f"  +0x{off:04x} = "
+                      f"{_safe_read32(port.ctrl_lo_base + off)}\n")
+
+
+# ---------------------------------------------------------------- unblock experiment
+
+_UNBLOCK_OFFSETS = (0x0000, 0x0004, 0x0008, 0x000c, 0x0010, 0x0100, 0x0104,
+                    0x0108, 0x010c, 0x0200)
+
+
+def unblock_experiment(apcie, buf, port_index=2, settle_ms=50):
+    """One-at-a-time bit-0 flip on a small offset set inside port N's
+    ctrl_lo block, reading LINKSTS between each write to see if any move
+    the port off LINKSTS_BUSY. Gated by --unblock-experiment because it
+    writes to the DART's MMIO alias -- if any of these offsets are the
+    DART's L0 base register we may lose port 2's DMA. Iterates only when
+    the port is active.
+
+    Bounded to ~10 writes so a hang burns at most one power-cycle."""
+    port = apcie.ports[port_index]
+    if not port.exists:
+        buf.write(f"\n=== unblock experiment: port {port_index} NOT active, "
+                  f"skipping ===\n")
+        return
+    buf.write(f"\n=== unblock experiment (port{port_index}, ctrl_lo @ "
+              f"0x{port.ctrl_lo_base:x}) ===\n")
+    buf.write("WARNING: these writes go through the DART's MMIO alias.\n")
+    buf.write("If port 2 DMA breaks after this run, that's why.\n\n")
+
+    def snap(label):
+        try:
+            v = p.read32(port.port_base + 0x208)
+        except Exception as e:
+            buf.write(f"  {label:24s} LINKSTS: <{e.__class__.__name__}: {e}>\n")
+            return None
+        buf.write(f"  {label:24s} LINKSTS = 0x{v:08x}  "
+                  f"[{_linksts_decode(v)}]\n")
+        return v
+
+    baseline = snap("baseline")
+    for off in _UNBLOCK_OFFSETS:
+        addr = port.ctrl_lo_base + off
+        try:
+            before = p.read32(addr)
+            buf.write(f"\n  ctrl_lo +0x{off:04x} = 0x{before:08x} "
+                      f"-> flipping bit 0\n")
+            p.set32(addr, 0x1)
+            after_set = p.read32(addr)
+            buf.write(f"  ctrl_lo +0x{off:04x} after set = "
+                      f"0x{after_set:08x}\n")
+            time.sleep(settle_ms / 1e3)
+            snap(f"after set +0x{off:04x}")
+            # Restore original bit-0 state to keep DART intact.
+            if not (before & 0x1):
+                p.clear32(addr, 0x1)
+        except Exception as e:
+            buf.write(f"  ctrl_lo +0x{off:04x} write FAILED: "
+                      f"{e.__class__.__name__}: {e}\n")
+            break
+    buf.write("\n")
+    final = snap("final")
+    if baseline is not None and final is not None and baseline != final:
+        buf.write(f"  ** LINKSTS changed: 0x{baseline:08x} -> 0x{final:08x} **\n")
+
+
 # ---------------------------------------------------------------- summary
 
 def summarize(out_path, buf, devices, nic):
@@ -624,19 +716,26 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     ap.add_argument("--out", default="/tmp/m4-recon",
                     help="output directory (default: /tmp/m4-recon)")
-    ap.add_argument("--ecam-base", type=lambda s: int(s, 0),
-                    default=0x1cb0000000,
-                    help="/arm-io/apcie reg[0] (default: 0x1cb0000000)")
     ap.add_argument("--no-perstn", action="store_true",
                     help="skip the PERSTN GPIO toggle (debug: matches pcie_up.py)")
-    ap.add_argument("--perstn-pin", type=int, default=PERSTN_PIN,
-                    help=f"gpio0 pin for NIC PERSTN (default: {PERSTN_PIN})")
+    ap.add_argument("--perstn-pin", type=int, default=None,
+                    help="override gpio0 pin for NIC PERSTN "
+                         "(default: from ADT pci-bridge2.function-perst)")
     ap.add_argument("--no-clkreq", action="store_true",
                     help="skip the CLKREQ GPIO assert (A/B: matches previous run)")
-    ap.add_argument("--clkreq-pin", type=int, default=CLKREQ_PIN,
-                    help=f"gpio0 pin for NIC CLKREQ (default: {CLKREQ_PIN})")
+    ap.add_argument("--clkreq-pin", type=int, default=None,
+                    help="override gpio0 pin for NIC CLKREQ "
+                         "(default: from ADT pci-bridge2.function-clkreq)")
     ap.add_argument("--no-ltssm-kick", action="store_true",
                     help="skip the post-init LTSSM kick experiment")
+    ap.add_argument("--no-unmapped-probe", action="store_true",
+                    help="skip the phy_extra + ctrl_lo read-only probe")
+    ap.add_argument("--unblock-experiment", action="store_true",
+                    help="poke bit 0 at a small set of ctrl_lo offsets on "
+                         "the NIC port to see if any move LINKSTS off BUSY. "
+                         "OFF by default -- writes go through DART MMIO alias.")
+    ap.add_argument("--unblock-port", type=int, default=2,
+                    help="port index for --unblock-experiment (default: 2)")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -646,6 +745,29 @@ def main():
 
     log("=== Phase 3.3 pcie_up ===")
 
+    # Build the ADT-sourced map first so every subsequent step has named
+    # handles for the reg blocks it wants to touch.
+    log("building ApcieMap from ADT...")
+    apcie = ApcieMap.from_adt(u)
+    apcie.describe(buf)
+    buf.write("\n")
+
+    # Resolve NIC-side GPIO pins from the ADT if the caller didn't override.
+    nic_port = apcie.nic_port()
+    perstn_pin = args.perstn_pin
+    clkreq_pin = args.clkreq_pin
+    if nic_port is not None:
+        if perstn_pin is None and nic_port.perst_pin is not None:
+            perstn_pin = nic_port.perst_pin
+        if clkreq_pin is None and nic_port.clkreq_pin is not None:
+            clkreq_pin = nic_port.clkreq_pin
+    if perstn_pin is None:
+        perstn_pin = PERSTN_PIN
+    if clkreq_pin is None:
+        clkreq_pin = CLKREQ_PIN
+    buf.write(f"NIC GPIO pins: PERSTN=gpio0[{perstn_pin}] "
+              f"CLKREQ=gpio0[{clkreq_pin}]\n\n")
+
     log("SMC power on apcie fabric...")
     try_(lambda: smc_power(buf), "SMC power")
 
@@ -653,16 +775,16 @@ def main():
         log("CLKREQ assert skipped (--no-clkreq)")
         buf.write("=== CLKREQ assert (skipped) ===\n\n")
     else:
-        log(f"CLKREQ assert on gpio0 pin {args.clkreq_pin}...")
-        try_(lambda: assert_clkreq(buf, pin=args.clkreq_pin),
+        log(f"CLKREQ assert on gpio0 pin {clkreq_pin}...")
+        try_(lambda: assert_clkreq(buf, pin=clkreq_pin),
              "assert_clkreq")
 
     if args.no_perstn:
         log("PERSTN toggle skipped (--no-perstn)")
         buf.write("=== PERSTN deassert (skipped) ===\n\n")
     else:
-        log(f"PERSTN deassert on gpio0 pin {args.perstn_pin}...")
-        try_(lambda: deassert_perstn(buf, pin=args.perstn_pin),
+        log(f"PERSTN deassert on gpio0 pin {perstn_pin}...")
+        try_(lambda: deassert_perstn(buf, pin=perstn_pin),
              "deassert_perstn")
 
     log("p.pcie_init()...")
@@ -678,26 +800,48 @@ def main():
         traceback.print_exc(limit=5)
 
     if pcie_init_ok:
+        log(f"active ports (per ADT): {apcie.active_ports}")
         log("dumping PCIe controller registers (post-init)...")
-        try_(lambda: dump_pcie_regs(buf, "post-init"), "dump_pcie_regs")
+        try_(lambda: dump_pcie_regs(apcie, buf, "post-init"),
+             "dump_pcie_regs")
+
+        if args.no_unmapped_probe:
+            log("unmapped-block probe skipped (--no-unmapped-probe)")
+            buf.write("\n=== unmapped block probe (skipped) ===\n\n")
+        else:
+            log("probing phy_extra + ctrl_lo (read-only)...")
+            try_(lambda: probe_unmapped(apcie, buf), "probe_unmapped")
 
         if args.no_ltssm_kick:
             log("LTSSM kick skipped (--no-ltssm-kick)")
             buf.write("\n=== LTSSM kick experiment (skipped) ===\n\n")
         else:
-            log("trying LTSSM kick sequences on ports 0 and 2...")
-            try_(lambda: try_ltssm_kick(buf, port_indices=(0, 2)),
+            log(f"trying LTSSM kick sequences on ports "
+                f"{apcie.active_ports}...")
+            try_(lambda: try_ltssm_kick(apcie, buf),
                  "try_ltssm_kick")
 
             log("dumping PCIe controller registers (post-kick)...")
-            try_(lambda: dump_pcie_regs(buf, "post-kick"), "dump_pcie_regs")
+            try_(lambda: dump_pcie_regs(apcie, buf, "post-kick"),
+                 "dump_pcie_regs")
+
+        if args.unblock_experiment:
+            log(f"running unblock experiment on port {args.unblock_port}...")
+            try_(lambda: unblock_experiment(apcie, buf,
+                                            port_index=args.unblock_port),
+                 "unblock_experiment")
+            log("dumping PCIe controller registers (post-unblock)...")
+            try_(lambda: dump_pcie_regs(apcie, buf, "post-unblock"),
+                 "dump_pcie_regs")
     else:
         log("skipping PCIe register dump (m1n1 is wedged, reads would time out)")
         buf.write("=== PCIe controller register dump ===\n"
-                  "SKIPPED: p.pcie_init() raised — m1n1 is not responding.\n\n")
+                  "SKIPPED: p.pcie_init() raised -- m1n1 is not responding.\n\n")
 
-    log(f"ECAM walk @ 0x{args.ecam_base:x} ...")
-    devices = try_(lambda: ecam_walk(args.ecam_base, buf), "ecam_walk") or []
+    log(f"ECAM walk @ 0x{apcie.ecam_base:x} ...")
+    devices = try_(lambda: ecam_walk(apcie.ecam_base, buf,
+                                     active_ports=apcie.active_ports),
+                   "ecam_walk") or []
 
     # Pick the NIC: class-0x02 device on any downstream bus.
     nic = None
@@ -707,7 +851,7 @@ def main():
             break
 
     if nic is not None:
-        try_(lambda: enable_nic(args.ecam_base, nic, buf), "enable_nic")
+        try_(lambda: enable_nic(apcie.ecam_base, nic, buf), "enable_nic")
     else:
         buf.write("\n=== enable NIC ===\nNo class-0x02 device found.\n")
 
