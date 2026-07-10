@@ -165,6 +165,97 @@ Success signal on the next boot log:
 value. `nic-runtime.txt` committed to `m4_recon/` closes out
 `m4_recon/recon-summary.md` Q2/Q3.
 
+### 3.3.1 State after c9d659e — where the loop stalled
+
+After the m1n1 patch landed (§3.1) and `perstn.py` grew software
+PERSTN + CLKREQ toggles + LTSSM kick sequences, `p.pcie_init()`
+now returns 0 on t8132 but the log ends with:
+
+    pcie: Initializing port 0
+    pcie: Port failed to become idle on /arm-io/apcie/pci-bridge0
+    pcie: Initializing port 2
+    pcie: Port failed to become idle on /arm-io/apcie/pci-bridge2
+    pcie: Initialized controller 0
+
+Then the Python-side register dump hangs. Two problems:
+
+1. **Port 1 has no `pci-bridge1` node in the ADT on j773g** —
+   m1n1's per-port loop `continue`s at `pcie.c:591`, so port 1's
+   MMIO blocks are never PMGR-gated on and never PHY-enabled.
+   `perstn.py`'s `dump_pcie_regs` iterated all three ports
+   unconditionally, so its first read of `port1.port_base +
+   0x800` faulted the fabric and wedged m1n1. Hence "test hangs
+   here" with no post-init state ever printed.
+
+2. **Ports 0 and 2 finish with `LINKSTS_BUSY` never cleared** —
+   the port controller runs (`PORT_STATUS_RUN` set, otherwise
+   the earlier "Port failed to come up" would fire), but LTSSM
+   training never converges. Neither the software PERSTN cold
+   reset (gpio0 pin 165) nor the CLKREQ assert (gpio0 pin 162)
+   unstuck it.
+
+### 3.3.2 t8132 apcie ADT: full reg map (25 entries)
+
+Verified from `m4_recon/adt.txt` lines 1391-1443. The complete
+map now lives in `Scripts/m1n1/pcie_regs.py` (module-level
+docstring). Highlights:
+
+    shared reg[0]  ECAM             0x1cb0000000 sz 0x10000000
+    shared reg[1]  RC               0x494000000  sz 0x4000
+    shared reg[2]  PHY packed       0x497000000  sz 0x40000
+                     phy_common     = +0x4000
+                     port_phy       = +0x8000 + N*0x4000
+    shared reg[3]  PHY IP           0x497040000  sz 0x20000
+    shared reg[4]  AXI              0x496000000  sz 0x1000000
+    shared reg[5]  AXI subrange     0x495046200  sz 0x4000   *
+    shared reg[6]  AXI subrange     0x495044000  sz 0x4000   *
+
+    per port (N = 0/1/2):
+      [0] port_base    0x49N028000 sz 0x8000  APPCLK/STATUS/LINKSTS/...
+      [1] ltssm_base   0x49N03c000 sz 0x4000  LTSSM debug
+      [2] port_phy     0x497020000+ sz 0x4000 per-port PHY (packed)
+      [3] phy_extra    0x497048000+ sz 0x8000 per-port PHY IP slice
+                                              (overlaps shared PHY IP;
+                                              apcie-phy-ip-*-tunables
+                                              write into this window)
+      [4] intr2axi     0x49N024000 sz 0x4000  interrupt-to-AXI bridge
+      [5] ctrl_lo      0x49N000000 sz 0xc000  **overlaps DART MMIO for
+                                              this port** (dart-apcie0
+                                              sits at 0x490000000/sz
+                                              0x20000; dart-apcie2 at
+                                              0x492000000)
+
+    * = purpose unknown; sit inside the AXI window.
+
+Per-port GPIO wiring (from `pci-bridge{N}.function-{perst,clkreq}`,
+`m4_recon/adt.txt` lines 2488-2589):
+
+    port 0 (WiFi+BT):  perst=gpio0[163], clkreq=gpio0[160] (mode 2)
+    port 1:            no pci-bridge1 in ADT on j773g
+    port 2 (1 GbE):    perst=gpio0[165], clkreq=gpio0[162] (mode 2)
+
+**Key implication:** ctrl_lo writes go through the DART's MMIO
+alias. Reading ctrl_lo is safe; writing to bit 0 of low offsets
+may corrupt DART state. `perstn.py --unblock-experiment` restores
+each bit's original state after probing so the DART stays intact.
+
+### 3.3.3 Next-iteration hypothesis: ctrl_lo probe
+
+`perstn.py` now (a) fixes the port-1 hang by iterating only ADT-
+active ports in `dump_pcie_regs`/`try_ltssm_kick`/`ecam_walk`,
+(b) does a read-only sample of phy_extra + ctrl_lo pre-init and
+post-init (`--no-unmapped-probe` to disable), and (c) offers
+`--unblock-experiment` for a bounded bit-0 flip on port 2's
+ctrl_lo to see if any offset moves LINKSTS off BUSY. Since
+ctrl_lo overlaps the DART, if none of the offsets move LINKSTS
+we've ruled out DART registers as the LTSSM release signal.
+
+If the ctrl_lo probe finds nothing, the next candidates are the
+undocumented AXI subranges (shared reg[5], reg[6]) at
+`0x495046200` / `0x495044000` — they are inside the AXI2AF
+window and could be a per-controller "start" register. These
+should also be sampled read-only first.
+
 ### 3.4 Rollback path
 
 If the patched m1n1 breaks boot:
