@@ -90,16 +90,23 @@ def try_(fn, label):
 
 
 @contextmanager
-def guarded(buf=None, label="", silent=True):
-    """Enable m1n1's SYNC/SError exception guard for the duration of the block.
+def guarded(buf=None, label="", silent=True, short_timeout=0.3):
+    """Enable m1n1's SYNC/SError exception guard + shortened UART timeout.
 
-    Faulting p.read32/p.write32 calls return a sentinel (0xacce5515) and bump
-    m1n1's exc_count instead of wedging the proxy on a fabric SLVERR. Without
-    this, a single bad address (e.g. an unpowered PHY block) kills m1n1
-    mid-transaction and Python sees a UART timeout instead of continuing.
+    Faulting p.read32/p.write32 calls to blocks that respond with SLVERR
+    return a sentinel (0xacce5515) and bump m1n1's exc_count. That covers
+    synchronous CPU exceptions (SLVERR, memory-type mismatch, etc.).
 
-    silent=True suppresses the per-fault TTY> print on the M4 side (we already
-    see the sentinel in the log). Set False to cross-reference addresses.
+    IMPORTANT LIMITATION: GUARD.SKIP does NOT help against AXI bus stalls.
+    If a target block is completely un-clocked (PMGR gate off) or held in
+    reset, the AXI transaction never completes, no CPU exception fires, and
+    the M4 CPU stalls forever on the load. In that case the proxy request
+    never returns; the UART times out on the Python side and m1n1 is dead
+    until the next power-cycle. `short_timeout` bounds how long we wait
+    before declaring m1n1 wedged (default 300 ms vs. the 3 s default).
+
+    Use with check_alive() after any timeout to bail before wasting more
+    reads. Set silent=False to see per-fault TTY> prints on the M4 side.
     """
     mode = GUARD.SKIP | (GUARD.SILENT if silent else 0)
     cnt_before = 0
@@ -109,11 +116,29 @@ def guarded(buf=None, label="", silent=True):
         if buf is not None:
             buf.write(f"[guard] {label}: get_exc_count(pre) failed: "
                       f"{e.__class__.__name__}: {e}\n")
+
+    old_timeout = None
+    if short_timeout is not None:
+        try:
+            old_timeout = iface.dev.timeout
+            iface.dev.timeout = short_timeout
+        except Exception as e:
+            if buf is not None:
+                buf.write(f"[guard] {label}: could not set short timeout: "
+                          f"{e.__class__.__name__}: {e}\n")
+            old_timeout = None
+
     p.set_exc_guard(mode)
     try:
         yield
     finally:
-        # Restore first so any follow-up proxy op isn't guarded.
+        # Restore timeout FIRST so cleanup proxy ops don't fail on the
+        # tightened budget.
+        if old_timeout is not None:
+            try:
+                iface.dev.timeout = old_timeout
+            except Exception:
+                pass
         try:
             p.set_exc_guard(GUARD.OFF)
         except Exception as e:
@@ -130,6 +155,34 @@ def guarded(buf=None, label="", silent=True):
             if buf is not None:
                 buf.write(f"[guard] {label}: get_exc_count(post) failed: "
                           f"{e.__class__.__name__}: {e}\n")
+
+
+def check_alive(timeout=0.5):
+    """Non-destructive probe: does m1n1 still respond?
+
+    Temporarily lowers the UART timeout, issues a cheap proxy request
+    (get_exc_count), returns True iff it comes back. Restores timeout.
+
+    Use after a read fails inside a `guarded()` block to decide whether
+    the rest of the dump is worth trying or whether m1n1 is wedged.
+    """
+    old = None
+    try:
+        old = iface.dev.timeout
+        iface.dev.timeout = timeout
+    except Exception:
+        pass
+    try:
+        p.get_exc_count()
+        return True
+    except Exception:
+        return False
+    finally:
+        if old is not None:
+            try:
+                iface.dev.timeout = old
+            except Exception:
+                pass
 
 
 def ecam_addr(base, bus, dev, fn, off):
@@ -478,6 +531,59 @@ def enable_nic(base, nic, buf):
 # GPIO wiring, and DART overlap notes.
 
 
+# Sentinel value m1n1's GUARD.SKIP handler returns from a faulting load.
+GUARD_SENTINEL = 0xacce5515
+
+
+class DumpAborted(Exception):
+    """Raised to bail from a dump when m1n1 has stopped responding.
+
+    A single AXI stall wedges m1n1's CPU; every subsequent p.read32 will
+    time out. Rather than burn one UART-timeout per remaining register,
+    the read helper raises this so callers unwind quickly to the next
+    guarded() block.
+    """
+
+
+def _read32_live(addr, label, buf, log_progress=True, alive_probe=True):
+    """Read one 32-bit register, printing progress on stdout AND to buf.
+
+    - On success: writes '<label> @ <addr> = 0x<value>' (annotates the
+      m1n1 GUARD.SKIP sentinel).
+    - On Python exception (UART timeout etc.): writes '<FAILED>' and,
+      if alive_probe, checks m1n1 liveness. If m1n1 is dead, raises
+      DumpAborted so the whole dump bails.
+
+    Returns the register value on success, or None on failure.
+    """
+    if log_progress:
+        log(f"    read32(0x{addr:x}) [{label}]...")
+    try:
+        v = p.read32(addr)
+    except Exception as e:
+        msg = f"{e.__class__.__name__}: {e}"
+        buf.write(f"  {label:26s} @ 0x{addr:x} = <{msg}>\n")
+        if log_progress:
+            log(f"      -> FAILED: {msg}")
+        if alive_probe:
+            log("      probing m1n1 liveness after failed read...")
+            if not check_alive():
+                buf.write(f"  [ABORT] m1n1 is not responding; "
+                          f"stopping dump\n")
+                log("      m1n1 DEAD -- bailing from dump")
+                raise DumpAborted() from e
+            log("      m1n1 still alive; continuing")
+        return None
+    tag = ""
+    if v == GUARD_SENTINEL:
+        tag = "   <-- GUARD.SKIP sentinel (SLVERR caught)"
+    buf.write(f"  {label:26s} @ 0x{addr:x} = 0x{v:08x}{tag}\n")
+    if log_progress:
+        log(f"      -> 0x{v:08x}{tag}")
+    return v
+
+
+# Backward-compat shim (keeps any lingering callers happy).
 def _safe_read32(addr):
     try:
         return f"0x{p.read32(addr):08x}"
@@ -485,61 +591,90 @@ def _safe_read32(addr):
         return f"<{e.__class__.__name__}: {e}>"
 
 
-def dump_pcie_regs(apcie, buf, tag="post-init", include_inactive=False):
-    """Dump shared regs + per-port regs. Only iterates apcie.active_ports
-    unless include_inactive is True. IMPORTANT: reading an inactive port's
-    MMIO (its PHY was never enabled, PMGR gate is off) faults the fabric
-    and wedges m1n1 -- keep include_inactive False in normal use."""
-    buf.write(f"=== PCIe controller register dump ({tag}) ===\n")
-    buf.write(f"PHYCMN_CLK    @ 0x{apcie.phy_common_base:x} + 0x000 = "
-              f"{_safe_read32(apcie.phy_common_base + 0x000)}\n")
-    buf.write(f"RC_BASE       @ 0x{apcie.rc_base:x} + 0x03c = "
-              f"{_safe_read32(apcie.rc_base + 0x03c)}   "
-              f"(T602X APCIE sets to 0x1)\n\n")
+def dump_pcie_regs(apcie, buf, tag="post-init", tier=1):
+    """Dump PCIe controller state, gated by safety tier.
 
-    port_indices = (range(apcie.N_PORTS) if include_inactive
-                    else apcie.active_ports)
-    for i in port_indices:
-        p_ = apcie.ports[i]
-        pb = p_.port_base
-        lt = p_.ltssm_base
-        phy = p_.phy_base
-        phyx = p_.phy_extra_base
-        ctrl = p_.ctrl_lo_base
-        tag_line = f"--- port{i} port_base=0x{pb:x} ltssm=0x{lt:x} " \
-                   f"phy=0x{phy:x} phy_extra=0x{phyx:x} ctrl_lo=0x{ctrl:x}"
-        if not p_.exists:
-            tag_line += "  [INACTIVE]"
-        buf.write(tag_line + " ---\n")
-        # Known port_base registers.
-        buf.write(f"  APPCLK      @ port+0x800 = {_safe_read32(pb + 0x800)}\n")
-        buf.write(f"  STATUS      @ port+0x804 = {_safe_read32(pb + 0x804)}\n")
-        buf.write(f"  LINKSTS     @ port+0x208 = {_safe_read32(pb + 0x208)}\n")
-        buf.write(f"  T602X_RESET @ port+0x82c = {_safe_read32(pb + 0x82c)}\n")
-        buf.write(f"  +0x010                   = {_safe_read32(pb + 0x010)}   "
-                  f"(T602X APCIE writes 0x2)\n")
-        buf.write(f"  +0x104                   = {_safe_read32(pb + 0x104)}\n")
-        # PHY.
-        buf.write(f"  PHY_CTRL    @ phy+0x000  = {_safe_read32(phy + 0x000)}\n")
-        # LTSSM debug block (16 KB).
-        buf.write(f"  LTSSM +0x10              = {_safe_read32(lt + 0x10)}   "
-                  f"(T602X non-APCIE writes 0x2)\n")
-        buf.write(f"  LTSSM +0x14              = {_safe_read32(lt + 0x14)}   "
-                  f"(T602X non-APCIE writes 0x1)\n")
-        buf.write(f"  LTSSM +0x1c              = {_safe_read32(lt + 0x1c)}   "
-                  f"(T602X non-APCIE writes 0x4)\n")
-        buf.write(f"  LTSSM +0x20              = {_safe_read32(lt + 0x20)}   "
-                  f"(T602X non-APCIE sets bit 1)\n")
-        # phy_extra (overlaps shared PHY IP), ctrl_lo (overlaps DART) --
-        # read-only sample, first few words. See pcie_regs.py header notes.
-        buf.write(f"  phy_extra +0x000         = {_safe_read32(phyx + 0x000)}\n")
-        buf.write(f"  phy_extra +0x004         = {_safe_read32(phyx + 0x004)}\n")
-        buf.write(f"  phy_extra +0x008         = {_safe_read32(phyx + 0x008)}\n")
-        buf.write(f"  ctrl_lo   +0x000         = {_safe_read32(ctrl + 0x000)}\n")
-        buf.write(f"  ctrl_lo   +0x004         = {_safe_read32(ctrl + 0x004)}\n")
-        buf.write(f"  ctrl_lo   +0x008         = {_safe_read32(ctrl + 0x008)}\n")
-        buf.write(f"  ctrl_lo   +0x100         = {_safe_read32(ctrl + 0x100)}\n")
-        buf.write("\n")
+    tier=1 (DEFAULT, always safe):
+        Registers m1n1 provably wrote to during pcie_init on the t8132
+        branch (regs_t8140 shared_reg_count=7). Per active port: APPCLK,
+        STATUS, LINKSTS, T602X_RESET, +0x104. Plus rc_base+0x3c.
+    tier=2 (--tier2):
+        Adds phy_common (m1n1 applies phy-common tunables here), and the
+        per-port phy_base which m1n1 pokes when releasing PHY reset.
+    tier=3 (--tier3, DANGEROUS):
+        Adds ltssm_base, phy_extra, ctrl_lo. ctrl_lo OVERLAPS the
+        dart-apcie* MMIO -- if the DART is not clocked (m1n1 doesn't
+        touch it during pcie_init), reads will AXI-stall and wedge m1n1.
+        GUARD.SKIP does not save us from AXI stalls; only from SLVERR.
+
+    After every read that fails, m1n1 liveness is probed. If m1n1 is
+    dead, DumpAborted is raised and the dump exits early.
+    """
+    buf.write(f"=== PCIe controller register dump ({tag}, tier={tier}) ===\n")
+    log(f"  dump_pcie_regs tier={tier} tag={tag} "
+        f"active_ports={apcie.active_ports}")
+
+    try:
+        # --- Tier 1: always safe. ---
+        _read32_live(apcie.rc_base + 0x03c,
+                     "rc_base + 0x03c", buf)
+        for i in apcie.active_ports:
+            p_ = apcie.ports[i]
+            pb = p_.port_base
+            buf.write(f"\n--- port{i} (T1) port_base=0x{pb:x} ---\n")
+            log(f"  === port{i} Tier 1 (port_base=0x{pb:x}) ===")
+            _read32_live(pb + 0x800, f"port{i} APPCLK   (+0x800)", buf)
+            _read32_live(pb + 0x804, f"port{i} STATUS   (+0x804)", buf)
+            _read32_live(pb + 0x208, f"port{i} LINKSTS  (+0x208)", buf)
+            _read32_live(pb + 0x82c, f"port{i} T602X_RESET (+0x82c)", buf)
+            _read32_live(pb + 0x104, f"port{i} +0x104", buf)
+
+        if tier < 2:
+            return
+
+        # --- Tier 2: PHY common + per-port PHY_CTRL. ---
+        buf.write(f"\n=== Tier 2 (--tier2) ===\n")
+        log("  === Tier 2 (phy_common + phy_base) ===")
+        _read32_live(apcie.phy_common_base + 0x000,
+                     "PHYCMN_CLK (phy_common+0x000)", buf)
+        _read32_live(apcie.rc_base + 0x024,
+                     "PHYIF_CTRL (rc_base+0x024)", buf)
+        for i in apcie.active_ports:
+            p_ = apcie.ports[i]
+            phy = p_.phy_base
+            buf.write(f"\n--- port{i} (T2) phy_base=0x{phy:x} ---\n")
+            log(f"  === port{i} Tier 2 (phy_base=0x{phy:x}) ===")
+            _read32_live(phy + 0x000, f"port{i} PHY_CTRL (+0x000)", buf)
+            _read32_live(phy + 0x004, f"port{i} PHY      (+0x004)", buf)
+
+        if tier < 3:
+            return
+
+        # --- Tier 3: LTSSM + phy_extra + ctrl_lo. May AXI-stall. ---
+        buf.write(f"\n=== Tier 3 (--tier3, DANGEROUS) ===\n")
+        log("  === Tier 3 (ltssm + phy_extra + ctrl_lo) ===")
+        for i in apcie.active_ports:
+            p_ = apcie.ports[i]
+            lt = p_.ltssm_base
+            phyx = p_.phy_extra_base
+            ctrl = p_.ctrl_lo_base
+            buf.write(f"\n--- port{i} (T3) ltssm=0x{lt:x} "
+                      f"phy_extra=0x{phyx:x} ctrl_lo=0x{ctrl:x} ---\n")
+            log(f"  === port{i} Tier 3 ===")
+            _read32_live(lt + 0x10, f"port{i} LTSSM +0x10", buf)
+            _read32_live(lt + 0x14, f"port{i} LTSSM +0x14", buf)
+            _read32_live(lt + 0x1c, f"port{i} LTSSM +0x1c", buf)
+            _read32_live(lt + 0x20, f"port{i} LTSSM +0x20", buf)
+            _read32_live(phyx + 0x000, f"port{i} phy_extra +0x000", buf)
+            _read32_live(phyx + 0x004, f"port{i} phy_extra +0x004", buf)
+            _read32_live(phyx + 0x008, f"port{i} phy_extra +0x008", buf)
+            _read32_live(ctrl + 0x000, f"port{i} ctrl_lo +0x000", buf)
+            _read32_live(ctrl + 0x004, f"port{i} ctrl_lo +0x004", buf)
+            _read32_live(ctrl + 0x008, f"port{i} ctrl_lo +0x008", buf)
+            _read32_live(ctrl + 0x100, f"port{i} ctrl_lo +0x100", buf)
+    except DumpAborted:
+        log("  dump aborted (m1n1 wedged)")
+        buf.write(f"[dump_pcie_regs] aborted -- m1n1 not responding\n")
 
 
 # ---------------------------------------------------------------- LTSSM kick
@@ -558,7 +693,7 @@ def _linksts_decode(v):
     return "|".join(bits) if bits else "none"
 
 
-def try_ltssm_kick(apcie, buf, port_indices=None):
+def try_ltssm_kick(apcie, buf, port_indices=None, aggressive=False):
     """After p.pcie_init() has returned (with ports stuck at LINKSTS_BUSY),
     try the LTSSM kick sequences that the T602X code paths use but the
     T8140/t8132 path skips. Read LINKSTS before and after each write so we
@@ -566,12 +701,19 @@ def try_ltssm_kick(apcie, buf, port_indices=None):
 
     Sequences tried in order per port:
       A) T602X APCIE:  rc_base+0x3c |= 0x1;  port_base+0x10 <- 0x2
-      B) T602X non-APCIE LTSSM kick + APPCLK bit8 clear
+      B) T602X non-APCIE LTSSM kick + APPCLK bit8 clear (writes to
+         ltssm_base -- DANGEROUS, gated behind `aggressive`)
       C) cycle T602X_PORT_RESET (deassert, reassert, deassert)
+
+    LINKSTS snapshots use the liveness-aware _read32_live so a wedged
+    m1n1 causes an early bail rather than one 300 ms timeout per snap.
     """
     if port_indices is None:
         port_indices = apcie.active_ports
     buf.write("\n=== LTSSM kick experiment (post-init) ===\n")
+    log(f"  try_ltssm_kick ports={list(port_indices)} "
+        f"aggressive={aggressive}")
+
     for i in port_indices:
         p_ = apcie.ports[i]
         pb = p_.port_base
@@ -579,88 +721,81 @@ def try_ltssm_kick(apcie, buf, port_indices=None):
         name = f"port{i}"
 
         def snap(label):
-            v = None
-            try:
-                v = p.read32(pb + 0x208)
-            except Exception as e:
-                buf.write(f"  {name} {label:22s} LINKSTS: <{e.__class__.__name__}: {e}>\n")
-                return
-            buf.write(f"  {name} {label:22s} LINKSTS = 0x{v:08x}  [{_linksts_decode(v)}]\n")
+            v = _read32_live(pb + 0x208,
+                             f"{name} LINKSTS ({label})", buf)
+            if v is not None:
+                buf.write(f"  {name} {label:22s} LINKSTS decode: "
+                          f"[{_linksts_decode(v)}]\n")
 
         buf.write(f"\n--- {name} @ port_base=0x{pb:x} ltssm=0x{lt:x} ---\n")
-        snap("baseline")
-
-        # Sequence A: T602X APCIE-branch kick.
         try:
+            snap("baseline")
+
+            # Sequence A: T602X APCIE-branch kick (rc_base + port_base only).
+            log(f"    seq A on {name}")
             buf.write(f"  seq A: set32(rc_base+0x3c, 0x1)  # 0x{apcie.rc_base + 0x3c:x}\n")
-            p.set32(apcie.rc_base + 0x3c, 0x1)
-            buf.write(f"  seq A: write32(port_base+0x10, 0x2)\n")
-            p.write32(pb + 0x10, 0x2)
-        except Exception as e:
-            buf.write(f"  seq A FAILED: {e.__class__.__name__}: {e}\n")
-        time.sleep(0.01)
-        snap("after seq A")
+            try:
+                p.set32(apcie.rc_base + 0x3c, 0x1)
+                buf.write(f"  seq A: write32(port_base+0x10, 0x2)\n")
+                p.write32(pb + 0x10, 0x2)
+            except Exception as e:
+                buf.write(f"  seq A FAILED: {e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            time.sleep(0.01)
+            snap("after seq A")
 
-        # Sequence B: T602X non-APCIE LTSSM kick.
-        try:
-            buf.write(f"  seq B: write32(ltssm+0x10, 0x2)\n")
-            p.write32(lt + 0x10, 0x2)
-            buf.write(f"  seq B: write32(ltssm+0x1c, 0x4)\n")
-            p.write32(lt + 0x1c, 0x4)
-            buf.write(f"  seq B: set32(ltssm+0x20, 0x2)\n")
-            p.set32(lt + 0x20, 0x2)
-            buf.write(f"  seq B: write32(ltssm+0x14, 0x1)\n")
-            p.write32(lt + 0x14, 0x1)
-            buf.write(f"  seq B: clear32(port_base+0x800, 0x100)  (APPCLK bit 8)\n")
-            p.clear32(pb + 0x800, 0x100)
-        except Exception as e:
-            buf.write(f"  seq B FAILED: {e.__class__.__name__}: {e}\n")
-        time.sleep(0.05)
-        snap("after seq B")
+            # Sequence B: T602X non-APCIE LTSSM kick. Writes to ltssm_base
+            # (Tier 3). If ltssm's clock is off, this AXI-stalls.
+            if aggressive:
+                log(f"    seq B on {name} (aggressive; writes ltssm_base)")
+                for label, addr, val in [
+                    ("ltssm+0x10", lt + 0x10, 0x2),
+                    ("ltssm+0x1c", lt + 0x1c, 0x4),
+                    ("ltssm+0x20 |= 0x2", lt + 0x20, None),
+                    ("ltssm+0x14", lt + 0x14, 0x1),
+                    ("port+0x800 &= ~0x100", pb + 0x800, None),
+                ]:
+                    buf.write(f"  seq B: write to {label}\n")
+                    try:
+                        if label.endswith("|= 0x2"):
+                            p.set32(addr, 0x2)
+                        elif label.startswith("port+0x800"):
+                            p.clear32(addr, 0x100)
+                        else:
+                            p.write32(addr, val)
+                    except Exception as e:
+                        buf.write(f"  seq B write to {label} FAILED: "
+                                  f"{e.__class__.__name__}: {e}\n")
+                        if not check_alive():
+                            raise DumpAborted() from e
+                time.sleep(0.05)
+                snap("after seq B")
+            else:
+                buf.write("  seq B: skipped (--ltssm-kick-aggressive to enable; "
+                          "writes ltssm_base which may AXI-stall)\n")
 
-        # Sequence C: cycle T602X_PORT_RESET (deassert, reassert, deassert)
-        # -- copies what m1n1 does for T602X APCIE at line 752-754.
-        try:
+            # Sequence C: cycle T602X_PORT_RESET.
+            log(f"    seq C on {name}")
             buf.write(f"  seq C: clear+set T602X_RESET (port_base+0x82c)\n")
-            p.clear32(pb + 0x82c, 0x1)
-            time.sleep(0.001)
-            p.set32(pb + 0x82c, 0x1)
-        except Exception as e:
-            buf.write(f"  seq C FAILED: {e.__class__.__name__}: {e}\n")
-        time.sleep(0.05)
-        snap("after seq C")
+            try:
+                p.clear32(pb + 0x82c, 0x1)
+                time.sleep(0.001)
+                p.set32(pb + 0x82c, 0x1)
+            except Exception as e:
+                buf.write(f"  seq C FAILED: {e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+            time.sleep(0.05)
+            snap("after seq C")
 
-        # Extended settle in case training is slow.
-        time.sleep(0.2)
-        snap("after 200ms settle")
-
-
-# ---------------------------------------------------------------- unmapped probe
-
-def probe_unmapped(apcie, buf, span_words=16):
-    """Read the first `span_words` 32-bit words of each active port's
-    phy_extra and ctrl_lo blocks. Read-only; safe as long as the port's
-    fabric is powered on (which it is post-SMC + post-pcie_init).
-
-    Purpose: reveal the initial contents of the two per-port blocks that
-    m1n1's t8140-path code does not touch. phy_extra sits inside the
-    shared PHY IP window (m1n1 does apply apcie-phy-ip-* tunables at
-    offsets that overlap here). ctrl_lo overlaps the DART MMIO for that
-    port; interesting values might be DART registers left over from
-    iBoot's own bring-up."""
-    buf.write("\n=== unmapped block probe (read-only) ===\n")
-    for i in apcie.active_ports:
-        port = apcie.ports[i]
-        buf.write(f"\n--- port{i} phy_extra @ 0x{port.phy_extra_base:x} "
-                  f"(sz 0x{port.phy_extra_size:x}) ---\n")
-        for off in range(0, span_words * 4, 4):
-            buf.write(f"  +0x{off:04x} = "
-                      f"{_safe_read32(port.phy_extra_base + off)}\n")
-        buf.write(f"\n--- port{i} ctrl_lo @ 0x{port.ctrl_lo_base:x} "
-                  f"(sz 0x{port.ctrl_lo_size:x}, overlaps dart-apcie{i}) ---\n")
-        for off in range(0, span_words * 4, 4):
-            buf.write(f"  +0x{off:04x} = "
-                      f"{_safe_read32(port.ctrl_lo_base + off)}\n")
+            # Extended settle in case training is slow.
+            time.sleep(0.2)
+            snap("after 200ms settle")
+        except DumpAborted:
+            log(f"    LTSSM kick aborted (m1n1 wedged) on {name}")
+            buf.write(f"[try_ltssm_kick] aborted -- m1n1 not responding\n")
+            return
 
 
 # ---------------------------------------------------------------- unblock experiment
@@ -689,39 +824,51 @@ def unblock_experiment(apcie, buf, port_index=2, settle_ms=50):
     buf.write("If port 2 DMA breaks after this run, that's why.\n\n")
 
     def snap(label):
-        try:
-            v = p.read32(port.port_base + 0x208)
-        except Exception as e:
-            buf.write(f"  {label:24s} LINKSTS: <{e.__class__.__name__}: {e}>\n")
-            return None
-        buf.write(f"  {label:24s} LINKSTS = 0x{v:08x}  "
-                  f"[{_linksts_decode(v)}]\n")
+        v = _read32_live(port.port_base + 0x208,
+                         f"port{port_index} LINKSTS ({label})", buf)
+        if v is not None:
+            buf.write(f"  {label:24s} LINKSTS decode: "
+                      f"[{_linksts_decode(v)}]\n")
         return v
 
-    baseline = snap("baseline")
-    for off in _UNBLOCK_OFFSETS:
-        addr = port.ctrl_lo_base + off
-        try:
-            before = p.read32(addr)
-            buf.write(f"\n  ctrl_lo +0x{off:04x} = 0x{before:08x} "
-                      f"-> flipping bit 0\n")
-            p.set32(addr, 0x1)
-            after_set = p.read32(addr)
-            buf.write(f"  ctrl_lo +0x{off:04x} after set = "
-                      f"0x{after_set:08x}\n")
+    try:
+        baseline = snap("baseline")
+        for off in _UNBLOCK_OFFSETS:
+            addr = port.ctrl_lo_base + off
+            log(f"    ctrl_lo +0x{off:04x} probe")
+            before = _read32_live(addr, f"ctrl_lo +0x{off:04x} (pre)", buf)
+            if before is None:
+                buf.write(f"  ctrl_lo +0x{off:04x} read FAILED; skipping flip\n")
+                continue
+            buf.write(f"\n  flipping ctrl_lo +0x{off:04x} bit 0\n")
+            try:
+                p.set32(addr, 0x1)
+            except Exception as e:
+                buf.write(f"  ctrl_lo +0x{off:04x} write FAILED: "
+                          f"{e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+                continue
+            after_set = _read32_live(addr, f"ctrl_lo +0x{off:04x} (post)", buf)
             time.sleep(settle_ms / 1e3)
             snap(f"after set +0x{off:04x}")
             # Restore original bit-0 state to keep DART intact.
             if not (before & 0x1):
-                p.clear32(addr, 0x1)
-        except Exception as e:
-            buf.write(f"  ctrl_lo +0x{off:04x} write FAILED: "
-                      f"{e.__class__.__name__}: {e}\n")
-            break
-    buf.write("\n")
-    final = snap("final")
-    if baseline is not None and final is not None and baseline != final:
-        buf.write(f"  ** LINKSTS changed: 0x{baseline:08x} -> 0x{final:08x} **\n")
+                try:
+                    p.clear32(addr, 0x1)
+                except Exception as e:
+                    buf.write(f"  ctrl_lo +0x{off:04x} restore FAILED: "
+                              f"{e.__class__.__name__}: {e}\n")
+                    if not check_alive():
+                        raise DumpAborted() from e
+        buf.write("\n")
+        final = snap("final")
+        if baseline is not None and final is not None and baseline != final:
+            buf.write(f"  ** LINKSTS changed: 0x{baseline:08x} "
+                      f"-> 0x{final:08x} **\n")
+    except DumpAborted:
+        log("    unblock experiment aborted (m1n1 wedged)")
+        buf.write(f"[unblock_experiment] aborted -- m1n1 not responding\n")
 
 
 # ---------------------------------------------------------------- summary
@@ -773,8 +920,24 @@ def main():
                          "(default: from ADT pci-bridge2.function-clkreq)")
     ap.add_argument("--no-ltssm-kick", action="store_true",
                     help="skip the post-init LTSSM kick experiment")
-    ap.add_argument("--no-unmapped-probe", action="store_true",
-                    help="skip the phy_extra + ctrl_lo read-only probe")
+    ap.add_argument("--ltssm-kick-aggressive", action="store_true",
+                    help="in try_ltssm_kick, also run seq B (writes ltssm_base "
+                         "-- may AXI-stall if ltssm clock is off)")
+    tier_group = ap.add_mutually_exclusive_group()
+    tier_group.add_argument("--tier1", action="store_const", dest="tier",
+                            const=1, help="dump only Tier 1 regs (safe, "
+                                          "default)")
+    tier_group.add_argument("--tier2", action="store_const", dest="tier",
+                            const=2, help="dump Tier 1 + phy_common + "
+                                          "per-port phy_base")
+    tier_group.add_argument("--tier3", action="store_const", dest="tier",
+                            const=3, help="dump Tier 1 + Tier 2 + ltssm + "
+                                          "phy_extra + ctrl_lo. DANGEROUS "
+                                          "(may AXI-stall on un-clocked blocks)")
+    ap.set_defaults(tier=1)
+    ap.add_argument("--dump-timeout", type=float, default=0.3,
+                    help="UART timeout (seconds) during guarded read spans "
+                         "(default: 0.3). Lower = faster fail on wedged m1n1.")
     ap.add_argument("--unblock-experiment", action="store_true",
                     help="poke bit 0 at a small set of ctrl_lo offsets on "
                          "the NIC port to see if any move LINKSTS off BUSY. "
@@ -844,56 +1007,77 @@ def main():
         log(f"p.pcie_init raised: {e.__class__.__name__}: {e}")
         traceback.print_exc(limit=5)
 
+    timeout = args.dump_timeout
+
+    def liveness_gate(label):
+        """Skip subsequent sections if m1n1 died in a previous one.
+        Returns True if m1n1 is still alive."""
+        if check_alive(timeout=max(timeout, 0.5)):
+            return True
+        log(f"m1n1 DEAD before {label}; skipping this and all further sections")
+        buf.write(f"[liveness] {label}: m1n1 not responding, skipping\n")
+        return False
+
     if pcie_init_ok:
         log(f"active ports (per ADT): {apcie.active_ports}")
-        log("dumping PCIe controller registers (post-init)...")
-        with guarded(buf, "dump_pcie_regs(post-init)"):
-            try_(lambda: dump_pcie_regs(apcie, buf, "post-init"),
+        log(f"dumping PCIe controller registers (post-init, tier={args.tier})...")
+        with guarded(buf, "dump_pcie_regs(post-init)",
+                     short_timeout=timeout):
+            try_(lambda: dump_pcie_regs(apcie, buf, "post-init",
+                                        tier=args.tier),
                  "dump_pcie_regs")
-
-        if args.no_unmapped_probe:
-            log("unmapped-block probe skipped (--no-unmapped-probe)")
-            buf.write("\n=== unmapped block probe (skipped) ===\n\n")
-        else:
-            log("probing phy_extra + ctrl_lo (read-only)...")
-            with guarded(buf, "probe_unmapped"):
-                try_(lambda: probe_unmapped(apcie, buf), "probe_unmapped")
 
         if args.no_ltssm_kick:
             log("LTSSM kick skipped (--no-ltssm-kick)")
             buf.write("\n=== LTSSM kick experiment (skipped) ===\n\n")
-        else:
+        elif liveness_gate("LTSSM kick"):
             log(f"trying LTSSM kick sequences on ports "
-                f"{apcie.active_ports}...")
-            with guarded(buf, "try_ltssm_kick"):
-                try_(lambda: try_ltssm_kick(apcie, buf),
+                f"{apcie.active_ports} (aggressive="
+                f"{args.ltssm_kick_aggressive})...")
+            with guarded(buf, "try_ltssm_kick",
+                         short_timeout=timeout):
+                try_(lambda: try_ltssm_kick(
+                        apcie, buf,
+                        aggressive=args.ltssm_kick_aggressive),
                      "try_ltssm_kick")
 
-            log("dumping PCIe controller registers (post-kick)...")
-            with guarded(buf, "dump_pcie_regs(post-kick)"):
-                try_(lambda: dump_pcie_regs(apcie, buf, "post-kick"),
-                     "dump_pcie_regs")
+            if liveness_gate("post-kick dump"):
+                log(f"dumping PCIe controller registers "
+                    f"(post-kick, tier={args.tier})...")
+                with guarded(buf, "dump_pcie_regs(post-kick)",
+                             short_timeout=timeout):
+                    try_(lambda: dump_pcie_regs(apcie, buf, "post-kick",
+                                                tier=args.tier),
+                         "dump_pcie_regs")
 
-        if args.unblock_experiment:
+        if args.unblock_experiment and liveness_gate("unblock experiment"):
             log(f"running unblock experiment on port {args.unblock_port}...")
-            with guarded(buf, "unblock_experiment"):
+            with guarded(buf, "unblock_experiment",
+                         short_timeout=timeout):
                 try_(lambda: unblock_experiment(apcie, buf,
                                                 port_index=args.unblock_port),
                      "unblock_experiment")
-            log("dumping PCIe controller registers (post-unblock)...")
-            with guarded(buf, "dump_pcie_regs(post-unblock)"):
-                try_(lambda: dump_pcie_regs(apcie, buf, "post-unblock"),
-                     "dump_pcie_regs")
+            if liveness_gate("post-unblock dump"):
+                log(f"dumping PCIe controller registers "
+                    f"(post-unblock, tier={args.tier})...")
+                with guarded(buf, "dump_pcie_regs(post-unblock)",
+                             short_timeout=timeout):
+                    try_(lambda: dump_pcie_regs(apcie, buf, "post-unblock",
+                                                tier=args.tier),
+                         "dump_pcie_regs")
     else:
         log("skipping PCIe register dump (m1n1 is wedged, reads would time out)")
         buf.write("=== PCIe controller register dump ===\n"
                   "SKIPPED: p.pcie_init() raised -- m1n1 is not responding.\n\n")
 
-    log(f"ECAM walk @ 0x{apcie.ecam_base:x} ...")
-    with guarded(buf, "ecam_walk"):
-        devices = try_(lambda: ecam_walk(apcie.ecam_base, buf,
-                                         active_ports=apcie.active_ports),
-                       "ecam_walk") or []
+    if liveness_gate("ECAM walk"):
+        log(f"ECAM walk @ 0x{apcie.ecam_base:x} ...")
+        with guarded(buf, "ecam_walk", short_timeout=timeout):
+            devices = try_(lambda: ecam_walk(apcie.ecam_base, buf,
+                                             active_ports=apcie.active_ports),
+                           "ecam_walk") or []
+    else:
+        devices = []
 
     # Pick the NIC: class-0x02 device on any downstream bus.
     nic = None
@@ -902,10 +1086,10 @@ def main():
             nic = d
             break
 
-    if nic is not None:
-        with guarded(buf, "enable_nic"):
+    if nic is not None and liveness_gate("enable_nic"):
+        with guarded(buf, "enable_nic", short_timeout=timeout):
             try_(lambda: enable_nic(apcie.ecam_base, nic, buf), "enable_nic")
-    else:
+    elif nic is None:
         buf.write("\n=== enable NIC ===\nNo class-0x02 device found.\n")
 
     summarize(out / "nic-runtime.txt", buf, devices, nic)
