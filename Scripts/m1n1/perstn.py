@@ -185,6 +185,45 @@ def check_alive(timeout=0.5):
                 pass
 
 
+def check_alive_fast(exc_count_before, timeout=0.3):
+    """Cheaper liveness probe than check_alive() -- gets exc_count once,
+    returns (alive, delta). Use INSIDE a guarded read loop where a
+    full proxy round-trip on top of an already-faulted read may itself
+    wedge. This still makes one proxy call, but only one, and with
+    a strict short timeout.
+    """
+    old = None
+    try:
+        old = iface.dev.timeout
+        iface.dev.timeout = timeout
+    except Exception:
+        pass
+    try:
+        cnt = p.get_exc_count()
+        return True, cnt - exc_count_before
+    except Exception:
+        return False, -1
+    finally:
+        if old is not None:
+            try:
+                iface.dev.timeout = old
+            except Exception:
+                pass
+
+
+def flush_partial_log(out_path, buf, tag):
+    """Persist buf to out_path mid-run so a subsequent wedge doesn't
+    destroy the log we already have. Call after every stable section
+    in main().
+    """
+    try:
+        out_path.write_text(buf.getvalue())
+        log(f"[flush:{tag}] wrote partial log ({len(buf.getvalue())} bytes) "
+            f"to {out_path}")
+    except Exception as e:
+        log(f"[flush:{tag}] FAILED: {e.__class__.__name__}: {e}")
+
+
 def ecam_addr(base, bus, dev, fn, off):
     return base + (bus << 20) + (dev << 15) + (fn << 12) + off
 
@@ -689,18 +728,162 @@ def dump_phy_ip_tunables_report(apcie, buf):
         buf.write("no tunable entries target an inactive port slice.\n\n")
 
 
-# ---------------------------------- pre-pcie_init shared MMIO probe
+# ---------------------------------- pre-pcie_init probes (phase 0/A/B/C)
 
-def probe_preinit_regs(apcie, buf, timeout=0.3):
-    """Probe a small set of SHARED apcie MMIO addresses BEFORE p.pcie_init().
+def _decode_pmgr_name(dev):
+    n = getattr(dev, "name", None)
+    if n is None:
+        return "?"
+    if isinstance(n, (bytes, bytearray)):
+        try:
+            return n.rstrip(b"\x00").decode("ascii", "replace")
+        except Exception:
+            return n.hex()
+    return str(n)
 
-    Only shared blocks are touched -- port_base / ltssm / intr2axi /
-    ctrl_lo require per-port PMGR gates that only pcie_init enables, and
-    probing them unpowered will AXI-stall.
 
-    Even the shared reads are done under guarded() with a short timeout
-    so the first wedge aborts the rest of the probe cleanly.
+def probe_phase0_pmgr_state(apcie, buf):
+    """Phase 0 -- PMGR gate readout for apcie's power_gates.
+
+    ZERO apcie MMIO. Only touches /arm-io/pmgr registers, which are
+    always reachable (SMC + iBoot have PMGR up long before any driver
+    runs). Reveals which gates SMC gP0d=0x800001 already turned on.
+
+    PS register (Apple PMGR device state) field layout on t8xxx:
+        bits [3:0]  state_actual  (current power state)
+        bits [7:4]  state_target  (requested power state)
+        0x0 = ON, 0xf = OFF; intermediate values seen during transitions.
     """
+    buf.write("=== Phase 0: PMGR gate state (no apcie MMIO) ===\n")
+    buf.write(f"apcie.power_gates from ADT: {list(apcie.power_gates)}\n\n")
+
+    try:
+        pmgr = u.adt["arm-io/pmgr"]
+    except Exception as e:
+        buf.write(f"  ERROR: cannot open /arm-io/pmgr: "
+                  f"{e.__class__.__name__}: {e}\n\n")
+        return
+
+    dev_by_idx = {}
+    try:
+        for dev in pmgr.devices:
+            try:
+                idx = int(u.adt.pmgr_dev_get_id(dev))
+                dev_by_idx[idx] = dev
+            except Exception:
+                continue
+    except Exception as e:
+        buf.write(f"  ERROR: pmgr.devices enumeration failed: "
+                  f"{e.__class__.__name__}: {e}\n\n")
+        return
+
+    for gate in apcie.power_gates:
+        gate = int(gate)
+        dev = dev_by_idx.get(gate)
+        if dev is None:
+            buf.write(f"  gate {gate:4d}: <NOT FOUND in pmgr.devices>\n")
+            continue
+        name = _decode_pmgr_name(dev)
+        try:
+            ps_addr = u.adt.pmgr_dev_get_addr(dev)
+        except Exception as e:
+            buf.write(f"  gate {gate:4d} name={name!r:24s} "
+                      f"pmgr_dev_get_addr failed: "
+                      f"{e.__class__.__name__}: {e}\n")
+            continue
+        try:
+            ps_val = p.read32(ps_addr)
+        except Exception as e:
+            buf.write(f"  gate {gate:4d} name={name!r:24s} "
+                      f"ps@0x{ps_addr:x} read FAILED "
+                      f"({e.__class__.__name__}: {e})\n")
+            continue
+        actual = ps_val & 0xf
+        target = (ps_val >> 4) & 0xf
+        buf.write(f"  gate {gate:4d} name={name!r:24s} "
+                  f"ps@0x{ps_addr:x} = 0x{ps_val:08x} "
+                  f"(target=0x{target:x}, actual=0x{actual:x})\n")
+    buf.write("\n")
+
+
+def probe_phaseA_preinit_single(apcie, buf, timeout=0.2):
+    """Phase A -- single hardened pre-PMGR probe.
+
+    Exactly one read (phy_ip_base + 0x0) with exc_count-delta bookkeeping.
+    Documents pre-PMGR reachability without iterating; a fault here is
+    strong evidence the apcie MMIO is decoded-but-unpowered.
+
+    Bails without further probes regardless of outcome.
+    """
+    addr = apcie.phy_ip_base + 0x0
+    label = "phy_ip_base +0x0 (PLL area head)"
+    buf.write("=== Phase A: pre-PMGR single-probe ===\n")
+
+    try:
+        exc_before = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"  ERROR: get_exc_count pre-probe failed "
+                  f"({e.__class__.__name__}: {e})\n")
+        buf.write("  --> m1n1 already unresponsive; bailing\n\n")
+        return
+
+    with guarded(buf, "phaseA", short_timeout=timeout):
+        val = _safe_read32(addr)
+
+    alive, delta = check_alive_fast(exc_before, timeout=timeout)
+    buf.write(f"  read32(0x{addr:x}) [{label}] = {val}\n")
+    buf.write(f"  exc_count delta = {delta} (alive={alive})\n")
+    if not alive:
+        buf.write("  --> m1n1 unresponsive after single probe; "
+                  "block is likely decoded-but-unpowered\n")
+    elif delta != 0:
+        buf.write("  --> SYNC/SError on this read; pre-PMGR block "
+                  "is decoded-but-unpowered (recovered by GUARD.SKIP)\n")
+    else:
+        buf.write("  --> pre-PMGR read completed cleanly\n")
+    buf.write("\n")
+
+
+def probe_phaseB_apcie_pmgr(apcie, buf, timeout=0.3):
+    """Phase B -- enable apcie PMGR from Python + shared MMIO probe.
+
+    Calls p.pmgr_adt_power_enable('/arm-io/apcie') which is the same C
+    helper m1n1's pcie.c:425 uses. This turns on the individual per-block
+    clocks/gates that make rc_base / phy_common / phy_ip / axi_base
+    readable, WITHOUT running the tunable-application code that wedges
+    the current m1n1.
+
+    Then walks the shared-MMIO probe list with per-read exc_count-delta
+    bail: any fault stops the probe immediately instead of triggering
+    a cascade.
+    """
+    buf.write("=== Phase B: apcie PMGR enable + shared MMIO probe ===\n")
+
+    try:
+        exc_before = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"  ERROR: get_exc_count pre-PMGR failed "
+                  f"({e.__class__.__name__}: {e})\n\n")
+        return
+
+    try:
+        p.pmgr_adt_power_enable("/arm-io/apcie")
+        buf.write("  p.pmgr_adt_power_enable('/arm-io/apcie') -> ok\n")
+    except Exception as e:
+        buf.write(f"  p.pmgr_adt_power_enable raised: "
+                  f"{e.__class__.__name__}: {e}\n\n")
+        return
+
+    try:
+        exc_after_pmgr = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"  ERROR: get_exc_count post-PMGR failed "
+                  f"({e.__class__.__name__}: {e})\n\n")
+        return
+    buf.write(f"  exc_count during PMGR enable: "
+              f"{exc_before} -> {exc_after_pmgr} "
+              f"(delta={exc_after_pmgr - exc_before})\n\n")
+
     probes = [
         (apcie.rc_base + 0x00,          "rc_base +0x00"),
         (apcie.rc_base + 0x04,          "rc_base +0x04"),
@@ -709,22 +892,95 @@ def probe_preinit_regs(apcie, buf, timeout=0.3):
         (apcie.rc_base + 0x50,          "rc_base +0x50"),
         (apcie.rc_base + 0x54,          "rc_base +0x54"),
         (apcie.rc_base + 0x58,          "rc_base +0x58"),
-        (apcie.phy_common_base + 0x00,  "phy_common_base +0x00 (PHYCMN_CLK)"),
-        (apcie.phy_ip_base + 0x00,      "phy_ip_base +0x00 (PLL area head)"),
-        (apcie.phy_ip_base + 0x8000,    "phy_ip_base +0x08000 (port 0 slice head)"),
-        (apcie.phy_ip_base + 0x10000,   "phy_ip_base +0x10000 (port 1 slice head -- INACTIVE)"),
-        (apcie.phy_ip_base + 0x18000,   "phy_ip_base +0x18000 (port 2 slice head)"),
+        (apcie.phy_common_base + 0x00,  "phy_common +0x00 (PHYCMN_CLK)"),
+        (apcie.phy_ip_base + 0x00,      "phy_ip +0x00 (PLL area head)"),
+        (apcie.phy_ip_base + 0x8000,    "phy_ip +0x08000 (port 0 slice head)"),
+        (apcie.phy_ip_base + 0x10000,   "phy_ip +0x10000 (port 1 slice head -- INACTIVE)"),
+        (apcie.phy_ip_base + 0x18000,   "phy_ip +0x18000 (port 2 slice head)"),
         (apcie.axi_base + 0x00,         "axi_base +0x00"),
     ]
-    buf.write("=== pre-pcie_init shared MMIO probe ===\n")
-    buf.write("(reads only; port_base / ltssm / ctrl_lo skipped -- "
-              "need per-port PMGR)\n\n")
+
+    exc_running = exc_after_pmgr
     for addr, label in probes:
-        val = _safe_read32(addr)
-        buf.write(f"  read32(0x{addr:09x}) [{label}] = {val}\n")
-        if not check_alive(timeout=timeout):
-            buf.write("  !!! m1n1 wedged during preinit probe; bailing\n")
-            break
+        with guarded(buf, f"phaseB.0x{addr:x}", short_timeout=timeout):
+            val = _safe_read32(addr)
+        alive, delta = check_alive_fast(exc_running, timeout=timeout)
+        buf.write(f"  read32(0x{addr:09x}) [{label}] = {val} "
+                  f"(delta={delta}, alive={alive})\n")
+        if not alive:
+            buf.write("  !!! m1n1 unresponsive; bailing Phase B\n")
+            return
+        if delta != 0:
+            buf.write("  !!! SYNC/SError on this read; bailing Phase B\n")
+            return
+    buf.write("\n")
+
+
+def probe_phaseC_port_pmgr(apcie, buf, timeout=0.3):
+    """Phase C -- per-active-port PMGR + port_base probe.
+
+    For each port whose pci-bridge{N} exists in the ADT, call
+    p.pmgr_adt_power_enable(port.bridge_path) to enable the per-port
+    gates (mirrors m1n1's per-port loop in pcie.c). Then probe the
+    port_base Tier 1 register set, per-read exc_count bail.
+
+    Compare the results here vs. pcie_up_1.log's post-init state to
+    infer which specific registers m1n1's LATER init steps write to.
+    """
+    buf.write("=== Phase C: per-port PMGR enable + port_base probe ===\n")
+    for port in apcie.ports:
+        if not port.exists:
+            buf.write(f"  port{port.index}: skipped "
+                      f"(no pci-bridge{port.index} in ADT)\n")
+            continue
+        buf.write(f"  -- port{port.index} (bridge={port.bridge_path}) --\n")
+        try:
+            exc_before = p.get_exc_count()
+        except Exception as e:
+            buf.write(f"    ERROR: get_exc_count failed "
+                      f"({e.__class__.__name__}: {e})\n")
+            return
+        try:
+            p.pmgr_adt_power_enable(port.bridge_path)
+            buf.write(f"    p.pmgr_adt_power_enable('{port.bridge_path}') -> ok\n")
+        except Exception as e:
+            buf.write(f"    p.pmgr_adt_power_enable raised: "
+                      f"{e.__class__.__name__}: {e}\n")
+            continue
+        try:
+            exc_after = p.get_exc_count()
+        except Exception as e:
+            buf.write(f"    ERROR: post-PMGR exc_count failed "
+                      f"({e.__class__.__name__}: {e})\n")
+            return
+        buf.write(f"    exc_count during PMGR: {exc_before} -> {exc_after} "
+                  f"(delta={exc_after - exc_before})\n")
+
+        pb = port.port_base
+        port_probes = [
+            (pb + 0x800, f"port{port.index} APPCLK      (+0x800)"),
+            (pb + 0x804, f"port{port.index} STATUS      (+0x804)"),
+            (pb + 0x208, f"port{port.index} LINKSTS     (+0x208)"),
+            (pb + 0x82c, f"port{port.index} T602X_RESET (+0x82c)"),
+            (pb + 0x814, f"port{port.index} PORT_RESET  (+0x814)"),
+            (pb + 0x104, f"port{port.index} +0x104"),
+            (pb + 0x808, f"port{port.index} +0x808"),
+        ]
+        exc_running = exc_after
+        for addr, label in port_probes:
+            with guarded(buf, f"phaseC.0x{addr:x}", short_timeout=timeout):
+                val = _safe_read32(addr)
+            alive, delta = check_alive_fast(exc_running, timeout=timeout)
+            buf.write(f"    read32(0x{addr:09x}) [{label}] = {val} "
+                      f"(delta={delta}, alive={alive})\n")
+            if not alive:
+                buf.write(f"    !!! m1n1 unresponsive on port{port.index}; "
+                          f"bailing Phase C\n")
+                return
+            if delta != 0:
+                buf.write(f"    !!! SYNC on port{port.index} read; "
+                          f"bailing this port\n")
+                break
     buf.write("\n")
 
 
@@ -1435,17 +1691,31 @@ def main():
                          "report (default: enabled). Report is wedge-immune -- "
                          "no MMIO, only ADT parsing.")
     ap.add_argument("--preinit-probe", action="store_true",
-                    help="probe shared apcie MMIO (rc_base, phy_common, "
-                         "phy_ip head + per-port slice heads, axi_base) "
-                         "BEFORE p.pcie_init(). Off by default because most "
-                         "of these blocks need PMGR gates that only pcie_init "
-                         "enables -- probing them unpowered may AXI-stall.")
+                    help="run pre-pcie_init probes. Phase 0 = PMGR gate "
+                         "readout (safe, no apcie MMIO). Phase A = one "
+                         "hardened read at phy_ip_base+0 with exc_count "
+                         "delta bail. Off by default; combine with "
+                         "--pmgr-enable / --pmgr-per-port for deeper probing.")
+    ap.add_argument("--pmgr-enable", action="store_true",
+                    help="Phase B: call p.pmgr_adt_power_enable('/arm-io/apcie') "
+                         "from Python (same helper m1n1's pcie.c:425 uses), "
+                         "then probe the shared MMIO block set with per-read "
+                         "exc_count bail. Requires --preinit-probe.")
+    ap.add_argument("--pmgr-per-port", action="store_true",
+                    help="Phase C: after --pmgr-enable, also call "
+                         "pmgr_adt_power_enable on each active pci-bridge{N} "
+                         "path and probe port_base Tier 1 regs. Requires "
+                         "--preinit-probe and --pmgr-enable.")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    runtime_path = out / "nic-runtime.txt"
 
     buf = io.StringIO()
+
+    def flush(tag):
+        flush_partial_log(runtime_path, buf, tag)
 
     log("=== Phase 3.3 pcie_up ===")
 
@@ -1455,6 +1725,7 @@ def main():
     apcie = ApcieMap.from_adt(u)
     apcie.describe(buf)
     buf.write("\n")
+    flush("adt-map")
 
     # ADT-only, wedge-immune. Runs regardless of --no-pcie-init so we
     # always leave a full tunable dump in nic-runtime.txt.
@@ -1462,6 +1733,7 @@ def main():
         log("dumping apcie-phy-ip-{pll,auspma}-tunables report...")
         try_(lambda: dump_phy_ip_tunables_report(apcie, buf),
              "dump_phy_ip_tunables_report")
+        flush("phy-ip-report")
 
     # Resolve NIC-side GPIO pins from the ADT if the caller didn't override.
     nic_port = apcie.nic_port()
@@ -1481,6 +1753,7 @@ def main():
 
     log("SMC power on apcie fabric...")
     try_(lambda: smc_power(buf), "SMC power")
+    flush("smc-power")
 
     if args.no_clkreq:
         log("CLKREQ assert skipped (--no-clkreq)")
@@ -1489,6 +1762,7 @@ def main():
         log(f"CLKREQ assert on gpio0 pin {clkreq_pin}...")
         try_(lambda: assert_clkreq(buf, pin=clkreq_pin),
              "assert_clkreq")
+        flush("clkreq")
 
     if args.no_perstn:
         log("PERSTN toggle skipped (--no-perstn)")
@@ -1497,14 +1771,36 @@ def main():
         log(f"PERSTN deassert on gpio0 pin {perstn_pin}...")
         try_(lambda: deassert_perstn(buf, pin=perstn_pin),
              "deassert_perstn")
+        flush("perstn")
 
     timeout = args.dump_timeout
 
     if args.preinit_probe:
-        log("probing shared apcie MMIO pre-pcie_init...")
-        with guarded(buf, "probe_preinit_regs", short_timeout=timeout):
-            try_(lambda: probe_preinit_regs(apcie, buf, timeout=timeout),
-                 "probe_preinit_regs")
+        log("Phase 0: PMGR gate readout (no apcie MMIO)...")
+        try_(lambda: probe_phase0_pmgr_state(apcie, buf),
+             "probe_phase0_pmgr_state")
+        flush("phase0-pmgr-state")
+
+        log("Phase A: single pre-PMGR probe at phy_ip_base+0...")
+        try_(lambda: probe_phaseA_preinit_single(apcie, buf, timeout=timeout),
+             "probe_phaseA_preinit_single")
+        flush("phaseA-preinit-single")
+
+        if args.pmgr_enable:
+            log("Phase B: p.pmgr_adt_power_enable('/arm-io/apcie') + shared MMIO...")
+            try_(lambda: probe_phaseB_apcie_pmgr(apcie, buf, timeout=timeout),
+                 "probe_phaseB_apcie_pmgr")
+            flush("phaseB-apcie-pmgr")
+
+            if args.pmgr_per_port:
+                log("Phase C: per-port pmgr_adt_power_enable + port_base probe...")
+                try_(lambda: probe_phaseC_port_pmgr(apcie, buf, timeout=timeout),
+                     "probe_phaseC_port_pmgr")
+                flush("phaseC-port-pmgr")
+        elif args.pmgr_per_port:
+            log("--pmgr-per-port requested without --pmgr-enable; skipping Phase C")
+            buf.write("\n=== Phase C: skipped (--pmgr-per-port needs "
+                      "--pmgr-enable) ===\n\n")
 
     pcie_init_ok = False
     if args.no_pcie_init:
@@ -1523,6 +1819,7 @@ def main():
             buf.write(f"\np.pcie_init raised: {e.__class__.__name__}: {e}\n\n")
             log(f"p.pcie_init raised: {e.__class__.__name__}: {e}")
             traceback.print_exc(limit=5)
+    flush("pcie-init")
 
     def liveness_gate(label):
         """Skip subsequent sections if m1n1 died in a previous one.
@@ -1541,6 +1838,7 @@ def main():
             try_(lambda: dump_pcie_regs(apcie, buf, "post-init",
                                         tier=args.tier),
                  "dump_pcie_regs")
+        flush("dump-post-init")
 
         if args.no_ltssm_kick:
             log("LTSSM kick skipped (--no-ltssm-kick)")
@@ -1555,6 +1853,7 @@ def main():
                         apcie, buf,
                         aggressive=args.ltssm_kick_aggressive),
                      "try_ltssm_kick")
+            flush("ltssm-kick")
 
             if liveness_gate("post-kick dump"):
                 log(f"dumping PCIe controller registers "
@@ -1564,6 +1863,7 @@ def main():
                     try_(lambda: dump_pcie_regs(apcie, buf, "post-kick",
                                                 tier=args.tier),
                          "dump_pcie_regs")
+                flush("dump-post-kick")
 
         if args.t602x_init and liveness_gate("T602X init replay"):
             log(f"replaying T602X APCIE port init on ports "
@@ -1578,6 +1878,7 @@ def main():
                         do_again=args.t602x_do_again,
                         do_msimap=args.t602x_msimap),
                      "t602x_port_init_replay")
+            flush("t602x-replay")
             if liveness_gate("post-T602X dump"):
                 log(f"dumping PCIe controller registers "
                     f"(post-t602x, tier={args.tier})...")
@@ -1586,6 +1887,7 @@ def main():
                     try_(lambda: dump_pcie_regs(apcie, buf, "post-t602x",
                                                 tier=args.tier),
                          "dump_pcie_regs")
+                flush("dump-post-t602x")
 
         if args.unblock_experiment and liveness_gate("unblock experiment"):
             log(f"running unblock experiment on port {args.unblock_port}...")
@@ -1594,6 +1896,7 @@ def main():
                 try_(lambda: unblock_experiment(apcie, buf,
                                                 port_index=args.unblock_port),
                      "unblock_experiment")
+            flush("unblock-experiment")
             if liveness_gate("post-unblock dump"):
                 log(f"dumping PCIe controller registers "
                     f"(post-unblock, tier={args.tier})...")
@@ -1602,6 +1905,7 @@ def main():
                     try_(lambda: dump_pcie_regs(apcie, buf, "post-unblock",
                                                 tier=args.tier),
                          "dump_pcie_regs")
+                flush("dump-post-unblock")
     else:
         log("skipping PCIe register dump (m1n1 is wedged, reads would time out)")
         buf.write("=== PCIe controller register dump ===\n"
@@ -1613,6 +1917,7 @@ def main():
             devices = try_(lambda: ecam_walk(apcie.ecam_base, buf,
                                              active_ports=apcie.active_ports),
                            "ecam_walk") or []
+        flush("ecam-walk")
     else:
         devices = []
 
@@ -1626,10 +1931,11 @@ def main():
     if nic is not None and liveness_gate("enable_nic"):
         with guarded(buf, "enable_nic", short_timeout=timeout):
             try_(lambda: enable_nic(apcie.ecam_base, nic, buf), "enable_nic")
+        flush("enable-nic")
     elif nic is None:
         buf.write("\n=== enable NIC ===\nNo class-0x02 device found.\n")
 
-    summarize(out / "nic-runtime.txt", buf, devices, nic)
+    summarize(runtime_path, buf, devices, nic)
     log("done. Copy /tmp/m4-recon/nic-runtime.txt into m4_recon/ if it looks sane.")
 
 
