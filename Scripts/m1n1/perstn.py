@@ -43,6 +43,7 @@ import pathlib
 import sys
 import time
 import traceback
+from contextlib import contextmanager
 
 sys.path.append(str(pathlib.Path.home() /
     "Projects/AsahiLinux/m4/m1n1/proxyclient"))
@@ -50,6 +51,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 from m1n1.setup import *          # noqa: F401,F403 -- exposes u, p, iface
 from m1n1.fw.smc import SMCClient
+from m1n1.proxy import GUARD
 
 from pcie_regs import ApcieMap
 
@@ -85,6 +87,49 @@ def try_(fn, label):
         log(f"WARN {label}: {e.__class__.__name__}: {e}")
         traceback.print_exc(limit=3)
         return None
+
+
+@contextmanager
+def guarded(buf=None, label="", silent=True):
+    """Enable m1n1's SYNC/SError exception guard for the duration of the block.
+
+    Faulting p.read32/p.write32 calls return a sentinel (0xacce5515) and bump
+    m1n1's exc_count instead of wedging the proxy on a fabric SLVERR. Without
+    this, a single bad address (e.g. an unpowered PHY block) kills m1n1
+    mid-transaction and Python sees a UART timeout instead of continuing.
+
+    silent=True suppresses the per-fault TTY> print on the M4 side (we already
+    see the sentinel in the log). Set False to cross-reference addresses.
+    """
+    mode = GUARD.SKIP | (GUARD.SILENT if silent else 0)
+    cnt_before = 0
+    try:
+        cnt_before = p.get_exc_count()
+    except Exception as e:
+        if buf is not None:
+            buf.write(f"[guard] {label}: get_exc_count(pre) failed: "
+                      f"{e.__class__.__name__}: {e}\n")
+    p.set_exc_guard(mode)
+    try:
+        yield
+    finally:
+        # Restore first so any follow-up proxy op isn't guarded.
+        try:
+            p.set_exc_guard(GUARD.OFF)
+        except Exception as e:
+            if buf is not None:
+                buf.write(f"[guard] {label}: set_exc_guard(OFF) failed: "
+                          f"{e.__class__.__name__}: {e}\n")
+        try:
+            cnt_after = p.get_exc_count()
+            delta = cnt_after - cnt_before
+            if buf is not None:
+                buf.write(f"[guard] {label}: exc_count delta = {delta} "
+                          f"(before={cnt_before}, after={cnt_after})\n")
+        except Exception as e:
+            if buf is not None:
+                buf.write(f"[guard] {label}: get_exc_count(post) failed: "
+                          f"{e.__class__.__name__}: {e}\n")
 
 
 def ecam_addr(base, bus, dev, fn, off):
@@ -802,15 +847,17 @@ def main():
     if pcie_init_ok:
         log(f"active ports (per ADT): {apcie.active_ports}")
         log("dumping PCIe controller registers (post-init)...")
-        try_(lambda: dump_pcie_regs(apcie, buf, "post-init"),
-             "dump_pcie_regs")
+        with guarded(buf, "dump_pcie_regs(post-init)"):
+            try_(lambda: dump_pcie_regs(apcie, buf, "post-init"),
+                 "dump_pcie_regs")
 
         if args.no_unmapped_probe:
             log("unmapped-block probe skipped (--no-unmapped-probe)")
             buf.write("\n=== unmapped block probe (skipped) ===\n\n")
         else:
             log("probing phy_extra + ctrl_lo (read-only)...")
-            try_(lambda: probe_unmapped(apcie, buf), "probe_unmapped")
+            with guarded(buf, "probe_unmapped"):
+                try_(lambda: probe_unmapped(apcie, buf), "probe_unmapped")
 
         if args.no_ltssm_kick:
             log("LTSSM kick skipped (--no-ltssm-kick)")
@@ -818,30 +865,35 @@ def main():
         else:
             log(f"trying LTSSM kick sequences on ports "
                 f"{apcie.active_ports}...")
-            try_(lambda: try_ltssm_kick(apcie, buf),
-                 "try_ltssm_kick")
+            with guarded(buf, "try_ltssm_kick"):
+                try_(lambda: try_ltssm_kick(apcie, buf),
+                     "try_ltssm_kick")
 
             log("dumping PCIe controller registers (post-kick)...")
-            try_(lambda: dump_pcie_regs(apcie, buf, "post-kick"),
-                 "dump_pcie_regs")
+            with guarded(buf, "dump_pcie_regs(post-kick)"):
+                try_(lambda: dump_pcie_regs(apcie, buf, "post-kick"),
+                     "dump_pcie_regs")
 
         if args.unblock_experiment:
             log(f"running unblock experiment on port {args.unblock_port}...")
-            try_(lambda: unblock_experiment(apcie, buf,
-                                            port_index=args.unblock_port),
-                 "unblock_experiment")
+            with guarded(buf, "unblock_experiment"):
+                try_(lambda: unblock_experiment(apcie, buf,
+                                                port_index=args.unblock_port),
+                     "unblock_experiment")
             log("dumping PCIe controller registers (post-unblock)...")
-            try_(lambda: dump_pcie_regs(apcie, buf, "post-unblock"),
-                 "dump_pcie_regs")
+            with guarded(buf, "dump_pcie_regs(post-unblock)"):
+                try_(lambda: dump_pcie_regs(apcie, buf, "post-unblock"),
+                     "dump_pcie_regs")
     else:
         log("skipping PCIe register dump (m1n1 is wedged, reads would time out)")
         buf.write("=== PCIe controller register dump ===\n"
                   "SKIPPED: p.pcie_init() raised -- m1n1 is not responding.\n\n")
 
     log(f"ECAM walk @ 0x{apcie.ecam_base:x} ...")
-    devices = try_(lambda: ecam_walk(apcie.ecam_base, buf,
-                                     active_ports=apcie.active_ports),
-                   "ecam_walk") or []
+    with guarded(buf, "ecam_walk"):
+        devices = try_(lambda: ecam_walk(apcie.ecam_base, buf,
+                                         active_ports=apcie.active_ports),
+                       "ecam_walk") or []
 
     # Pick the NIC: class-0x02 device on any downstream bus.
     nic = None
@@ -851,7 +903,8 @@ def main():
             break
 
     if nic is not None:
-        try_(lambda: enable_nic(apcie.ecam_base, nic, buf), "enable_nic")
+        with guarded(buf, "enable_nic"):
+            try_(lambda: enable_nic(apcie.ecam_base, nic, buf), "enable_nic")
     else:
         buf.write("\n=== enable NIC ===\nNo class-0x02 device found.\n")
 
