@@ -71,6 +71,28 @@ Per-port (6 entries each, indices 7..24; N = 0/1/2):
 
 import struct
 
+# ---------------------------------------------- phy_ip_base slice geometry
+#
+# On T8140/T8132 the shared `phy_ip_base` window (reg[3], size 0x20000) is
+# partitioned as:
+#     [0x00000, 0x08000)  -- shared PLL area
+#                            (used by apcie-phy-ip-pll-tunables)
+#     [0x08000, 0x10000)  -- port 0 PHY IP slice
+#                            (aliased to phy_extra_base[0])
+#     [0x10000, 0x18000)  -- port 1 PHY IP slice
+#                            (aliased to phy_extra_base[1])
+#     [0x18000, 0x20000)  -- port 2 PHY IP slice
+#                            (aliased to phy_extra_base[2])
+#
+# The Apple-supplied apcie-phy-ip-{pll,auspma}-tunables blob is a single
+# un-indexed list whose entries have absolute offsets from phy_ip_base --
+# writes at offsets in a port's slice are "for" that port. On j773g port 1
+# has no pci-bridge1 node and its PHY IP slice is decoded but unpowered,
+# so writes in [0x10000, 0x18000) AXI-stall m1n1. See PLAN.md § 3.3.
+PHY_IP_SLICE_BASE   = 0x8000
+PHY_IP_SLICE_STRIDE = 0x8000
+PHY_IP_WINDOW_SIZE  = 0x20000
+
 # ------------------------------------------------------------------ tunables
 
 # Apple ADT tunable entry format is 24 bytes (LE):
@@ -340,6 +362,39 @@ class ApcieMap:
         apcie = u.adt["arm-io/apcie"]
         val = _try_prop(apcie, prop)
         return parse_tunables_container(val)
+
+    def classify_phy_ip_offset(self, offset):
+        """Classify a tunable offset (from apcie-phy-ip-* lists) against
+        the phy_ip_base slice geometry. See PHY_IP_* constants at the top
+        of this module for the layout on T8140/T8132.
+
+        Returns a dict:
+            target_addr        -- phy_ip_base + offset (int)
+            kind               -- "shared" | "port_slice" | "out_of_window"
+            port_index         -- 0/1/2 or None (only for "port_slice")
+            port_active        -- True/False or None (only for "port_slice";
+                                  True iff pci-bridge{N} exists in ADT)
+            slice_base_offset  -- offset of the start of the slice, or None
+            slice_size         -- slice length in bytes, or None
+        """
+        target_addr = self.phy_ip_base + offset
+        if offset < 0 or offset >= PHY_IP_WINDOW_SIZE:
+            return dict(target_addr=target_addr, kind="out_of_window",
+                        port_index=None, port_active=None,
+                        slice_base_offset=None, slice_size=None)
+        if offset < PHY_IP_SLICE_BASE:
+            return dict(target_addr=target_addr, kind="shared",
+                        port_index=None, port_active=None,
+                        slice_base_offset=0,
+                        slice_size=PHY_IP_SLICE_BASE)
+        rel = offset - PHY_IP_SLICE_BASE
+        idx = rel // PHY_IP_SLICE_STRIDE
+        slice_base = PHY_IP_SLICE_BASE + idx * PHY_IP_SLICE_STRIDE
+        active = (0 <= idx < len(self.ports)) and self.ports[idx].exists
+        return dict(target_addr=target_addr, kind="port_slice",
+                    port_index=idx, port_active=active,
+                    slice_base_offset=slice_base,
+                    slice_size=PHY_IP_SLICE_STRIDE)
 
     # ------------------------------------------------------------ dump
 

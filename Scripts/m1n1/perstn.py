@@ -591,6 +591,143 @@ def _safe_read32(addr):
         return f"<{e.__class__.__name__}: {e}>"
 
 
+# ------------------------------------------------ phy_ip tunables report
+
+def _slice_label(info):
+    k = info["kind"]
+    if k == "shared":
+        return "shared", "-"
+    if k == "port_slice":
+        return (f"port{info['port_index']}",
+                "yes" if info["port_active"] else "NO")
+    return "!OOR", "-"
+
+
+def dump_phy_ip_tunables_report(apcie, buf):
+    """Dump apcie-phy-ip-{pll,auspma}-tunables with phy_ip_base slice
+    classification. ADT-only -- no MMIO reads, no proxy calls.
+
+    Safe to run regardless of pcie_init state: if m1n1 has wedged during
+    a previous p.pcie_init() call in the same session, this still works
+    because everything comes out of u.adt (loaded once at startup).
+
+    Answers the two questions blocking Phase 3.3:
+      1) which tunable entries write into which phy_ip_base slice, and
+      2) how many entries land in slices whose pci-bridge{N} is absent
+         from the ADT (currently port 1 on j773g).
+    """
+    buf.write("=== phy_ip tunables report (from ADT, no MMIO) ===\n")
+    buf.write(f"phy_ip_base       = 0x{apcie.phy_ip_base:x} "
+              f"sz 0x{apcie.phy_ip_size:x}\n")
+    buf.write(f"active ADT ports  = {apcie.active_ports}\n")
+    buf.write("slice geometry    = shared [0x0000..0x8000)  "
+              "port0 [0x08000..0x10000)  "
+              "port1 [0x10000..0x18000)  "
+              "port2 [0x18000..0x20000)\n\n")
+
+    first_wedge = None
+
+    for prop in ("apcie-phy-ip-pll-tunables",
+                 "apcie-phy-ip-auspma-tunables"):
+        entries = apcie.apcie_tunables(u, prop)
+        buf.write(f"--- {prop} ({len(entries)} entries) ---\n")
+        if not entries:
+            buf.write("  (property missing from ADT)\n\n")
+            continue
+
+        tally = {"shared": 0, "out_of_window": 0}
+        range_lo = {}
+        range_hi = {}
+
+        buf.write("  #  offset     sz  mask               "
+                  "value              -> target_addr slice   active\n")
+        for i, (off, size, mask, val) in enumerate(entries):
+            info = apcie.classify_phy_ip_offset(off)
+            slabel, active = _slice_label(info)
+
+            key = slabel
+            if info["kind"] == "port_slice":
+                key = f"port{info['port_index']}_" + \
+                      ("active" if info["port_active"] else "inactive")
+            tally[key] = tally.get(key, 0) + 1
+
+            range_lo.setdefault(slabel, off)
+            range_hi.setdefault(slabel, off)
+            range_lo[slabel] = min(range_lo[slabel], off)
+            range_hi[slabel] = max(range_hi[slabel], off)
+
+            if (first_wedge is None
+                    and info["kind"] == "port_slice"
+                    and not info["port_active"]):
+                first_wedge = (prop, i, off, info["target_addr"])
+
+            buf.write(f"  {i:3d} 0x{off:08x} {size:2d}  0x{mask:016x} "
+                      f"0x{val:016x}    0x{info['target_addr']:09x} "
+                      f"{slabel:6s} {active}\n")
+
+        buf.write("  --- tally by slice ---\n")
+        for k in sorted(tally.keys()):
+            if tally[k]:
+                buf.write(f"    {k:20s} {tally[k]:4d}\n")
+        buf.write("  --- offset ranges by slice ---\n")
+        for sl in sorted(range_lo.keys()):
+            buf.write(f"    {sl:8s} 0x{range_lo[sl]:08x} .. "
+                      f"0x{range_hi[sl]:08x}\n")
+        buf.write("\n")
+
+    if first_wedge is not None:
+        prop, i, off, addr = first_wedge
+        buf.write("=== port-1 wedge hypothesis ===\n")
+        buf.write(f"first tunable entry targeting an INACTIVE port slice:\n")
+        buf.write(f"  {prop} entry #{i}: offset=0x{off:x} "
+                  f"-> target_addr=0x{addr:x}\n")
+        buf.write("If m1n1's tunable applicator hits this address, the AXI\n")
+        buf.write("write to an unpowered slave hangs the fabric silently.\n")
+        buf.write("This matches the observed wedge in pcie_up_2.log.\n\n")
+    else:
+        buf.write("=== port-1 wedge hypothesis ===\n")
+        buf.write("no tunable entries target an inactive port slice.\n\n")
+
+
+# ---------------------------------- pre-pcie_init shared MMIO probe
+
+def probe_preinit_regs(apcie, buf, timeout=0.3):
+    """Probe a small set of SHARED apcie MMIO addresses BEFORE p.pcie_init().
+
+    Only shared blocks are touched -- port_base / ltssm / intr2axi /
+    ctrl_lo require per-port PMGR gates that only pcie_init enables, and
+    probing them unpowered will AXI-stall.
+
+    Even the shared reads are done under guarded() with a short timeout
+    so the first wedge aborts the rest of the probe cleanly.
+    """
+    probes = [
+        (apcie.rc_base + 0x00,          "rc_base +0x00"),
+        (apcie.rc_base + 0x04,          "rc_base +0x04"),
+        (apcie.rc_base + 0x24,          "rc_base +0x24 (PHYIF_CTRL)"),
+        (apcie.rc_base + 0x3c,          "rc_base +0x3c"),
+        (apcie.rc_base + 0x50,          "rc_base +0x50"),
+        (apcie.rc_base + 0x54,          "rc_base +0x54"),
+        (apcie.rc_base + 0x58,          "rc_base +0x58"),
+        (apcie.phy_common_base + 0x00,  "phy_common_base +0x00 (PHYCMN_CLK)"),
+        (apcie.phy_ip_base + 0x00,      "phy_ip_base +0x00 (PLL area head)"),
+        (apcie.phy_ip_base + 0x8000,    "phy_ip_base +0x08000 (port 0 slice head)"),
+        (apcie.phy_ip_base + 0x10000,   "phy_ip_base +0x10000 (port 1 slice head -- INACTIVE)"),
+        (apcie.phy_ip_base + 0x18000,   "phy_ip_base +0x18000 (port 2 slice head)"),
+        (apcie.axi_base + 0x00,         "axi_base +0x00"),
+    ]
+    buf.write("=== pre-pcie_init shared MMIO probe ===\n")
+    buf.write("(reads only; port_base / ltssm / ctrl_lo skipped -- "
+              "need per-port PMGR)\n\n")
+    for addr, label in probes:
+        val = _safe_read32(addr)
+        buf.write(f"  read32(0x{addr:09x}) [{label}] = {val}\n")
+        if not check_alive(timeout=timeout):
+            buf.write("  !!! m1n1 wedged during preinit probe; bailing\n")
+            break
+    buf.write("\n")
+
+
 def dump_pcie_regs(apcie, buf, tag="post-init", tier=1):
     """Dump PCIe controller state, gated by safety tier.
 
@@ -1287,6 +1424,22 @@ def main():
                     help="in --t602x-init, also populate the 512-entry MSIMAP "
                          "table with 0x80000000|i. Big loop; port_base + "
                          "0x3800 + i*4 for i in 0..511.")
+    ap.add_argument("--no-pcie-init", action="store_true",
+                    help="SKIP p.pcie_init(). Use with the currently-shipped "
+                         "m1n1 (t8132-pcie HEAD 6b277bc) which wedges inside "
+                         "pcie_init while applying auspma tunables to port "
+                         "1's inactive PHY slice. Skipping lets pre-init "
+                         "probing + tunables report run to completion.")
+    ap.add_argument("--no-phy-ip-report", action="store_true",
+                    help="skip the ADT-only apcie-phy-ip-{pll,auspma}-tunables "
+                         "report (default: enabled). Report is wedge-immune -- "
+                         "no MMIO, only ADT parsing.")
+    ap.add_argument("--preinit-probe", action="store_true",
+                    help="probe shared apcie MMIO (rc_base, phy_common, "
+                         "phy_ip head + per-port slice heads, axi_base) "
+                         "BEFORE p.pcie_init(). Off by default because most "
+                         "of these blocks need PMGR gates that only pcie_init "
+                         "enables -- probing them unpowered may AXI-stall.")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -1302,6 +1455,13 @@ def main():
     apcie = ApcieMap.from_adt(u)
     apcie.describe(buf)
     buf.write("\n")
+
+    # ADT-only, wedge-immune. Runs regardless of --no-pcie-init so we
+    # always leave a full tunable dump in nic-runtime.txt.
+    if not args.no_phy_ip_report:
+        log("dumping apcie-phy-ip-{pll,auspma}-tunables report...")
+        try_(lambda: dump_phy_ip_tunables_report(apcie, buf),
+             "dump_phy_ip_tunables_report")
 
     # Resolve NIC-side GPIO pins from the ADT if the caller didn't override.
     nic_port = apcie.nic_port()
@@ -1338,19 +1498,31 @@ def main():
         try_(lambda: deassert_perstn(buf, pin=perstn_pin),
              "deassert_perstn")
 
-    log("p.pcie_init()...")
-    pcie_init_ok = False
-    try:
-        rc = p.pcie_init()
-        buf.write(f"\np.pcie_init() -> {rc!r}\n\n")
-        log(f"p.pcie_init returned {rc!r}")
-        pcie_init_ok = True
-    except Exception as e:
-        buf.write(f"\np.pcie_init raised: {e.__class__.__name__}: {e}\n\n")
-        log(f"p.pcie_init raised: {e.__class__.__name__}: {e}")
-        traceback.print_exc(limit=5)
-
     timeout = args.dump_timeout
+
+    if args.preinit_probe:
+        log("probing shared apcie MMIO pre-pcie_init...")
+        with guarded(buf, "probe_preinit_regs", short_timeout=timeout):
+            try_(lambda: probe_preinit_regs(apcie, buf, timeout=timeout),
+                 "probe_preinit_regs")
+
+    pcie_init_ok = False
+    if args.no_pcie_init:
+        log("SKIPPING p.pcie_init() (--no-pcie-init)")
+        buf.write("\np.pcie_init() skipped (--no-pcie-init).\n"
+                  "Current m1n1 (6b277bc) wedges here on j773g -- see\n"
+                  "phy_ip tunables report above for the port-1 hypothesis.\n\n")
+    else:
+        log("p.pcie_init()...")
+        try:
+            rc = p.pcie_init()
+            buf.write(f"\np.pcie_init() -> {rc!r}\n\n")
+            log(f"p.pcie_init returned {rc!r}")
+            pcie_init_ok = True
+        except Exception as e:
+            buf.write(f"\np.pcie_init raised: {e.__class__.__name__}: {e}\n\n")
+            log(f"p.pcie_init raised: {e.__class__.__name__}: {e}")
+            traceback.print_exc(limit=5)
 
     def liveness_gate(label):
         """Skip subsequent sections if m1n1 died in a previous one.
