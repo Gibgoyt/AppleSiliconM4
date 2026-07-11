@@ -40,6 +40,7 @@ Usage:
 import argparse
 import io
 import pathlib
+import re
 import sys
 import time
 import traceback
@@ -1993,6 +1994,14 @@ def probe_adt_fuse_recon(u, apcie, buf):
         buf.write("    (none)\n")
     buf.write("\n")
 
+    # 1b. Dump ALL /arm-io/apcie property names. RUN E showed zero
+    # /fuse/i matches among 30 properties; the source may live under
+    # a different name (calibration, otp, pll, tune, etc.).
+    buf.write(f"  /arm-io/apcie: full property list ({len(all_props)}):\n")
+    for k in all_props:
+        buf.write(f"    - {k}\n")
+    buf.write("\n")
+
     # 2. reg[] enumeration on /arm-io/apcie. ApcieMap uses 25 entries
     # (7 shared + 18 per-port). Any extra reg[] beyond that is a
     # candidate for the fuse block.
@@ -2036,6 +2045,74 @@ def probe_adt_fuse_recon(u, apcie, buf):
         except Exception:
             pass
 
+    # 3.5. Enumerate /arm-io/ top-level children matching /fuse|otp|
+    # efuse|chip.?id|calib/i. RUN E's fixed-path lookup missed
+    # anything with a non-obvious name.
+    buf.write("\n  /arm-io/ children matching "
+              "/fuse|otp|efuse|chip.?id|calib/i:\n")
+    io_root = None
+    try:
+        io_root = u.adt["arm-io"]
+    except Exception as e:
+        buf.write(f"    ERROR opening /arm-io: "
+                  f"{e.__class__.__name__}: {e}\n")
+    if io_root is not None:
+        child_names = []
+        try:
+            for c in io_root:
+                nm = getattr(c, "_name", None) or getattr(c, "name", None)
+                if isinstance(nm, (bytes, bytearray)):
+                    nm = nm.rstrip(b"\x00").decode("ascii", "replace")
+                if nm:
+                    child_names.append(str(nm))
+        except Exception as e:
+            buf.write(f"    WARN: /arm-io iteration failed "
+                      f"({e.__class__.__name__}: {e}); "
+                      f"trying _children fallback\n")
+            try:
+                child_names = list(io_root._children.keys())
+            except Exception:
+                child_names = []
+        pat = re.compile(r"fuse|otp|efuse|chip.?id|calib", re.I)
+        hits = sorted(nm for nm in child_names if pat.search(nm))
+        buf.write(f"    total /arm-io children: {len(child_names)}; "
+                  f"matches: {len(hits)}\n")
+        for h in hits:
+            try:
+                nn = u.adt[f"arm-io/{h}"]
+                base, size = nn.get_reg(0)
+                buf.write(f"    /arm-io/{h}: reg[0]=0x{base:x} "
+                          f"sz=0x{size:x}\n")
+            except Exception as e:
+                buf.write(f"    /arm-io/{h}: reg[0] FAILED "
+                          f"{e.__class__.__name__}: {e}\n")
+
+    # 3.6. /chosen properties matching /fuse|otp|calib|phy|pcie/i.
+    # Apple firmware sometimes passes per-die calibration blobs
+    # through /chosen.
+    buf.write("\n  /chosen properties matching "
+              "/fuse|otp|calib|phy|pcie/i:\n")
+    try:
+        chosen = u.adt["chosen"]
+        cprops = tuple(sorted(chosen._properties.keys()))
+        pat = re.compile(r"fuse|otp|calib|phy|pcie", re.I)
+        hits = [k for k in cprops if pat.search(k)]
+        buf.write(f"    total /chosen properties: {len(cprops)}; "
+                  f"matches: {len(hits)}\n")
+        for k in hits:
+            try:
+                v = getattr(chosen, k)
+                s = repr(v)
+                if len(s) > 200:
+                    s = s[:200] + "..."
+                buf.write(f"    {k!r} = {s}\n")
+            except Exception as e:
+                buf.write(f"    {k!r} = READ FAILED "
+                          f"{e.__class__.__name__}: {e}\n")
+    except Exception as e:
+        buf.write(f"    ERROR opening /chosen: "
+                  f"{e.__class__.__name__}: {e}\n")
+
     # 4. Cross-reference pcie_fuse_bits_t8112 tgt_regs against
     # apcie-phy-ip-pll-tunables shared-slice offsets.
     t8112_tgt_regs = (0x1204, 0x5018, 0x5220, 0x522c, 0x5278, 0x52a4,
@@ -2049,10 +2126,20 @@ def probe_adt_fuse_recon(u, apcie, buf):
         return
     tun_offsets = set()
     for ent in pll_entries or ():
+        # parse_tunables_container returns 4-tuples
+        # (offset, size, mask, value) (pcie_regs.py:132). Handle
+        # dict/attr forms defensively too.
         try:
-            tun_offsets.add(int(ent.offset))
-        except Exception:
-            pass
+            if isinstance(ent, tuple):
+                off = ent[0]
+            elif isinstance(ent, dict):
+                off = ent["offset"]
+            else:
+                off = getattr(ent, "offset")
+            tun_offsets.add(int(off))
+        except Exception as e:
+            buf.write(f"    WARN: tunable entry extract failed "
+                      f"({e.__class__.__name__}: {e}); entry={ent!r}\n")
     hits = sorted(o for o in t8112_tgt_regs if o in tun_offsets)
     misses = sorted(o for o in t8112_tgt_regs if o not in tun_offsets)
     buf.write(f"    hits ({len(hits)}): {[hex(o) for o in hits]}\n")
@@ -2077,6 +2164,20 @@ _T8140_RC_IDX      = 1
 _T8140_PHY_IDX     = 2   # phy_common_idx and phy_idx both = 2 on T8140
 _T8140_PHY_IP_IDX  = 3
 _T8140_AXI_IDX     = 4
+
+# Phase F diag checkpoints. RUN E proved any phy_ip read against
+# unclocked hardware permanently wedges m1n1 (AXI stall, not SYNC),
+# so only ONE phy_ip probe per boot -- chosen at CLI time via
+# --phy-ip-diag-at=. Every checkpoint always runs phy_common probe
+# (safe alive check). Order matches Phase F execution.
+_PHY_IP_DIAG_CHECKPOINTS = (
+    "F.entry",
+    "post-1.pmgr",
+    "post-5.phy-tunables",
+    "post-6.b.CLK0ACK",
+    "post-6.d.CLK1ACK",
+    "post-6.f.T8140-marker",
+)
 
 # APCIE_PHY_CTRL bit layout -- m1n1/src/pcie.c:38-43.
 _APCIE_PHY_CTRL     = 0x000
@@ -2108,7 +2209,8 @@ def _poll32_bit(addr, mask, want, timeout_ms):
 
 def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               extra_tunables=False, phycmn_first=False,
-                              phy_ip_diag=False):
+                              phy_ip_diag=False,
+                              phy_ip_diag_at="post-6.f.T8140-marker"):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -2230,18 +2332,20 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
 
     def diag(label):
         """No-op unless --phy-ip-diag. At each Phase F checkpoint:
-          1. phy_common+0 read -- safe alive check, independent of
-             phy_ip state. Always runs.
-          2. phy_ip+0 read -- SKIPPED at F.entry (RUN D wedged m1n1
-             with Exception: SYNC there; GUARD.SKIP does not catch
-             that class). Runs at every subsequent checkpoint.
+          1. phy_common+0 read -- safe alive check, always runs.
+          2. phy_ip+0 read -- runs ONLY at phy_ip_diag_at (default
+             post-6.f.T8140-marker). RUN E proved any phy_ip read
+             against unclocked hardware permanently wedges m1n1
+             (AXI bus stall, not SYNC), so exactly one phy_ip
+             data point per boot. Bisect across runs by re-running
+             with different --phy-ip-diag-at values.
 
-        Flushes after both so a wedge always leaves the log ending
-        at the exact checkpoint that broke."""
+        Flushes after both so a wedge leaves the log ending at the
+        exact checkpoint that broke."""
         if not phy_ip_diag:
             return
         probe_phy_common_reachability(apcie, buf, label, timeout=timeout)
-        if label != "F.entry":
+        if label == phy_ip_diag_at:
             probe_phy_ip_reachability(apcie, buf, label, timeout=timeout)
         _flush(f"phaseF.diag.{label}")
 
@@ -3404,7 +3508,25 @@ def main():
                          "(entry, after step 1, 5, 6.b, 6.d, 6.f) with "
                          "guarded read + alive check. Answers 'at which "
                          "step does phy_ip transition from unreachable "
-                         "to reachable?'. Requires --t8140-replay.")
+                         "to reachable?'. Requires --t8140-replay. "
+                         "RUN E: exactly ONE phy_ip probe per boot -- "
+                         "see --phy-ip-diag-at.")
+    ap.add_argument("--phy-ip-diag-at", default="post-6.f.T8140-marker",
+                    choices=_PHY_IP_DIAG_CHECKPOINTS,
+                    help="Which Phase F checkpoint runs the destructive "
+                         "phy_ip+0 probe. Every checkpoint always runs "
+                         "the phy_common+0 alive probe; only the "
+                         "SELECTED one also probes phy_ip. RUN E proved "
+                         "multi-checkpoint phy_ip probing wedges m1n1 "
+                         "at the first unreachable read, so only one "
+                         "phy_ip probe per boot. Bisect by re-running "
+                         "with different values. Default is the furthest "
+                         "checkpoint (post-6.f.T8140-marker): REACHABLE "
+                         "there means the T8140 codepath ungates phy_ip "
+                         "somewhere -- walk backwards to localize. "
+                         "Wedges there means the T8140 codepath does "
+                         "NOT ungate phy_ip; next lever is fuse writes "
+                         "or non-ADT sources.")
     ap.add_argument("--pmgr-explore", action="store_true",
                     help="Enumerate every PMGR gate whose name matches "
                          "PCIE/PHY/APCIE/ANS/DART_APCIE (case-insensitive) "
@@ -3559,12 +3681,14 @@ def main():
                 log("Phase F: T8140 controller-init replay (pcie.c)"
                     f" [extra_tunables={args.extra_tunables}, "
                     f"phycmn_first={args.phycmn_first}, "
-                    f"phy_ip_diag={args.phy_ip_diag}]...")
+                    f"phy_ip_diag={args.phy_ip_diag}, "
+                    f"phy_ip_diag_at={args.phy_ip_diag_at!r}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
                         extra_tunables=args.extra_tunables,
                         phycmn_first=args.phycmn_first,
-                        phy_ip_diag=args.phy_ip_diag),
+                        phy_ip_diag=args.phy_ip_diag,
+                        phy_ip_diag_at=args.phy_ip_diag_at),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:

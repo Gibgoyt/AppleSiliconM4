@@ -20,4 +20,11 @@ Multi-week project to get PCIe working on Apple M4 mini so the port-2 NIC can be
 - **Current lead: fuse-bits programming.** m1n1's pcie.c:496-503 programs phy_ip PHY-PLL calibration bits from OTP fuses on t8103/t6000/t8112 (`pcie_fuse_bits_t{8103,6000,8112}`), but sets `fuse_bits = NULL` for t8122/t8140/t6020/t6030/t6031/t8132 (pcie.c:284-318). This is the very first phy_ip write in each supported family's controller-init. Without it, the PHY-PLL never receives per-die calibration -> never locks -> any subsequent phy_ip write aborts. Matches RUN A/B/C's SYNC-at-first-phy_ip-write symptom exactly.
 - Next iteration (RUN E, delivered 2026-07-11): diag F.entry replaced with a phy_common+0 probe (safe alive check, phy_common was proven reachable in RUN A/B/C step 5); new `--fuse-recon` flag scours the ADT for the fuse-programming source m1n1 is missing.
 
+**State as of 2026-07-11 (post RUN E):**
+- RUN E validated the diag fix: F.entry no longer crashes; phy_common+0 REACHABLE (val=0x80300000). First run to flush past the DART section into Phase F.
+- Step 1 (`pmgr_adt_power_enable /arm-io/apcie`) does NOT ungate phy_ip on t8132. post-1.pmgr phy_ip+0 read AXI-stalled m1n1 (UartTimeout, not SYNC). Definitive: pmgr enable alone is not the ungate.
+- `--fuse-recon` came up empty: 0 fuse-matching properties among 30 on `/arm-io/apcie`, 25/25 reg[] mapped, all 5 well-known fuse paths absent. Cross-ref had a shape bug (`parse_tunables_container` returns 4-tuples, recon read `.offset` attribute) so reported 0/9 hits even though 0x1204 IS in the shared slice.
+- Design constraint learned: any phy_ip probe against unclocked hardware permanently wedges m1n1 (`guarded()` docstring at `perstn.py:100-106` documented this). Multi-checkpoint diag was self-defeating; RUN E killed itself at post-1.pmgr and never got to see post-5/6.b/6.d/6.f.
+- Next iteration (RUN F, delivered 2026-07-11): `--phy-ip-diag-at=<checkpoint>` for single-shot phy_ip probes (bisect across boots, default post-6.f.T8140-marker). Cross-ref bug fixed. fuse-recon broadened: full `/arm-io/apcie` property list, `/arm-io/` children matching /fuse|otp|efuse|chip.?id|calib/i, and `/chosen` properties matching /fuse|otp|calib|phy|pcie/i.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling)
