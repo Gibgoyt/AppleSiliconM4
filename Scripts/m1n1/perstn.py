@@ -2087,6 +2087,14 @@ def probe_adt_fuse_recon(u, apcie, buf):
                 buf.write(f"    /arm-io/{h}: reg[0] FAILED "
                           f"{e.__class__.__name__}: {e}\n")
 
+        # 3.7. Full /arm-io/ child name dump. RUN F showed 138 children
+        # and 0 filter matches; the fuse block name (if any) is not
+        # obvious. Dump all names so we can eyeball for anything odd.
+        buf.write(f"\n  /arm-io/ full child list "
+                  f"({len(child_names)}):\n")
+        for nm in sorted(child_names):
+            buf.write(f"    - {nm}\n")
+
     # 3.6. /chosen properties matching /fuse|otp|calib|phy|pcie/i.
     # Apple firmware sometimes passes per-die calibration blobs
     # through /chosen.
@@ -2210,7 +2218,8 @@ def _poll32_bit(addr, mask, want, timeout_ms):
 def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               extra_tunables=False, phycmn_first=False,
                               phy_ip_diag=False,
-                              phy_ip_diag_at="post-6.f.T8140-marker"):
+                              phy_ip_diag_at="post-6.f.T8140-marker",
+                              phyif_ctrl_run=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -2692,6 +2701,25 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     if not step("6.f.set32(phy_shared+4, 0x01) [T8140 marker, pcie.c:492]",
                 lambda: p.set32(phy_shared_base + 4, 0x01)):
         return
+
+    # ---- step 6.f.5: EXPERIMENTAL T81XX PHYIF_CTRL_RUN write.
+    # pcie.c has an XOR between the T81XX write (rc_base + 0x024 <-
+    # BIT(0), pcie.c:487) and the T8140 marker (phy_shared + 4 <-
+    # 0x01, pcie.c:492). Both marked /* ??? */ in the m1n1 source.
+    # m1n1's t8132 clause uses regs_t8140 so only the marker fires.
+    # RUN F proved the T8140 codepath (through step 6.f) does NOT
+    # ungate phy_ip on t8132. Hypothesis: t8132 needs BOTH writes.
+    # rc_base is proven reachable throughout Phase F; low wedge
+    # risk. If this write ungates phy_ip, the subsequent phy-ip-
+    # diag at post-6.f.T8140-marker will report REACHABLE.
+    if phyif_ctrl_run:
+        if not step("6.f.5.set32(rc_base+0x024, RUN=BIT(0)) "
+                    "[T81XX PHYIF_CTRL, pcie.c:487]",
+                    lambda: p.set32(rc_base + 0x024, 0x01)):
+            return
+        # pcie.c does udelay(1) after the RUN write; 1 ms is plenty.
+        time.sleep(0.001)
+
     diag("post-6.f.T8140-marker")
 
     # ---- step 6.g-h: FIRST phy_ip access ever from this script.
@@ -3502,6 +3530,19 @@ def main():
                          "phy_common CLK MODE bit is the ungate for "
                          "phy_ip, this reorder alone unblocks 6.g. "
                          "Requires --t8140-replay.")
+    ap.add_argument("--phyif-ctrl-run", action="store_true",
+                    help="Phase F experiment: after step 6.f (T8140 "
+                         "marker), also do the T81XX PHYIF_CTRL_RUN "
+                         "write: set32(rc_base + 0x024, 0x01); "
+                         "udelay(1). m1n1 pcie.c does one or the "
+                         "other (T81XX branch line 487 vs T8140 "
+                         "branch line 492), both marked /* ??? */. "
+                         "RUN F confirmed the T8140 codepath alone "
+                         "does NOT ungate phy_ip on t8132; this tests "
+                         "the hypothesis that t8132 needs BOTH the "
+                         "T8140 marker AND the T81XX RUN. rc_base is "
+                         "proven reachable throughout Phase F, so low "
+                         "wedge risk. Requires --t8140-replay.")
     ap.add_argument("--phy-ip-diag", action="store_true",
                     help="Phase F diagnostic sweep: probe "
                          "read32(phy_ip_base+0) at 6 points in Phase F "
@@ -3682,13 +3723,15 @@ def main():
                     f" [extra_tunables={args.extra_tunables}, "
                     f"phycmn_first={args.phycmn_first}, "
                     f"phy_ip_diag={args.phy_ip_diag}, "
-                    f"phy_ip_diag_at={args.phy_ip_diag_at!r}]...")
+                    f"phy_ip_diag_at={args.phy_ip_diag_at!r}, "
+                    f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
                         extra_tunables=args.extra_tunables,
                         phycmn_first=args.phycmn_first,
                         phy_ip_diag=args.phy_ip_diag,
-                        phy_ip_diag_at=args.phy_ip_diag_at),
+                        phy_ip_diag_at=args.phy_ip_diag_at,
+                        phyif_ctrl_run=args.phyif_ctrl_run),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:

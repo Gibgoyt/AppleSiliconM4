@@ -27,4 +27,11 @@ Multi-week project to get PCIe working on Apple M4 mini so the port-2 NIC can be
 - Design constraint learned: any phy_ip probe against unclocked hardware permanently wedges m1n1 (`guarded()` docstring at `perstn.py:100-106` documented this). Multi-checkpoint diag was self-defeating; RUN E killed itself at post-1.pmgr and never got to see post-5/6.b/6.d/6.f.
 - Next iteration (RUN F, delivered 2026-07-11): `--phy-ip-diag-at=<checkpoint>` for single-shot phy_ip probes (bisect across boots, default post-6.f.T8140-marker). Cross-ref bug fixed. fuse-recon broadened: full `/arm-io/apcie` property list, `/arm-io/` children matching /fuse|otp|efuse|chip.?id|calib/i, and `/chosen` properties matching /fuse|otp|calib|phy|pcie/i.
 
+**State as of 2026-07-11 (post RUN F):**
+- **Definitive:** T8140 codepath (Phase F steps 1..6.f) does NOT ungate phy_ip on t8132. All 6 `[phy-common-diag @ ...]` REACHABLE with val=0x80300000 unchanged; `[phy-ip-diag @ post-6.f.T8140-marker]` AXI-stalled m1n1. Every T8140 shared-init step completed with delta=0.
+- phy_common+0 = 0x80300000: bit 31 (`CLK_100MHZ`) set (ref clock UP), bits 20-21 set (undocumented in m1n1), `CLK_MODE=00` (step 7 hasn't run). T8140 codepath doesn't touch phy_common at all.
+- Fuse-recon with bug fix: cross-ref 1/9 hit (`0x1204` confirms partial t8112 family compat). 0 hits among 138 `/arm-io/` children matching fuse|otp|calib. `/chosen` has only irrelevant matches (`esdm-fuses=0`, `bootp-response`). No ADT source of PCIe fuse calibration on t8132.
+- New hypothesis: pcie.c XOR between T81XX PHYIF_CTRL_RUN write (rc_base + 0x024 <- BIT(0), pcie.c:487) and T8140 marker (phy_shared + 4 <- 0x01, pcie.c:492). Both marked `/* ??? */` in m1n1. t8132 uses T8140 branch (regs_t8140 pin) so only the marker gets written. Test: also do the T81XX write.
+- Next iteration (RUN G, delivered 2026-07-11): `--phyif-ctrl-run` flag adds the T81XX PHYIF_CTRL_RUN write between step 6.f and the post-6.f diag. fuse-recon dumps the full 138-name `/arm-io/` child list for eyeball scan.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling)
