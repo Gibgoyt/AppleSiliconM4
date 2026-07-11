@@ -1543,22 +1543,38 @@ def probe_phaseD_gate151_poke(apcie, buf, timeout_ms=100):
                   f"  the shared phy_ip fabric that lives behind it.\n\n")
 
 
-def probe_phaseE_port1_slice(apcie, buf, timeout=0.3):
-    """Phase E -- shared-PLL + port-1 slice probe (post gate 151 ACTIVE).
+def probe_phaseE_rc_axi_sanity(apcie, buf, timeout=0.3):
+    """Phase E -- post-Phase-D fabric sanity probe (rc_base + axi_base).
 
-    This is the definitive test of the port-1 wedge hypothesis. With
-    APCIE_PHY_SW confirmed ACTIVE, walk the phy_ip window in order:
-        1. shared PLL slice heads (all real per the ADT tunables report)
-        2. port 0 slice head (ACTIVE per ADT)
-        3. port 2 slice head (ACTIVE per ADT)
-        4. port 1 slice head (INACTIVE per ADT)
+    HISTORY: earlier versions of Phase E probed phy_ip_base right after
+    Phase D confirmed gates 150+151 ACTIVE. That approach WEDGED m1n1
+    on every j773g cold-boot run (reproduced 2026-07-10 + 2026-07-11):
+    the very first read32(phy_ip_base+0) took a SYNC exception whose
+    recovery path never returned, m1n1 died silently.
 
-    If (1)-(3) succeed and (4) SYNCs, the tunable-applicator write into
-    the unpowered port-1 slice is confirmed as the root cause of the
-    m1n1 wedge; the upstream fix is to skip port-1 tunables (or power
-    port-1 first).
+    Root cause (learned from that dead-end): phy_ip_base is downstream
+    of the phy_base CLK0/CLK1 handshake performed by m1n1's own pcie.c
+    at pcie.c:468-480 (see APCIE_PHY_CTRL_CLK0REQ/ACK, CLK1REQ/ACK).
+    PMGR gates 148/149/150/151 being ACTIVE is NECESSARY but NOT
+    SUFFICIENT to reach phy_ip: the fabric between the AXI backbone
+    and the phy_ip window is held un-clocked until the shared PHY
+    control block acks the clock request. Without that handshake, any
+    load into phy_ip AXI-stalls forever (no exception, no recovery,
+    GUARD.SKIP does not help -- see the doc on guarded() line 100).
+
+    Phase E is therefore now a NON-DANGEROUS sanity probe of the two
+    shared blocks whose reachability we already proved via Phase 0/D:
+      - rc_base   -> lives behind gate 148 (ANS) + 149 (APCIE_ST),
+                     both ACTIVE at boot per Phase 0.
+      - axi_base  -> lives behind gates 135/136 (APCIE_GP/SYS_GP),
+                     both ACTIVE at boot per Phase 0.
+    Neither read touches phy_ip. If either SYNCs we know something
+    fundamental broke between Phase D and here.
+
+    The actual phy_ip access moved to Phase F (T8140 pcie.c replay),
+    which does the CLK handshake FIRST. See probe_phaseF_t8140_replay.
     """
-    buf.write("=== Phase E: shared-PLL + port-1 slice probe ===\n")
+    buf.write("=== Phase E: post-Phase-D rc/axi sanity probe ===\n")
     if not getattr(apcie, "phaseD_gate151_active", False):
         failing = getattr(apcie, "phaseD_failing_gate", None)
         if failing is not None:
@@ -1617,15 +1633,17 @@ def probe_phaseE_port1_slice(apcie, buf, timeout=0.3):
                       f"phy_ip read would wedge m1n1.\n\n")
             return
 
+    # rc_base and axi_base are under PMGR gates that Phase 0 already
+    # showed ACTIVE at boot (ANS/APCIE_ST/APCIE_GP/APCIE_SYS_GP). No
+    # phy_ip reads here -- those need Phase F's CLK handshake first.
     probes = [
-        (apcie.phy_ip_base + 0x00000, "phy_ip +0x00000 shared head"),
-        (apcie.phy_ip_base + 0x00038, "phy_ip +0x00038 shared[tunable#0]"),
-        (apcie.phy_ip_base + 0x01000, "phy_ip +0x01000 shared[tunable#3]"),
-        (apcie.phy_ip_base + 0x05000, "phy_ip +0x05000 shared PLL area"),
-        (apcie.phy_ip_base + 0x06000, "phy_ip +0x06000 shared PLL area"),
-        (apcie.phy_ip_base + 0x08000, "phy_ip +0x08000 port 0 slice head (ACTIVE)"),
-        (apcie.phy_ip_base + 0x18000, "phy_ip +0x18000 port 2 slice head (ACTIVE)"),
-        (apcie.phy_ip_base + 0x10000, "phy_ip +0x10000 port 1 slice head (INACTIVE) -- hypothesis test"),
+        (apcie.rc_base + 0x00,  "rc_base  +0x000"),
+        (apcie.rc_base + 0x3c,  "rc_base  +0x03c"),
+        (apcie.rc_base + 0x50,  "rc_base  +0x050"),
+        (apcie.rc_base + 0x54,  "rc_base  +0x054"),
+        (apcie.rc_base + 0x58,  "rc_base  +0x058"),
+        (apcie.axi_base + 0x00, "axi_base +0x000"),
+        (apcie.axi_base + 0x600,"axi_base +0x600"),
     ]
 
     try:
@@ -1635,44 +1653,331 @@ def probe_phaseE_port1_slice(apcie, buf, timeout=0.3):
                   f"({e.__class__.__name__}: {e})\n\n")
         return
 
-    port1_wedged = None  # None = didn't reach it; True/False set once we do.
+    apcie.phaseE_rc_axi_ok = True
     for addr, label in probes:
         with guarded(buf, f"phaseE.0x{addr:x}", short_timeout=timeout):
             val = _safe_read32(addr)
         alive, delta = check_alive_fast(exc_running, timeout=timeout)
-        is_port1 = (addr == apcie.phy_ip_base + 0x10000)
         buf.write(f"  read32(0x{addr:09x}) [{label}] = {val} "
                   f"(delta={delta}, alive={alive})\n")
         if not alive:
-            buf.write("  !!! m1n1 unresponsive; bailing Phase E\n")
-            if is_port1:
-                port1_wedged = True
-            buf.write("\n")
+            buf.write("  !!! m1n1 unresponsive on a supposedly-ACTIVE\n"
+                      "  block; this should NOT happen after Phase D.\n"
+                      "  Bailing Phase E.\n\n")
+            apcie.phaseE_rc_axi_ok = False
             return
         if delta != 0:
-            buf.write(f"  !!! SYNC/SError on this read (delta={delta})\n")
-            if is_port1:
-                port1_wedged = True
-                buf.write("  ==> port-1 slice read faulted with all shared "
-                          "gates confirmed ACTIVE. Port-1 wedge hypothesis "
-                          "CONFIRMED: tunable applicator would fatally hit "
-                          "an unpowered slice. Upstream fix: skip port-1 "
-                          "tunables in pcie_init.\n\n")
-                return
-            # Non-port-1 SYNC: still worth logging then continuing so we
-            # see whether port-1 also faults.
-        else:
-            if is_port1:
-                port1_wedged = False
+            buf.write(f"  !!! SYNC/SError delta={delta} on a\n"
+                      f"  supposedly-ACTIVE block. Something regressed\n"
+                      f"  between Phase 0 and Phase E; Phase F should\n"
+                      f"  NOT run until this is understood.\n")
+            apcie.phaseE_rc_axi_ok = False
         exc_running += delta
 
-    if port1_wedged is False:
-        buf.write("  ==> port-1 slice read SUCCEEDED. The port-1 wedge "
-                  "hypothesis is NOT confirmed by this test; the m1n1 "
-                  "wedge lives elsewhere in pcie_init (tunable ordering, "
-                  "reset sequence, or the LTSSM path).\n\n")
+    if apcie.phaseE_rc_axi_ok:
+        buf.write("  rc/axi sanity OK; Phase F may run.\n\n")
     else:
         buf.write("\n")
+
+
+# ------------------------------------------------ Phase F: T8140 replay
+
+# T8140 reg indices, from m1n1/src/pcie.c regs_t8140 (lines 211-221).
+_T8140_CONFIG_IDX  = 0
+_T8140_RC_IDX      = 1
+_T8140_PHY_IDX     = 2   # phy_common_idx and phy_idx both = 2 on T8140
+_T8140_PHY_IP_IDX  = 3
+_T8140_AXI_IDX     = 4
+
+# APCIE_PHY_CTRL bit layout -- m1n1/src/pcie.c:38-43.
+_APCIE_PHY_CTRL     = 0x000
+_PHY_CTRL_CLK0REQ   = 1 << 0
+_PHY_CTRL_CLK1REQ   = 1 << 1
+_PHY_CTRL_CLK0ACK   = 1 << 2
+_PHY_CTRL_CLK1ACK   = 1 << 3
+_PHY_CTRL_RESET     = 1 << 7
+
+# APCIE_PHYCMN_CLK mode -- m1n1/src/pcie.c:49-52.
+_APCIE_PHYCMN_CLK_MODE_MASK = 0x3   # GENMASK(1, 0)
+_APCIE_PHYCMN_CLK_MODE_ON   = 0x1
+
+
+def _poll32_bit(addr, mask, want, timeout_ms):
+    """Poll (read32(addr) & mask == want). Returns (converged, last_val,
+    elapsed_ms). Reads only; raises on read failure so callers can bail.
+    """
+    deadline = time.monotonic() + timeout_ms / 1000.0
+    started = time.monotonic()
+    val = 0
+    while True:
+        val = p.read32(addr)
+        if (val & mask) == want:
+            return True, val, (time.monotonic() - started) * 1000.0
+        if time.monotonic() >= deadline:
+            return False, val, (time.monotonic() - started) * 1000.0
+
+
+def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3):
+    """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
+
+    m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
+    shared-init sequence in pcie_init_controller() for the T8140
+    codepath is what this phase replays, one MMIO/proxy call at a
+    time, with guarded() around each step so a SYNC gets converted
+    to sentinel and we can bail with a full log rather than a wedge.
+
+    Mapping to pcie.c line numbers (all in the T8140/T8122 branches):
+      1. pmgr_adt_power_enable('/arm-io/apcie')       [pcie.c:425]
+      2. tunables_apply_local apcie-axi2af-tunables   [pcie.c:432]
+      3. controller==APCIE: write32(rc_base+0x4, 0)   [pcie.c:438-439]
+      4. tunables_apply_local apcie-common-tunables   [pcie.c:443]
+      5. tunables_apply_local apcie-phy-tunables      [pcie.c:454]
+      6.a set32(phy_shared+0, CLK0REQ)                [pcie.c:468]
+      6.b poll32 CLK0ACK, 50 ms                       [pcie.c:469-473]
+      6.c set32(phy_shared+0, CLK1REQ)                [pcie.c:475]
+      6.d poll32 CLK1ACK, 50 ms                       [pcie.c:476-480]
+      6.e clear32(phy_shared+0, RESET); udelay(1)     [pcie.c:482-483]
+      6.f T8140: set32(phy_shared+4, 0x01)            [pcie.c:492]
+      6.g tunables apcie-phy-ip-pll-tunables          [pcie.c:518]
+      6.h tunables apcie-phy-ip-auspma-tunables       [pcie.c:522]
+      7.  mask32(phy_common+0, MODE_MASK, MODE_ON=1)  [pcie.c:535]
+      8.  write32(rc_base+0x54, 0x140)                [pcie.c:558]
+      9.  write32(rc_base+0x50, 0x1)                  [pcie.c:559]
+     10.  poll32(rc_base+0x58, 1, 1, 250 ms)          [pcie.c:560]
+
+    Not covered here (per-port init, phase G / future work):
+      pcie.c:571-852 -- per-active-port bring-up (port_base pokes,
+      port_phy_base CLK handshakes, port RESET release, RC config
+      space DBI writes, LTSSM training). Do NOT run those until
+      Phase F reports shared_up = True.
+
+    CRITICAL invariant (learned the hard way -- see Phase E docstring):
+      phy_ip_base is NOT reachable until step 6.a-c complete. Steps
+      6.g/6.h are the first phy_ip writes this script ever does. If
+      m1n1 wedges there, the CLK handshake succeeded but phy_ip is
+      still gated by something else (SMC key, phy_common poke, per
+      port PHY dependency). The log tells us EXACTLY which step
+      broke; iterate from there.
+
+    Preconditions:
+      * apcie.phaseD_gate151_active is True (parents-first poke ran
+        and every ancestor of gate 151 reached ACTUAL=0xf)
+      * apcie.phaseE_rc_axi_ok is True (Phase E confirmed rc/axi
+        reads work). Missing attr defaults to True (Phase E skipped).
+
+    Postconditions:
+      * apcie.phaseF_shared_up = True on full success
+      * apcie.phaseF_last_step = one of:
+          "not started" | "N.<name>" | "shared init complete"
+        so the log always tells us EXACTLY where the replay stopped.
+    """
+    buf.write("=== Phase F: T8140 controller-init replay (pcie.c) ===\n")
+    apcie.phaseF_shared_up = False
+    apcie.phaseF_last_step = "not started"
+
+    if not getattr(apcie, "phaseD_gate151_active", False):
+        buf.write("  SKIPPED: Phase D did not confirm gate 151 ACTIVE.\n\n")
+        return
+    if not getattr(apcie, "phaseE_rc_axi_ok", True):
+        buf.write("  SKIPPED: Phase E flagged rc/axi as unsafe.\n\n")
+        return
+
+    path = "/arm-io/apcie"
+    rc_base = apcie.rc_base
+    axi_base = apcie.axi_base
+    # T8140 does phy_base = phy_packed + 0x8000 (pcie.c:394) and
+    # phy_common_base += 0x4000 (pcie.c:395). ApcieMap has phy_common
+    # pre-shifted; phy_shared_base we compute here.
+    phy_shared_base = apcie.phy_packed_base + 0x8000
+    phy_common_base = apcie.phy_common_base
+    phy_ip_base     = apcie.phy_ip_base
+
+    buf.write("  layout for replay (T8140 codepath):\n")
+    buf.write(f"    path            = {path}\n")
+    buf.write(f"    rc_base         = 0x{rc_base:x}\n")
+    buf.write(f"    axi_base        = 0x{axi_base:x}\n")
+    buf.write(f"    phy_shared_base = 0x{phy_shared_base:x} "
+              f"(= phy_packed + 0x8000)\n")
+    buf.write(f"    phy_common_base = 0x{phy_common_base:x}\n")
+    buf.write(f"    phy_ip_base     = 0x{phy_ip_base:x}\n\n")
+
+    try:
+        exc_running = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"  ERROR: initial get_exc_count failed: "
+                  f"{e.__class__.__name__}: {e}\n\n")
+        return
+
+    def step(label, fn):
+        nonlocal exc_running
+        apcie.phaseF_last_step = label
+        buf.write(f"  --- {label} ---\n")
+        with guarded(buf, label, short_timeout=timeout):
+            try:
+                r = fn()
+                if r is not None:
+                    buf.write(f"    -> {r!r}\n")
+            except Exception as e:
+                buf.write(f"    RAISED: {e.__class__.__name__}: {e}\n")
+                return False
+        alive, delta = check_alive_fast(exc_running, timeout=timeout)
+        if not alive:
+            buf.write("    m1n1 UNRESPONSIVE after step; aborting Phase F\n")
+            return False
+        if delta:
+            buf.write(f"    !!! exc delta = {delta} on this step\n")
+            exc_running += delta
+            return False
+        exc_running += delta
+        return True
+
+    def poll_step(label, addr, mask, want, timeout_ms):
+        nonlocal exc_running
+        apcie.phaseF_last_step = label
+        buf.write(f"  --- {label} ---\n")
+        buf.write(f"    poll addr=0x{addr:x} mask=0x{mask:x} "
+                  f"want=0x{want:x} timeout={timeout_ms}ms\n")
+        converged = False
+        val = 0
+        elapsed_ms = 0.0
+        raised = None
+        with guarded(buf, label, short_timeout=timeout):
+            try:
+                converged, val, elapsed_ms = _poll32_bit(
+                    addr, mask, want, timeout_ms=timeout_ms)
+            except Exception as e:
+                raised = e
+        if raised is not None:
+            buf.write(f"    RAISED: {raised.__class__.__name__}: {raised}\n")
+            return False
+        buf.write(f"    conv={converged} val=0x{val:x} ({elapsed_ms:.1f} ms)\n")
+        alive, delta = check_alive_fast(exc_running, timeout=timeout)
+        if not alive:
+            buf.write("    m1n1 UNRESPONSIVE after poll; aborting Phase F\n")
+            return False
+        if delta:
+            buf.write(f"    !!! exc delta = {delta} during poll\n")
+            exc_running += delta
+            return False
+        exc_running += delta
+        if not converged:
+            buf.write(f"    !!! poll did NOT converge; aborting Phase F\n")
+            return False
+        return True
+
+    # ---- step 1: PMGR power enable
+    # Gate 150 should already be ACTIVE from Phase D's parents-first
+    # poke, so m1n1's internal pmgr_set_mode_recursive should complete
+    # in microseconds (no polling loop hits).
+    if not step("1.pmgr_adt_power_enable('/arm-io/apcie')",
+                lambda: p.pmgr_adt_power_enable(path)):
+        return
+
+    # ---- step 2: axi2af tunables
+    if not step(f"2.tunables apcie-axi2af-tunables reg_idx={_T8140_AXI_IDX}",
+                lambda: p.tunables_apply_local(
+                    path, "apcie-axi2af-tunables", _T8140_AXI_IDX)):
+        return
+
+    # ---- step 3: rc_base + 0x4 <- 0
+    if not step("3.write32(rc_base+0x4, 0) [pcie.c:438-439]",
+                lambda: p.write32(rc_base + 0x4, 0)):
+        return
+
+    # ---- step 4: common tunables
+    if not step(f"4.tunables apcie-common-tunables reg_idx={_T8140_RC_IDX}",
+                lambda: p.tunables_apply_local(
+                    path, "apcie-common-tunables", _T8140_RC_IDX)):
+        return
+
+    # ---- step 5: phy tunables
+    if not step(f"5.tunables apcie-phy-tunables reg_idx={_T8140_PHY_IDX}",
+                lambda: p.tunables_apply_local(
+                    path, "apcie-phy-tunables", _T8140_PHY_IDX)):
+        return
+
+    # ---- step 6.a-b: CLK0 handshake
+    if not step("6.a.set32(phy_shared+0, CLK0REQ=BIT(0))",
+                lambda: p.set32(phy_shared_base + _APCIE_PHY_CTRL,
+                                _PHY_CTRL_CLK0REQ)):
+        return
+    if not poll_step("6.b.poll_CLK0ACK",
+                     phy_shared_base + _APCIE_PHY_CTRL,
+                     _PHY_CTRL_CLK0ACK, _PHY_CTRL_CLK0ACK,
+                     timeout_ms=50):
+        return
+
+    # ---- step 6.c-d: CLK1 handshake
+    if not step("6.c.set32(phy_shared+0, CLK1REQ=BIT(1))",
+                lambda: p.set32(phy_shared_base + _APCIE_PHY_CTRL,
+                                _PHY_CTRL_CLK1REQ)):
+        return
+    if not poll_step("6.d.poll_CLK1ACK",
+                     phy_shared_base + _APCIE_PHY_CTRL,
+                     _PHY_CTRL_CLK1ACK, _PHY_CTRL_CLK1ACK,
+                     timeout_ms=50):
+        return
+
+    # ---- step 6.e: release RESET
+    if not step("6.e.clear32(phy_shared+0, RESET=BIT(7))",
+                lambda: p.clear32(phy_shared_base + _APCIE_PHY_CTRL,
+                                  _PHY_CTRL_RESET)):
+        return
+    # pcie.c does udelay(1) -- time.sleep floor on Linux is ~us but
+    # gets rounded up; 1 ms is plenty of settle margin and doesn't
+    # affect functional correctness.
+    time.sleep(0.001)
+
+    # ---- step 6.f: T8140 marker write (phy_shared + 4 <- 0x01)
+    if not step("6.f.set32(phy_shared+4, 0x01) [T8140 marker, pcie.c:492]",
+                lambda: p.set32(phy_shared_base + 4, 0x01)):
+        return
+
+    # ---- step 6.g-h: FIRST phy_ip access ever from this script.
+    # If Phase F wedges here, the phy_base CLK handshake completed
+    # but phy_ip is still gated by something else. Log clearly.
+    buf.write("  ==> ABOUT TO TOUCH phy_ip_base FOR THE FIRST TIME.\n"
+              "     If Phase F wedges below, the CLK0/CLK1 handshake\n"
+              "     completed but phy_ip is still gated (SMC key, a\n"
+              "     phy_common poke we missed, or a per-port PHY that\n"
+              "     needs bringing up first). Next iteration will need\n"
+              "     to explore those.\n")
+
+    if not step(f"6.g.tunables apcie-phy-ip-pll-tunables "
+                f"reg_idx={_T8140_PHY_IP_IDX} (base=phy_ip)",
+                lambda: p.tunables_apply_local(
+                    path, "apcie-phy-ip-pll-tunables", _T8140_PHY_IP_IDX)):
+        return
+    if not step(f"6.h.tunables apcie-phy-ip-auspma-tunables "
+                f"reg_idx={_T8140_PHY_IP_IDX} (base=phy_ip)",
+                lambda: p.tunables_apply_local(
+                    path, "apcie-phy-ip-auspma-tunables", _T8140_PHY_IP_IDX)):
+        return
+
+    # ---- step 7: phy_common CLK mode set
+    if not step("7.mask32(phy_common+0, MODE_MASK=0x3, MODE_ON=0x1)",
+                lambda: p.mask32(phy_common_base + 0,
+                                 _APCIE_PHYCMN_CLK_MODE_MASK,
+                                 _APCIE_PHYCMN_CLK_MODE_ON)):
+        return
+
+    # ---- steps 8-10: RC init handshake
+    if not step("8.write32(rc_base+0x54, 0x140)",
+                lambda: p.write32(rc_base + 0x54, 0x140)):
+        return
+    if not step("9.write32(rc_base+0x50, 0x01)",
+                lambda: p.write32(rc_base + 0x50, 0x01)):
+        return
+    if not poll_step("10.poll_rc_58_bit0",
+                     rc_base + 0x58, 1, 1, timeout_ms=250):
+        return
+
+    apcie.phaseF_shared_up = True
+    apcie.phaseF_last_step = "shared init complete"
+    buf.write("\n  === PHASE F SUCCESS: T8140 shared init complete. ===\n")
+    buf.write("  Shared PHY, phy_ip window, and RC control block are up.\n"
+              "  Next: Phase G (per-port bring-up) or `p.pcie_init()` --\n"
+              "  m1n1's own C-side init should now run without wedging.\n\n")
 
 
 def dump_pcie_regs(apcie, buf, tag="post-init", tier=1):
@@ -2404,11 +2709,19 @@ def main():
                          "escalates to raising the PS_AUTO floor if TARGET "
                          "alone doesn't converge. Requires --preinit-probe.")
     ap.add_argument("--phy-ip-probe", action="store_true",
-                    help="Phase E: after --gate-poke confirms gate 151 "
-                         "ACTIVE, probe phy_ip shared PLL area then each "
-                         "port slice head in order (active first, INACTIVE "
-                         "port 1 last). Tests the port-1 wedge hypothesis "
-                         "directly. Requires --gate-poke.")
+                    help="Phase E: after --gate-poke confirms the gate 151 "
+                         "chain ACTIVE, do a rc/axi sanity read (does NOT "
+                         "touch phy_ip -- earlier versions wedged m1n1 on "
+                         "the first phy_ip read because phy_ip is gated by "
+                         "the phy_base CLK handshake done in Phase F, not "
+                         "by PMGR). Requires --gate-poke.")
+    ap.add_argument("--t8140-replay", action="store_true",
+                    help="Phase F: replay m1n1 pcie.c T8140 shared-init "
+                         "step by step in Python (pmgr, tunables, phy_base "
+                         "CLK0/CLK1 handshake, phy_ip tunables, RC init "
+                         "handshake). Each step guarded + liveness-checked "
+                         "so a wedge tells us EXACTLY which m1n1 step is "
+                         "broken on t8132. Requires --gate-poke.")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -2505,14 +2818,19 @@ def main():
             flush("phaseD-gate151-poke")
 
             if args.phy_ip_probe:
-                log("Phase E: shared-PLL + port-1 slice probe...")
-                try_(lambda: probe_phaseE_port1_slice(apcie, buf, timeout=timeout),
-                     "probe_phaseE_port1_slice")
-                flush("phaseE-port1-slice")
-        elif args.phy_ip_probe:
-            log("--phy-ip-probe requested without --gate-poke; skipping Phase E")
-            buf.write("\n=== Phase E: skipped (--phy-ip-probe needs "
-                      "--gate-poke) ===\n\n")
+                log("Phase E: post-Phase-D rc/axi sanity probe...")
+                try_(lambda: probe_phaseE_rc_axi_sanity(apcie, buf, timeout=timeout),
+                     "probe_phaseE_rc_axi_sanity")
+                flush("phaseE-rc-axi-sanity")
+
+            if args.t8140_replay:
+                log("Phase F: T8140 controller-init replay (pcie.c)...")
+                try_(lambda: probe_phaseF_t8140_replay(apcie, buf, timeout=timeout),
+                     "probe_phaseF_t8140_replay")
+                flush("phaseF-t8140-replay")
+        elif args.phy_ip_probe or args.t8140_replay:
+            log("--phy-ip-probe/--t8140-replay require --gate-poke; skipping")
+            buf.write("\n=== Phase E/F: skipped (need --gate-poke) ===\n\n")
 
         if args.pmgr_enable:
             log("Phase B: p.pmgr_adt_power_enable('/arm-io/apcie') + shared MMIO...")
