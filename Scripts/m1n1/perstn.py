@@ -1827,6 +1827,55 @@ def probe_phy_ip_reachability(apcie, buf, label, timeout=0.3):
         buf.write(f"    REACHABLE: val=0x{val:x} (delta=0)\n")
 
 
+def probe_phy_common_reachability(apcie, buf, label, timeout=0.3):
+    """Guarded read32(phy_common_base + 0) + alive check.
+
+    Purpose: at each Phase F checkpoint, give a "is the fabric alive"
+    signal that is INDEPENDENT of phy_ip being up. phy_common is
+    proven reachable from Phase E onward (RUN A/B/C got past step 5
+    apcie-phy-tunables, which writes to phy_common). Reads here
+    should always succeed; if they don't, the fabric wedged in a
+    step BEFORE anything touches phy_ip.
+
+    Replacement for the F.entry phy_ip probe -- RUN D showed a
+    guarded read32(phy_ip_base + 0) at F.entry trips Exception:
+    SYNC on m1n1 that GUARD.SKIP does not catch, wedging m1n1
+    before any log flush.
+
+    Same result vocabulary as probe_phy_ip_reachability:
+        REACHABLE   -- read returned normally
+        SENTINEL    -- guard caught SLVERR
+        AXI_STALL   -- m1n1 unresponsive
+    """
+    addr = apcie.phy_common_base + 0
+    buf.write(f"  [phy-common-diag @ {label}] read32(0x{addr:x}):\n")
+    try:
+        exc_before = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"    ERROR: pre exc_count failed: "
+                  f"{e.__class__.__name__}: {e}\n")
+        return
+    val = None
+    raised = None
+    with guarded(buf, f"phy-common-diag.{label}", short_timeout=timeout):
+        try:
+            val = p.read32(addr)
+        except Exception as e:
+            raised = e
+    if raised is not None:
+        buf.write(f"    RAISED: {raised.__class__.__name__}: {raised}\n")
+        return
+    alive, delta = check_alive_fast(exc_before, timeout=timeout)
+    if not alive:
+        buf.write(f"    AXI_STALL: m1n1 UNRESPONSIVE after read\n")
+        return
+    if delta:
+        buf.write(f"    SENTINEL (SLVERR caught, delta={delta}): "
+                  f"val=0x{val:x}\n")
+    else:
+        buf.write(f"    REACHABLE: val=0x{val:x} (delta=0)\n")
+
+
 def probe_pmgr_explore(u, buf, name_patterns=("PCIE", "PHY", "APCIE",
                                               "ANS", "DART_APCIE")):
     """Enumerate every PMGR gate in the SoC, filter by name (case-
@@ -1886,6 +1935,138 @@ def probe_dart_power(buf, dart_paths=("/arm-io/dart-apcie0",
     except Exception as e:
         buf.write(f"  WARN: post exc_count failed: "
                   f"{e.__class__.__name__}: {e}\n\n")
+
+
+def probe_adt_fuse_recon(u, apcie, buf):
+    """Zero-write ADT recon: hunt for the missing t8132 fuse-bits
+    programming source.
+
+    m1n1's pcie.c sets fuse_bits=NULL for t8132 (pcie.c:318 branch --
+    the same branch also covers t8122/t8140/t6020/t6030/t6031). On
+    t8103/t6000/t8112 pcie.c:496-503 programs 11-12 phy_ip PHY-PLL
+    registers from OTP fuses BEFORE any tunables. Missing calibration
+    is the current suspected root cause for the RUN D SYNC at first
+    phy_ip write (post RUN D analysis, 2026-07-11).
+
+    This probe cannot wedge -- pure ADT reads. Sources:
+      1. /arm-io/apcie properties matching /fuse/i.
+      2. /arm-io/apcie reg[] entries beyond ApcieMap's 25 mapped
+         (extras may be the fuse block).
+      3. Well-known fuse-block ADT paths.
+      4. Cross-reference pcie_fuse_bits_t8112 tgt_regs against the
+         apcie-phy-ip-pll-tunables shared-slice offsets to confirm
+         register-file family compatibility, and to name which
+         offsets are pure fuse-only writes (never a tunable, so
+         they can only come from per-die OTP data).
+    """
+    buf.write("=== ADT fuse recon ===\n")
+    buf.write("  purpose: hunt for the ADT source of the fuse-bits\n"
+              "  programming m1n1's pcie.c pins to NULL on t8132.\n\n")
+
+    # 1. /arm-io/apcie properties matching /fuse/i.
+    try:
+        node = u.adt["arm-io/apcie"]
+    except Exception as e:
+        buf.write(f"  ERROR: cannot open /arm-io/apcie: "
+                  f"{e.__class__.__name__}: {e}\n\n")
+        return
+    try:
+        all_props = tuple(sorted(node._properties.keys()))
+    except Exception as e:
+        buf.write(f"  ERROR: cannot enumerate properties: "
+                  f"{e.__class__.__name__}: {e}\n\n")
+        return
+    fuse_props = [k for k in all_props if "fuse" in k.lower()]
+    buf.write(f"  /arm-io/apcie: {len(all_props)} total properties.\n")
+    buf.write(f"  properties matching /fuse/i: {len(fuse_props)}\n")
+    for k in fuse_props:
+        try:
+            val = getattr(node, k)
+            snippet = repr(val)
+            if len(snippet) > 200:
+                snippet = snippet[:200] + "..."
+            buf.write(f"    {k!r} = {snippet}\n")
+        except Exception as e:
+            buf.write(f"    {k!r} = READ FAILED "
+                      f"{e.__class__.__name__}: {e}\n")
+    if not fuse_props:
+        buf.write("    (none)\n")
+    buf.write("\n")
+
+    # 2. reg[] enumeration on /arm-io/apcie. ApcieMap uses 25 entries
+    # (7 shared + 18 per-port). Any extra reg[] beyond that is a
+    # candidate for the fuse block.
+    buf.write("  reg[] enumeration on /arm-io/apcie:\n")
+    reg_count = 0
+    extras = []
+    for i in range(64):
+        try:
+            base, size = node.get_reg(i)
+        except Exception:
+            break
+        reg_count = i + 1
+        if i >= 25:
+            extras.append((i, base, size))
+            buf.write(f"    reg[{i:2d}] = base=0x{base:x} sz=0x{size:x} "
+                      f"*** UNMAPPED BY ApcieMap ***\n")
+    buf.write(f"  total reg entries: {reg_count} "
+              f"(ApcieMap maps first 25; extras: {len(extras)})\n\n")
+
+    # 3. Well-known fuse-block paths.
+    buf.write("  well-known fuse-block paths:\n")
+    for path in ("arm-io/fuse", "arm-io/efuse", "arm-io/apcie/fuse",
+                 "arm-io/apcie/efuse", "arm-io/aop-fuse"):
+        try:
+            n = u.adt[path]
+        except Exception:
+            buf.write(f"    /{path}: absent\n")
+            continue
+        try:
+            base, size = n.get_reg(0)
+            buf.write(f"    /{path}: EXISTS reg[0]=0x{base:x} "
+                      f"sz=0x{size:x}\n")
+        except Exception as e:
+            buf.write(f"    /{path}: EXISTS but reg[0] FAILED "
+                      f"{e.__class__.__name__}: {e}\n")
+        try:
+            fp = tuple(sorted(n._properties.keys()))
+            head = list(fp)[:20]
+            tail = " ..." if len(fp) > 20 else ""
+            buf.write(f"      properties ({len(fp)}): {head}{tail}\n")
+        except Exception:
+            pass
+
+    # 4. Cross-reference pcie_fuse_bits_t8112 tgt_regs against
+    # apcie-phy-ip-pll-tunables shared-slice offsets.
+    t8112_tgt_regs = (0x1204, 0x5018, 0x5220, 0x522c, 0x5278, 0x52a4,
+                      0x6220, 0x6238, 0x62a4)
+    buf.write("\n  cross-ref: pcie_fuse_bits_t8112 tgt_regs vs\n"
+              "  apcie-phy-ip-pll-tunables shared-slice offsets:\n")
+    try:
+        pll_entries = apcie.apcie_tunables(u, "apcie-phy-ip-pll-tunables")
+    except Exception as e:
+        buf.write(f"    ERROR: {e.__class__.__name__}: {e}\n\n")
+        return
+    tun_offsets = set()
+    for ent in pll_entries or ():
+        try:
+            tun_offsets.add(int(ent.offset))
+        except Exception:
+            pass
+    hits = sorted(o for o in t8112_tgt_regs if o in tun_offsets)
+    misses = sorted(o for o in t8112_tgt_regs if o not in tun_offsets)
+    buf.write(f"    hits ({len(hits)}): {[hex(o) for o in hits]}\n")
+    buf.write(f"    misses ({len(misses)}): {[hex(o) for o in misses]}\n")
+    if hits:
+        buf.write("    -> shared phy_ip register layout appears family-\n"
+                  "    compatible with t8112; a t8132 fuse-bits table\n"
+                  "    would target similar offsets.\n")
+    if misses:
+        buf.write("    -> tgt_regs NOT present as tunables are the\n"
+                  "    strongest candidates for fuse-only programming\n"
+                  "    (they depend on per-die OTP data that can't\n"
+                  "    be baked into a static tunable list).\n")
+    buf.write("\n")
 
 
 # ------------------------------------------------ Phase F: T8140 replay
@@ -2048,12 +2229,20 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
             flush_fn(tag)
 
     def diag(label):
-        """No-op unless --phy-ip-diag. Guarded read32 of phy_ip_base+0
-        + alive check. Answers 'is phy_ip reachable RIGHT NOW?' at this
-        point in Phase F. Safe: guarded, alive-bailed."""
+        """No-op unless --phy-ip-diag. At each Phase F checkpoint:
+          1. phy_common+0 read -- safe alive check, independent of
+             phy_ip state. Always runs.
+          2. phy_ip+0 read -- SKIPPED at F.entry (RUN D wedged m1n1
+             with Exception: SYNC there; GUARD.SKIP does not catch
+             that class). Runs at every subsequent checkpoint.
+
+        Flushes after both so a wedge always leaves the log ending
+        at the exact checkpoint that broke."""
         if not phy_ip_diag:
             return
-        probe_phy_ip_reachability(apcie, buf, label, timeout=timeout)
+        probe_phy_common_reachability(apcie, buf, label, timeout=timeout)
+        if label != "F.entry":
+            probe_phy_ip_reachability(apcie, buf, label, timeout=timeout)
         _flush(f"phaseF.diag.{label}")
 
     def step(label, fn):
@@ -3228,7 +3417,19 @@ def main():
                          "BEFORE Phase F. Skips dart-apcie1 (inactive "
                          "port). DART overlaps port ctrl_lo; enabling "
                          "DART power may be a prerequisite we've been "
-                         "missing.")
+                         "missing. (RUN D: dead path -- dart-apcieN has "
+                         "no clock-gates ADT prop, pmgr call is no-op.)")
+    ap.add_argument("--fuse-recon", action="store_true",
+                    help="Zero-write ADT recon for the missing t8132 "
+                         "fuse-bits programming source. m1n1's pcie.c "
+                         "pins fuse_bits=NULL for t8132 (pcie.c:318) so "
+                         "no OTP-based PHY-PLL calibration is applied "
+                         "-- suspected root cause of RUN D's SYNC at "
+                         "first phy_ip write. Enumerates /arm-io/apcie "
+                         "fuse* properties, extra reg[] entries, "
+                         "/arm-io/*fuse* nodes, and cross-references "
+                         "pcie_fuse_bits_t8112 tgt_regs against the "
+                         "apcie-phy-ip-pll-tunables shared-slice.")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -3346,6 +3547,13 @@ def main():
                 try_(lambda: probe_dart_power(buf),
                      "probe_dart_power")
                 flush("dart-power")
+
+            if args.fuse_recon:
+                log("ADT fuse recon: searching for missing t8132 "
+                    "fuse-bits programming source...")
+                try_(lambda: probe_adt_fuse_recon(u, apcie, buf),
+                     "probe_adt_fuse_recon")
+                flush("fuse-recon")
 
             if args.t8140_replay:
                 log("Phase F: T8140 controller-init replay (pcie.c)"
