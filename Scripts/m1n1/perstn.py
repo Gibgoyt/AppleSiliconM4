@@ -1787,6 +1787,107 @@ def probe_phaseE_rc_axi_sanity(apcie, buf, timeout=0.3):
         buf.write("\n")
 
 
+# ------------------------------------------------ diagnostic probes
+
+def probe_phy_ip_reachability(apcie, buf, label, timeout=0.3):
+    """One guarded read32(phy_ip_base + 0) + alive check. Records
+    whether phy_ip is reachable right now. Zero write risk. If phy_ip
+    is unclocked the read AXI-stalls, guarded() converts it to a
+    sentinel, alive check bails cleanly. Result:
+        REACHABLE   -- read returned a nonzero non-sentinel value
+        SENTINEL    -- guard caught SLVERR, phy_ip returned sentinel
+        AXI_STALL   -- alive check failed, m1n1 dead (log + bail)
+    """
+    addr = apcie.phy_ip_base + 0
+    buf.write(f"  [phy-ip-diag @ {label}] read32(0x{addr:x}):\n")
+    try:
+        exc_before = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"    ERROR: pre exc_count failed: "
+                  f"{e.__class__.__name__}: {e}\n")
+        return
+    val = None
+    raised = None
+    with guarded(buf, f"phy-ip-diag.{label}", short_timeout=timeout):
+        try:
+            val = p.read32(addr)
+        except Exception as e:
+            raised = e
+    if raised is not None:
+        buf.write(f"    RAISED: {raised.__class__.__name__}: {raised}\n")
+        return
+    alive, delta = check_alive_fast(exc_before, timeout=timeout)
+    if not alive:
+        buf.write(f"    AXI_STALL: m1n1 UNRESPONSIVE after read\n")
+        return
+    if delta:
+        buf.write(f"    SENTINEL (SLVERR caught, delta={delta}): "
+                  f"val=0x{val:x}\n")
+    else:
+        buf.write(f"    REACHABLE: val=0x{val:x} (delta=0)\n")
+
+
+def probe_pmgr_explore(u, buf, name_patterns=("PCIE", "PHY", "APCIE",
+                                              "ANS", "DART_APCIE")):
+    """Enumerate every PMGR gate in the SoC, filter by name (case-
+    insensitive substring match), dump PS state. Pure PMGR reads, no
+    apcie MMIO, wedge-immune.
+
+    Purpose: find any gate we haven't identified whose name hints at
+    PHY/PCIE bring-up. On t8132 there may be an APCIE_PHY_IP or
+    APCIE_CIO or similar that gates phy_ip specifically.
+    """
+    buf.write("=== PMGR explore (all gates matching {}) ===\n"
+              .format(sorted(name_patterns)))
+    _pmgr, dev_by_idx = _load_pmgr_devices(buf)
+    if dev_by_idx is None:
+        return
+    patterns_upper = tuple(p.upper() for p in name_patterns)
+    matches = []
+    for gate_idx, dev in dev_by_idx.items():
+        name = _decode_pmgr_name(dev).upper()
+        if any(pat in name for pat in patterns_upper):
+            matches.append(gate_idx)
+    matches.sort()
+    buf.write(f"  {len(matches)} matching gates:\n")
+    for gate in matches:
+        _read_pmgr_gate_state(dev_by_idx, gate, buf, indent="    ")
+    buf.write("\n")
+
+
+def probe_dart_power(buf, dart_paths=("/arm-io/dart-apcie0",
+                                       "/arm-io/dart-apcie2")):
+    """Enable DART power via p.pmgr_adt_power_enable for each active
+    apcie DART. On t8132 the port_base ctrl_lo range overlaps DART
+    MMIO -- powering the DART may be a prerequisite for port_base
+    accesses. Whether it also affects phy_ip access is what we're
+    testing.
+
+    Skips /arm-io/dart-apcie1 because port 1 is inactive per ADT
+    (would AXI-stall on any downstream access).
+    """
+    buf.write("=== DART power enable ===\n")
+    try:
+        exc_before = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"  ERROR: pre exc_count failed: "
+                  f"{e.__class__.__name__}: {e}\n\n")
+        return
+    for path in dart_paths:
+        buf.write(f"  p.pmgr_adt_power_enable({path!r}):\n")
+        try:
+            r = p.pmgr_adt_power_enable(path)
+            buf.write(f"    -> {r!r}\n")
+        except Exception as e:
+            buf.write(f"    RAISED: {e.__class__.__name__}: {e}\n")
+    try:
+        exc_after = p.get_exc_count()
+        buf.write(f"  exc_count delta = {exc_after - exc_before}\n\n")
+    except Exception as e:
+        buf.write(f"  WARN: post exc_count failed: "
+                  f"{e.__class__.__name__}: {e}\n\n")
+
+
 # ------------------------------------------------ Phase F: T8140 replay
 
 # T8140 reg indices, from m1n1/src/pcie.c regs_t8140 (lines 211-221).
@@ -1825,7 +1926,8 @@ def _poll32_bit(addr, mask, want, timeout_ms):
 
 
 def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
-                              extra_tunables=False, phycmn_first=False):
+                              extra_tunables=False, phycmn_first=False,
+                              phy_ip_diag=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -1944,6 +2046,15 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     def _flush(tag):
         if flush_fn is not None:
             flush_fn(tag)
+
+    def diag(label):
+        """No-op unless --phy-ip-diag. Guarded read32 of phy_ip_base+0
+        + alive check. Answers 'is phy_ip reachable RIGHT NOW?' at this
+        point in Phase F. Safe: guarded, alive-bailed."""
+        if not phy_ip_diag:
+            return
+        probe_phy_ip_reachability(apcie, buf, label, timeout=timeout)
+        _flush(f"phaseF.diag.{label}")
 
     def step(label, fn):
         nonlocal exc_running
@@ -2163,6 +2274,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
         _flush(f"phaseF.done.{step_id}")
         return True
 
+    diag("F.entry")
+
     # ---- step 1: PMGR power enable
     # Gate 150 should already be ACTIVE from Phase D's parents-first
     # poke, so m1n1's internal pmgr_set_mode_recursive should complete
@@ -2170,6 +2283,7 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     if not step("1.pmgr_adt_power_enable('/arm-io/apcie')",
                 lambda: p.pmgr_adt_power_enable(path)):
         return
+    diag("post-1.pmgr")
 
     # ---- step 2: axi2af tunables (guarded by prop existence)
     if not tunables_step("2", "apcie-axi2af-tunables", _T8140_AXI_IDX):
@@ -2187,6 +2301,7 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     # ---- step 5: phy tunables (guarded)
     if not tunables_step("5", "apcie-phy-tunables", _T8140_PHY_IDX):
         return
+    diag("post-5.phy-tunables")
 
     # ---- step 5.5: t8132-specific extra tunables (--extra-tunables).
     # These props are NOT applied by m1n1 pcie.c on any codepath.
@@ -2256,6 +2371,7 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                      _PHY_CTRL_CLK0ACK, _PHY_CTRL_CLK0ACK,
                      timeout_ms=50):
         return
+    diag("post-6.b.CLK0ACK")
 
     # ---- step 6.c-d: CLK1 handshake
     if not step("6.c.set32(phy_shared+0, CLK1REQ=BIT(1))",
@@ -2267,6 +2383,7 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                      _PHY_CTRL_CLK1ACK, _PHY_CTRL_CLK1ACK,
                      timeout_ms=50):
         return
+    diag("post-6.d.CLK1ACK")
 
     # ---- step 6.e: release RESET
     if not step("6.e.clear32(phy_shared+0, RESET=BIT(7))",
@@ -2282,6 +2399,7 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     if not step("6.f.set32(phy_shared+4, 0x01) [T8140 marker, pcie.c:492]",
                 lambda: p.set32(phy_shared_base + 4, 0x01)):
         return
+    diag("post-6.f.T8140-marker")
 
     # ---- step 6.g-h: FIRST phy_ip access ever from this script.
     # Uses phy_ip_tunables_filtered (defined below) which parses the
@@ -3091,6 +3209,26 @@ def main():
                          "phy_common CLK MODE bit is the ungate for "
                          "phy_ip, this reorder alone unblocks 6.g. "
                          "Requires --t8140-replay.")
+    ap.add_argument("--phy-ip-diag", action="store_true",
+                    help="Phase F diagnostic sweep: probe "
+                         "read32(phy_ip_base+0) at 6 points in Phase F "
+                         "(entry, after step 1, 5, 6.b, 6.d, 6.f) with "
+                         "guarded read + alive check. Answers 'at which "
+                         "step does phy_ip transition from unreachable "
+                         "to reachable?'. Requires --t8140-replay.")
+    ap.add_argument("--pmgr-explore", action="store_true",
+                    help="Enumerate every PMGR gate whose name matches "
+                         "PCIE/PHY/APCIE/ANS/DART_APCIE (case-insensitive) "
+                         "and dump its PS state. Zero apcie MMIO -- PMGR "
+                         "reads only. Reveals hidden gates m1n1 doesn't "
+                         "poke that might gate phy_ip.")
+    ap.add_argument("--dart-power", action="store_true",
+                    help="Call p.pmgr_adt_power_enable() for "
+                         "/arm-io/dart-apcie0 and /arm-io/dart-apcie2 "
+                         "BEFORE Phase F. Skips dart-apcie1 (inactive "
+                         "port). DART overlaps port ctrl_lo; enabling "
+                         "DART power may be a prerequisite we've been "
+                         "missing.")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -3197,14 +3335,28 @@ def main():
                      "probe_phaseE_rc_axi_sanity")
                 flush("phaseE-rc-axi-sanity")
 
+            if args.pmgr_explore:
+                log("PMGR explore: dumping all PHY/PCIE/APCIE gates...")
+                try_(lambda: probe_pmgr_explore(u, buf),
+                     "probe_pmgr_explore")
+                flush("pmgr-explore")
+
+            if args.dart_power:
+                log("DART power: enabling /arm-io/dart-apcie{0,2}...")
+                try_(lambda: probe_dart_power(buf),
+                     "probe_dart_power")
+                flush("dart-power")
+
             if args.t8140_replay:
                 log("Phase F: T8140 controller-init replay (pcie.c)"
                     f" [extra_tunables={args.extra_tunables}, "
-                    f"phycmn_first={args.phycmn_first}]...")
+                    f"phycmn_first={args.phycmn_first}, "
+                    f"phy_ip_diag={args.phy_ip_diag}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
                         extra_tunables=args.extra_tunables,
-                        phycmn_first=args.phycmn_first),
+                        phycmn_first=args.phycmn_first,
+                        phy_ip_diag=args.phy_ip_diag),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:
