@@ -728,6 +728,113 @@ def dump_phy_ip_tunables_report(apcie, buf):
         buf.write("no tunable entries target an inactive port slice.\n\n")
 
 
+# ---------------------------------- t8132 extra tunables (cio3pllcore, pcieclkgen)
+
+# t8132's ADT has two apcie-node tunables that m1n1's pcie.c (as of
+# v1.6.0-rc1-56-g6b277bc) does not apply on any codepath -- they were
+# added to the ADT for this SoC but never wired into the C driver:
+#
+#   apcie-cio3pllcore-tunables  -- suspected CIO3 PLL core init.
+#                                  Likely provides the reference clock
+#                                  the phy_ip window needs before its
+#                                  MMIO becomes readable/writable.
+#
+#   apcie-pcieclkgen-tunables   -- suspected PCIe clock generator init.
+#                                  Together with cio3pllcore this is
+#                                  the missing "ungate phy_ip" step.
+#
+# On the 2026-07-11 run, Phase F got as far as step 6.g and wedged on
+# the first phy_ip write (mask32 @ 0x497040038) despite the phy_shared
+# CLK0/CLK1 handshake succeeding. Our current hypothesis: applying
+# these two tunable groups BEFORE 6.g is what unblocks phy_ip.
+_EXTRA_TUNABLE_PROPS = (
+    "apcie-cio3pllcore-tunables",
+    "apcie-pcieclkgen-tunables",
+)
+
+
+def _infer_tunable_target_reg(apcie, entries):
+    """Guess which reg[] index a tunables prop targets based on the max
+    offset in its entries vs the ADT reg block sizes. Returns
+    (reg_idx, base_addr, size, reason) or (None, None, None, reason).
+
+    Heuristic: pick the smallest reg[] whose size strictly contains the
+    max offset. Matches how m1n1's C-side `tunables_apply_local` works
+    (it takes a reg_idx and adds tunable->offset to that base).
+    """
+    if not entries:
+        return None, None, None, "no entries"
+    max_off = max(off for off, _sz, _mask, _val in entries)
+    min_off = min(off for off, _sz, _mask, _val in entries)
+    candidates = [
+        (1, "rc_base",         apcie.rc_base,         apcie.rc_size),
+        (2, "phy_packed_base", apcie.phy_packed_base, apcie.phy_packed_size),
+        (3, "phy_ip_base",     apcie.phy_ip_base,     apcie.phy_ip_size),
+        (4, "axi_base",        apcie.axi_base,        apcie.axi_size),
+    ]
+    valid = [c for c in candidates if max_off < c[3]]
+    if not valid:
+        return None, None, None, (f"max_off=0x{max_off:x} exceeds "
+                                  f"every reg block size")
+    # Pick the smallest reg block that fits (index 3 = size)
+    valid.sort(key=lambda c: c[3])
+    idx, name, base, size = valid[0]
+    reason = (f"max_off=0x{max_off:x} min_off=0x{min_off:x} "
+              f"fits in {name} (reg[{idx}], size 0x{size:x})")
+    return idx, base, size, reason
+
+
+def dump_extra_tunables_report(apcie, buf):
+    """Dump apcie-cio3pllcore-tunables + apcie-pcieclkgen-tunables per
+    entry, with target reg inference. ADT-only, wedge-immune -- safe
+    even if the AXI fabric is dead.
+
+    For each prop:
+      * lists every entry (offset, size, mask, value)
+      * infers the likely reg_idx and target base
+      * prints target_addr = base + offset per entry
+      * flags entries whose target lands in a known-inactive port slice
+        of phy_ip_base (would AXI-stall like the port-1 auspma entries)
+    """
+    buf.write("=== extra apcie tunables report (t8132-specific, "
+              "from ADT, no MMIO) ===\n")
+    buf.write("These are the two apcie-node tunable properties that\n"
+              "m1n1's pcie.c does NOT apply on the T8140 codepath.\n"
+              "They may be the missing PCIe clock/PLL setup that the\n"
+              "phy_ip window needs before its MMIO becomes reachable.\n\n")
+
+    for prop in _EXTRA_TUNABLE_PROPS:
+        entries = apcie.apcie_tunables(u, prop)
+        buf.write(f"--- {prop} ({len(entries)} entries) ---\n")
+        if not entries:
+            buf.write("  (property missing from ADT)\n\n")
+            continue
+
+        idx, base, size, reason = _infer_tunable_target_reg(apcie, entries)
+        buf.write(f"  target inference: {reason}\n")
+        if idx is None:
+            buf.write("  --> can NOT confidently apply this prop\n\n")
+            continue
+        buf.write(f"  --> reg_idx={idx}, base=0x{base:x}, size=0x{size:x}\n\n")
+
+        buf.write("  #  offset     sz  mask               "
+                  "value              -> target_addr    warning\n")
+        for i, (off, size_bytes, mask, val) in enumerate(entries):
+            target = base + off
+            warning = ""
+            # If we inferred phy_ip_base as the target, run the
+            # slice-classifier so we see inactive port entries.
+            if idx == 3:
+                info = apcie.classify_phy_ip_offset(off)
+                if info["kind"] == "port_slice" and not info["port_active"]:
+                    warning = (f"INACTIVE port{info['port_index']} "
+                               f"(would AXI-stall)")
+            buf.write(f"  {i:3d} 0x{off:08x} {size_bytes:2d}  "
+                      f"0x{mask:016x} 0x{val:016x}    "
+                      f"0x{target:09x}  {warning}\n")
+        buf.write("\n")
+
+
 # ---------------------------------- pre-pcie_init probes (phase 0/A/B/C)
 
 def _decode_pmgr_name(dev):
@@ -1717,7 +1824,8 @@ def _poll32_bit(addr, mask, want, timeout_ms):
             return False, val, (time.monotonic() - started) * 1000.0
 
 
-def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None):
+def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
+                              extra_tunables=False, phycmn_first=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -2080,6 +2188,64 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None):
     if not tunables_step("5", "apcie-phy-tunables", _T8140_PHY_IDX):
         return
 
+    # ---- step 5.5: t8132-specific extra tunables (--extra-tunables).
+    # These props are NOT applied by m1n1 pcie.c on any codepath.
+    # Hypothesis: cio3pllcore + pcieclkgen provide the reference clock
+    # phy_ip needs. Without them, step 6.g's mask32 at phy_ip_base+0x38
+    # AXI-stalls (observed 2026-07-11).
+    if extra_tunables:
+        for step_id, prop in [
+            ("5.5.a", "apcie-cio3pllcore-tunables"),
+            ("5.5.b", "apcie-pcieclkgen-tunables"),
+        ]:
+            entries = apcie.apcie_tunables(u, prop)
+            if not entries:
+                apcie.phaseF_last_step = f"{step_id}.{prop}.absent"
+                buf.write(f"  --- {step_id}.tunables {prop} ---\n")
+                buf.write(f"    SKIPPED: /arm-io/apcie has no property "
+                          f"{prop!r}.\n")
+                _flush(f"phaseF.skip.{step_id}")
+                continue
+            idx, base, size_, reason = _infer_tunable_target_reg(
+                apcie, entries)
+            if idx is None:
+                buf.write(f"  --- {step_id}.tunables {prop} ---\n")
+                buf.write(f"    ABORT: cannot infer reg for {prop}: "
+                          f"{reason}\n")
+                _flush(f"phaseF.err.{step_id}")
+                return
+            label = f"{step_id}.tunables {prop} inferred reg_idx={idx}"
+            buf.write(f"  --- {label} ---\n")
+            buf.write(f"    inference: {reason}\n")
+            buf.write(f"    -> base=0x{base:x} size=0x{size_:x} "
+                      f"(reg_idx={idx})\n")
+            if not step(label,
+                        lambda pr=prop, i=idx:
+                            p.tunables_apply_local(path, pr, i)):
+                return
+    else:
+        buf.write("  --- 5.5.extra-tunables SKIPPED "
+                  "(pass --extra-tunables to enable) ---\n")
+        _flush("phaseF.skip.5.5")
+
+    # ---- OPTIONAL: --phycmn-first moves step 7 (phy_common CLK MODE=ON)
+    # to BEFORE step 6.a. Hypothesis: setting the phy_common CLK MODE
+    # bit is what actually ungates phy_ip; the phy_shared CLK0/CLK1
+    # handshake alone is not enough on t8132.
+    def do_phycmn():
+        return step("7.mask32(phy_common+0, MODE_MASK=0x3, MODE_ON=0x1)",
+                    lambda: p.mask32(phy_common_base + 0,
+                                     _APCIE_PHYCMN_CLK_MODE_MASK,
+                                     _APCIE_PHYCMN_CLK_MODE_ON))
+    phycmn_done = False
+    if phycmn_first:
+        buf.write("  --- (5.75) --phycmn-first: applying phy_common "
+                  "CLK MODE=ON before step 6.a ---\n")
+        _flush("phaseF.info.phycmn-first")
+        if not do_phycmn():
+            return
+        phycmn_done = True
+
     # ---- step 6.a-b: CLK0 handshake
     if not step("6.a.set32(phy_shared+0, CLK0REQ=BIT(0))",
                 lambda: p.set32(phy_shared_base + _APCIE_PHY_CTRL,
@@ -2141,11 +2307,12 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None):
     if not phy_ip_tunables_filtered("6.h", "apcie-phy-ip-auspma-tunables"):
         return
 
-    # ---- step 7: phy_common CLK mode set
-    if not step("7.mask32(phy_common+0, MODE_MASK=0x3, MODE_ON=0x1)",
-                lambda: p.mask32(phy_common_base + 0,
-                                 _APCIE_PHYCMN_CLK_MODE_MASK,
-                                 _APCIE_PHYCMN_CLK_MODE_ON)):
+    # ---- step 7: phy_common CLK mode set (unless --phycmn-first
+    # already applied it before step 6.a).
+    if phycmn_done:
+        buf.write("  --- 7.phy_common CLK MODE (already applied under "
+                  "--phycmn-first) ---\n")
+    elif not do_phycmn():
         return
 
     # ---- steps 8-10: RC init handshake
@@ -2909,6 +3076,21 @@ def main():
                          "handshake). Each step guarded + liveness-checked "
                          "so a wedge tells us EXACTLY which m1n1 step is "
                          "broken on t8132. Requires --gate-poke.")
+    ap.add_argument("--extra-tunables", action="store_true",
+                    help="Phase F step 5.5: apply t8132-specific "
+                         "apcie-cio3pllcore-tunables + "
+                         "apcie-pcieclkgen-tunables BEFORE the phy_ip "
+                         "tunables. m1n1's T8140 codepath ignores these; "
+                         "on t8132 they may be the missing PCIe clock / "
+                         "PLL setup that ungates phy_ip. Requires "
+                         "--t8140-replay.")
+    ap.add_argument("--phycmn-first", action="store_true",
+                    help="Phase F ordering experiment: apply step 7 "
+                         "(phy_common CLK MODE=ON) BEFORE step 6.g "
+                         "(phy_ip tunables) instead of after. If the "
+                         "phy_common CLK MODE bit is the ungate for "
+                         "phy_ip, this reorder alone unblocks 6.g. "
+                         "Requires --t8140-replay.")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -2937,6 +3119,11 @@ def main():
         try_(lambda: dump_phy_ip_tunables_report(apcie, buf),
              "dump_phy_ip_tunables_report")
         flush("phy-ip-report")
+
+        log("dumping apcie-{cio3pllcore,pcieclkgen}-tunables report...")
+        try_(lambda: dump_extra_tunables_report(apcie, buf),
+             "dump_extra_tunables_report")
+        flush("extra-tunables-report")
 
     # Resolve NIC-side GPIO pins from the ADT if the caller didn't override.
     nic_port = apcie.nic_port()
@@ -3011,9 +3198,13 @@ def main():
                 flush("phaseE-rc-axi-sanity")
 
             if args.t8140_replay:
-                log("Phase F: T8140 controller-init replay (pcie.c)...")
+                log("Phase F: T8140 controller-init replay (pcie.c)"
+                    f" [extra_tunables={args.extra_tunables}, "
+                    f"phycmn_first={args.phycmn_first}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
-                        apcie, buf, timeout=timeout, flush_fn=flush),
+                        apcie, buf, timeout=timeout, flush_fn=flush,
+                        extra_tunables=args.extra_tunables,
+                        phycmn_first=args.phycmn_first),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:
