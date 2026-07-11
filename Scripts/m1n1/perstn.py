@@ -1790,7 +1790,8 @@ def probe_phaseE_rc_axi_sanity(apcie, buf, timeout=0.3):
 
 # ------------------------------------------------ diagnostic probes
 
-def probe_phy_ip_reachability(apcie, buf, label, timeout=0.3):
+def probe_phy_ip_reachability(apcie, buf, label, timeout=0.3,
+                              flush_fn=None):
     """One guarded read32(phy_ip_base + 0) + alive check. Records
     whether phy_ip is reachable right now. Zero write risk. If phy_ip
     is unclocked the read AXI-stalls, guarded() converts it to a
@@ -1798,9 +1799,18 @@ def probe_phy_ip_reachability(apcie, buf, label, timeout=0.3):
         REACHABLE   -- read returned a nonzero non-sentinel value
         SENTINEL    -- guard caught SLVERR, phy_ip returned sentinel
         AXI_STALL   -- alive check failed, m1n1 dead (log + bail)
+
+    flush_fn: optional callable(tag) that flushes the buf to disk.
+    Called immediately after the header line so a subsequent hang
+    inside p.get_exc_count() or p.read32() still leaves the header
+    on disk telling us "yes, this probe entered". RUN G showed the
+    default (no flush) can lose everything a probe writes if a
+    downstream call hangs indefinitely.
     """
     addr = apcie.phy_ip_base + 0
     buf.write(f"  [phy-ip-diag @ {label}] read32(0x{addr:x}):\n")
+    if flush_fn is not None:
+        flush_fn(f"phaseF.diag.{label}.phy-ip-enter")
     try:
         exc_before = p.get_exc_count()
     except Exception as e:
@@ -1828,7 +1838,8 @@ def probe_phy_ip_reachability(apcie, buf, label, timeout=0.3):
         buf.write(f"    REACHABLE: val=0x{val:x} (delta=0)\n")
 
 
-def probe_phy_common_reachability(apcie, buf, label, timeout=0.3):
+def probe_phy_common_reachability(apcie, buf, label, timeout=0.3,
+                                   flush_fn=None):
     """Guarded read32(phy_common_base + 0) + alive check.
 
     Purpose: at each Phase F checkpoint, give a "is the fabric alive"
@@ -1847,9 +1858,18 @@ def probe_phy_common_reachability(apcie, buf, label, timeout=0.3):
         REACHABLE   -- read returned normally
         SENTINEL    -- guard caught SLVERR
         AXI_STALL   -- m1n1 unresponsive
+
+    flush_fn: optional callable(tag) that flushes the buf to disk.
+    Called immediately after the header line so a subsequent hang
+    inside p.get_exc_count() or p.read32() still leaves the header
+    on disk telling us "yes, this probe entered". RUN G showed the
+    default (no flush) can lose everything a probe writes if a
+    downstream call hangs indefinitely.
     """
     addr = apcie.phy_common_base + 0
     buf.write(f"  [phy-common-diag @ {label}] read32(0x{addr:x}):\n")
+    if flush_fn is not None:
+        flush_fn(f"phaseF.diag.{label}.phy-common-enter")
     try:
         exc_before = p.get_exc_count()
     except Exception as e:
@@ -2353,9 +2373,11 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
         exact checkpoint that broke."""
         if not phy_ip_diag:
             return
-        probe_phy_common_reachability(apcie, buf, label, timeout=timeout)
+        probe_phy_common_reachability(apcie, buf, label,
+                                       timeout=timeout, flush_fn=_flush)
         if label == phy_ip_diag_at:
-            probe_phy_ip_reachability(apcie, buf, label, timeout=timeout)
+            probe_phy_ip_reachability(apcie, buf, label,
+                                       timeout=timeout, flush_fn=_flush)
         _flush(f"phaseF.diag.{label}")
 
     def step(label, fn):
@@ -2713,12 +2735,47 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     # risk. If this write ungates phy_ip, the subsequent phy-ip-
     # diag at post-6.f.T8140-marker will report REACHABLE.
     if phyif_ctrl_run:
+        # Pre-read: what does rc_base+0x024 hold before we write?
+        # rc_base is proven reachable throughout Phase F. Wrapped in
+        # guarded() as belt-and-suspenders. Flush BOTH before and
+        # after so a hang leaves us knowing exactly which side broke
+        # (RUN G lost everything after step 6.f.5's post-flush).
+        _rc24_addr = rc_base + 0x024
+        buf.write(f"  [phyif-ctrl-pre] read32(0x{_rc24_addr:x}) "
+                  f"[rc_base + 0x024]:\n")
+        _flush("phaseF.pre.6.f.5.phyif-ctrl-pre-enter")
+        with guarded(buf, "6.f.5.phyif-ctrl-pre", short_timeout=timeout):
+            try:
+                _val_pre = p.read32(_rc24_addr)
+                buf.write(f"    val_pre = 0x{_val_pre:08x}\n")
+            except Exception as e:
+                buf.write(f"    pre-read RAISED: "
+                          f"{e.__class__.__name__}: {e}\n")
+        _flush("phaseF.pre.6.f.5.phyif-ctrl-pre")
+
         if not step("6.f.5.set32(rc_base+0x024, RUN=BIT(0)) "
                     "[T81XX PHYIF_CTRL, pcie.c:487]",
                     lambda: p.set32(rc_base + 0x024, 0x01)):
             return
         # pcie.c does udelay(1) after the RUN write; 1 ms is plenty.
         time.sleep(0.001)
+
+        # Post-read: is rc_base+0x024 still readable? What value?
+        # Individual entry/result flushes tell us whether the RUN
+        # write immediately kills the fabric (post-enter flush is
+        # last thing on disk) or leaves it walking wounded (post-
+        # read result flush lands, phy_common probe still hangs).
+        buf.write(f"  [phyif-ctrl-post] read32(0x{_rc24_addr:x}) "
+                  f"[rc_base + 0x024]:\n")
+        _flush("phaseF.post.6.f.5.phyif-ctrl-post-enter")
+        with guarded(buf, "6.f.5.phyif-ctrl-post", short_timeout=timeout):
+            try:
+                _val_post = p.read32(_rc24_addr)
+                buf.write(f"    val_post = 0x{_val_post:08x}\n")
+            except Exception as e:
+                buf.write(f"    post-read RAISED: "
+                          f"{e.__class__.__name__}: {e}\n")
+        _flush("phaseF.post.6.f.5.phyif-ctrl-post")
 
     diag("post-6.f.T8140-marker")
 

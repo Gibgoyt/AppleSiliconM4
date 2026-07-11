@@ -34,4 +34,11 @@ Multi-week project to get PCIe working on Apple M4 mini so the port-2 NIC can be
 - New hypothesis: pcie.c XOR between T81XX PHYIF_CTRL_RUN write (rc_base + 0x024 <- BIT(0), pcie.c:487) and T8140 marker (phy_shared + 4 <- 0x01, pcie.c:492). Both marked `/* ??? */` in m1n1. t8132 uses T8140 branch (regs_t8140 pin) so only the marker gets written. Test: also do the T81XX write.
 - Next iteration (RUN G, delivered 2026-07-11): `--phyif-ctrl-run` flag adds the T81XX PHYIF_CTRL_RUN write between step 6.f and the post-6.f diag. fuse-recon dumps the full 138-name `/arm-io/` child list for eyeball scan.
 
+**State as of 2026-07-11 (post RUN G):**
+- Step 6.f.5 (`--phyif-ctrl-run`: T81XX PHYIF_CTRL_RUN write at rc_base+0x024) completed cleanly. Write returned 1 (was 0, OR'd BIT(0)), exc_delta=0, guard OFF succeeded.
+- Immediately after, m1n1 died. Nothing after the step 6.f.5 post-flush (36174 bytes) reached disk -- not even the `[phy-common-diag @ post-6.f.T8140-marker]` header. Either `p.get_exc_count()` hung indefinitely inside the phy_common probe, or m1n1 became UART-unresponsive in the ~1 ms gap.
+- **Conclusion:** the PHYIF_CTRL_RUN write is NOT benign on t8132. It materially changes state. Whether it ungates phy_ip or destabilizes the fabric is currently indeterminate.
+- fuse-recon `/arm-io/` full child dump (138 names): no fuse/otp block, no obviously overlooked candidate. Notable non-target finds: `lan-10gb-sync` (on-package NIC, relevant for later work), `apciec0/1/3` (CIO PCIe, unrelated). No hidden ADT source of PCIe calibration.
+- Next iteration (RUN H, delivered 2026-07-11): (i) flush-after-header inside probe_phy_common_reachability / probe_phy_ip_reachability -- header lands on disk before the first proxy call so a hang reveals which probe entered; (ii) guarded `read32(rc_base + 0x024)` with individual entry+result flushes before AND after the RUN write. Combined output disambiguates whether the write's fault is immediate (post-read hangs) or delayed (post-read fine, phy_common probe entered but hangs).
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling)
