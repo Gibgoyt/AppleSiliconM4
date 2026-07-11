@@ -1717,7 +1717,7 @@ def _poll32_bit(addr, mask, want, timeout_ms):
             return False, val, (time.monotonic() - started) * 1000.0
 
 
-def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3):
+def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -1799,19 +1799,51 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3):
     buf.write(f"    phy_shared_base = 0x{phy_shared_base:x} "
               f"(= phy_packed + 0x8000)\n")
     buf.write(f"    phy_common_base = 0x{phy_common_base:x}\n")
-    buf.write(f"    phy_ip_base     = 0x{phy_ip_base:x}\n\n")
+    buf.write(f"    phy_ip_base     = 0x{phy_ip_base:x}\n")
+
+    # Dump the actual property names on /arm-io/apcie so we can see
+    # WHICH tunable properties the ADT has (and skip the ones it
+    # doesn't). pcie.c:441-457 guards its tunables_apply calls with
+    # adt_getprop existence checks; missing props are just skipped.
+    # We do the same on the Python side below.
+    apcie_props = ()
+    try:
+        node = u.adt["/arm-io/apcie"]
+        apcie_props = tuple(sorted(node._properties.keys()))
+    except Exception as e:
+        buf.write(f"    WARN: could not enumerate /arm-io/apcie "
+                  f"properties: {e.__class__.__name__}: {e}\n")
+    tunable_props = [k for k in apcie_props if "tunables" in k]
+    buf.write(f"    tunable properties on /arm-io/apcie ({len(tunable_props)}):\n")
+    for k in tunable_props:
+        buf.write(f"      * {k}\n")
+    buf.write("\n")
+
+    def _prop_exists(prop):
+        if not apcie_props:
+            return False
+        return prop in apcie_props
 
     try:
         exc_running = p.get_exc_count()
     except Exception as e:
         buf.write(f"  ERROR: initial get_exc_count failed: "
                   f"{e.__class__.__name__}: {e}\n\n")
+        if flush_fn is not None:
+            flush_fn("phaseF-init-fail")
         return
+
+    def _flush(tag):
+        if flush_fn is not None:
+            flush_fn(tag)
 
     def step(label, fn):
         nonlocal exc_running
         apcie.phaseF_last_step = label
         buf.write(f"  --- {label} ---\n")
+        # Flush BEFORE the risky call so if it wedges we still see
+        # which step we were on. Overhead is tiny (a file write).
+        _flush(f"phaseF.pre.{label[:32]}")
         with guarded(buf, label, short_timeout=timeout):
             try:
                 r = fn()
@@ -1819,17 +1851,40 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3):
                     buf.write(f"    -> {r!r}\n")
             except Exception as e:
                 buf.write(f"    RAISED: {e.__class__.__name__}: {e}\n")
+                _flush(f"phaseF.post.{label[:32]}")
                 return False
         alive, delta = check_alive_fast(exc_running, timeout=timeout)
         if not alive:
             buf.write("    m1n1 UNRESPONSIVE after step; aborting Phase F\n")
+            _flush(f"phaseF.post.{label[:32]}")
             return False
         if delta:
             buf.write(f"    !!! exc delta = {delta} on this step\n")
             exc_running += delta
+            _flush(f"phaseF.post.{label[:32]}")
             return False
         exc_running += delta
+        _flush(f"phaseF.post.{label[:32]}")
         return True
+
+    def tunables_step(step_id, prop, reg_idx):
+        """Guarded tunables application. Mirrors pcie.c pattern:
+        check ADT prop existence first, skip if missing (log the skip
+        so future iterations see which props are actually present),
+        else apply. This makes Phase F robust against the j773g ADT
+        missing several of the tunable props m1n1 pcie.c ALSO checks.
+        """
+        label = f"{step_id}.tunables {prop} reg_idx={reg_idx}"
+        if not _prop_exists(prop):
+            apcie.phaseF_last_step = label + " (SKIPPED: prop absent)"
+            buf.write(f"  --- {label} ---\n")
+            buf.write(f"    SKIPPED: /arm-io/apcie has no property {prop!r}.\n"
+                      f"    (matches pcie.c pattern: adt_getprop check "
+                      f"before tunables_apply.)\n")
+            _flush(f"phaseF.skip.{step_id}")
+            return True
+        return step(label,
+                    lambda: p.tunables_apply_local(path, prop, reg_idx))
 
     def poll_step(label, addr, mask, want, timeout_ms):
         nonlocal exc_running
@@ -1837,6 +1892,7 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3):
         buf.write(f"  --- {label} ---\n")
         buf.write(f"    poll addr=0x{addr:x} mask=0x{mask:x} "
                   f"want=0x{want:x} timeout={timeout_ms}ms\n")
+        _flush(f"phaseF.pre.{label[:32]}")
         converged = False
         val = 0
         elapsed_ms = 0.0
@@ -1849,20 +1905,25 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3):
                 raised = e
         if raised is not None:
             buf.write(f"    RAISED: {raised.__class__.__name__}: {raised}\n")
+            _flush(f"phaseF.post.{label[:32]}")
             return False
         buf.write(f"    conv={converged} val=0x{val:x} ({elapsed_ms:.1f} ms)\n")
         alive, delta = check_alive_fast(exc_running, timeout=timeout)
         if not alive:
             buf.write("    m1n1 UNRESPONSIVE after poll; aborting Phase F\n")
+            _flush(f"phaseF.post.{label[:32]}")
             return False
         if delta:
             buf.write(f"    !!! exc delta = {delta} during poll\n")
             exc_running += delta
+            _flush(f"phaseF.post.{label[:32]}")
             return False
         exc_running += delta
         if not converged:
             buf.write(f"    !!! poll did NOT converge; aborting Phase F\n")
+            _flush(f"phaseF.post.{label[:32]}")
             return False
+        _flush(f"phaseF.post.{label[:32]}")
         return True
 
     # ---- step 1: PMGR power enable
@@ -1873,10 +1934,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3):
                 lambda: p.pmgr_adt_power_enable(path)):
         return
 
-    # ---- step 2: axi2af tunables
-    if not step(f"2.tunables apcie-axi2af-tunables reg_idx={_T8140_AXI_IDX}",
-                lambda: p.tunables_apply_local(
-                    path, "apcie-axi2af-tunables", _T8140_AXI_IDX)):
+    # ---- step 2: axi2af tunables (guarded by prop existence)
+    if not tunables_step("2", "apcie-axi2af-tunables", _T8140_AXI_IDX):
         return
 
     # ---- step 3: rc_base + 0x4 <- 0
@@ -1884,16 +1943,12 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3):
                 lambda: p.write32(rc_base + 0x4, 0)):
         return
 
-    # ---- step 4: common tunables
-    if not step(f"4.tunables apcie-common-tunables reg_idx={_T8140_RC_IDX}",
-                lambda: p.tunables_apply_local(
-                    path, "apcie-common-tunables", _T8140_RC_IDX)):
+    # ---- step 4: common tunables (guarded)
+    if not tunables_step("4", "apcie-common-tunables", _T8140_RC_IDX):
         return
 
-    # ---- step 5: phy tunables
-    if not step(f"5.tunables apcie-phy-tunables reg_idx={_T8140_PHY_IDX}",
-                lambda: p.tunables_apply_local(
-                    path, "apcie-phy-tunables", _T8140_PHY_IDX)):
+    # ---- step 5: phy tunables (guarded)
+    if not tunables_step("5", "apcie-phy-tunables", _T8140_PHY_IDX):
         return
 
     # ---- step 6.a-b: CLK0 handshake
@@ -1943,15 +1998,11 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3):
               "     needs bringing up first). Next iteration will need\n"
               "     to explore those.\n")
 
-    if not step(f"6.g.tunables apcie-phy-ip-pll-tunables "
-                f"reg_idx={_T8140_PHY_IP_IDX} (base=phy_ip)",
-                lambda: p.tunables_apply_local(
-                    path, "apcie-phy-ip-pll-tunables", _T8140_PHY_IP_IDX)):
+    if not tunables_step("6.g", "apcie-phy-ip-pll-tunables",
+                         _T8140_PHY_IP_IDX):
         return
-    if not step(f"6.h.tunables apcie-phy-ip-auspma-tunables "
-                f"reg_idx={_T8140_PHY_IP_IDX} (base=phy_ip)",
-                lambda: p.tunables_apply_local(
-                    path, "apcie-phy-ip-auspma-tunables", _T8140_PHY_IP_IDX)):
+    if not tunables_step("6.h", "apcie-phy-ip-auspma-tunables",
+                         _T8140_PHY_IP_IDX):
         return
 
     # ---- step 7: phy_common CLK mode set
@@ -2825,7 +2876,8 @@ def main():
 
             if args.t8140_replay:
                 log("Phase F: T8140 controller-init replay (pcie.c)...")
-                try_(lambda: probe_phaseF_t8140_replay(apcie, buf, timeout=timeout),
+                try_(lambda: probe_phaseF_t8140_replay(
+                        apcie, buf, timeout=timeout, flush_fn=flush),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:
