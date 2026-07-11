@@ -1926,6 +1926,135 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None):
         _flush(f"phaseF.post.{label[:32]}")
         return True
 
+    _mask_op_for_size = {1: p.mask8, 2: p.mask16, 4: p.mask32, 8: p.mask64}
+
+    def phy_ip_tunables_filtered(step_id, prop):
+        """Apply an apcie-phy-ip-* tunables prop with slice-filtering.
+
+        Parses the tunables entries via apcie.apcie_tunables (ADT-only,
+        wedge-immune) and classifies each entry via
+        apcie.classify_phy_ip_offset. Entries whose port slice is
+        INACTIVE per ADT (no pci-bridge{N}) are SKIPPED -- writing to
+        them would AXI-stall the fabric on j773g. Entries in the shared
+        slice or in an ACTIVE port slice are applied one-at-a-time as
+        p.mask{8,16,32,64}() calls under guarded() with per-entry
+        alive check.
+
+        Returns True on full success or on absent prop (mirrors pcie.c's
+        adt_getprop skip pattern). Returns False on wedge with
+        apcie.phaseF_last_step naming the exact failing entry.
+        """
+        nonlocal exc_running
+        label = f"{step_id}.tunables {prop} (slice-filtered)"
+        apcie.phaseF_last_step = label
+        buf.write(f"  --- {label} ---\n")
+        entries = apcie.apcie_tunables(u, prop)
+        if not entries:
+            buf.write(f"    SKIPPED: /arm-io/apcie has no property "
+                      f"{prop!r} (matches pcie.c adt_getprop skip).\n")
+            _flush(f"phaseF.skip.{step_id}")
+            return True
+
+        tally = {"shared": 0}
+        for pi in range(len(apcie.ports)):
+            tally[f"port{pi}_applied"] = 0
+            tally[f"port{pi}_skipped"] = 0
+        tally["out_of_window"] = 0
+
+        plan = []
+        for offset, size, mask, value in entries:
+            info = apcie.classify_phy_ip_offset(offset)
+            kind = info["kind"]
+            if kind == "shared":
+                tally["shared"] += 1
+                plan.append((offset, size, mask, value, "shared", True))
+            elif kind == "port_slice":
+                pi = info["port_index"]
+                if info["port_active"]:
+                    tally[f"port{pi}_applied"] += 1
+                    plan.append((offset, size, mask, value,
+                                 f"port{pi}", True))
+                else:
+                    tally[f"port{pi}_skipped"] += 1
+                    plan.append((offset, size, mask, value,
+                                 f"port{pi}", False))
+            else:
+                tally["out_of_window"] += 1
+                plan.append((offset, size, mask, value,
+                             "out_of_window", False))
+
+        buf.write(f"    plan ({len(entries)} entries):\n")
+        for k, v in tally.items():
+            if v > 0:
+                buf.write(f"      {k:20s} = {v}\n")
+        _flush(f"phaseF.plan.{step_id}")
+
+        applied = 0
+        skipped = 0
+        for i, (offset, size, mask, value, tag, do_apply) in enumerate(plan):
+            target = apcie.phy_ip_base + offset
+            if not do_apply:
+                skipped += 1
+                continue
+            op = _mask_op_for_size.get(size)
+            if op is None:
+                buf.write(f"    ERROR: entry #{i} unknown size {size}; "
+                          f"aborting {step_id}\n")
+                _flush(f"phaseF.err.{step_id}.{i}")
+                return False
+            entry_label = (f"{step_id}.#{i:03d}.{tag}."
+                           f"mask{size * 8}@0x{target:x}")
+            apcie.phaseF_last_step = entry_label
+            with guarded(buf, entry_label, short_timeout=timeout):
+                try:
+                    op(target, mask, value)
+                except Exception as e:
+                    buf.write(f"    RAISED at #{i} ({tag}) 0x{target:x}: "
+                              f"{e.__class__.__name__}: {e}\n")
+                    _flush(f"phaseF.raise.{step_id}.{i}")
+                    return False
+            alive, delta = check_alive_fast(exc_running, timeout=timeout)
+            if not alive:
+                buf.write(f"    !!! m1n1 UNRESPONSIVE at #{i} ({tag}) "
+                          f"0x{target:x}; aborting {step_id}\n")
+                _flush(f"phaseF.dead.{step_id}.{i}")
+                return False
+            if delta:
+                buf.write(f"    !!! SYNC delta={delta} at #{i} ({tag}) "
+                          f"0x{target:x}; aborting {step_id}\n")
+                exc_running += delta
+                _flush(f"phaseF.sync.{step_id}.{i}")
+                return False
+            exc_running += delta
+            applied += 1
+
+        buf.write(f"    ok: applied {applied}, skipped {skipped} "
+                  f"(port1 inactive per ADT)\n")
+        # Quick verification read of each active slice's head to prove
+        # phy_ip really is writable now. Guarded; one read per slice.
+        buf.write(f"    verification reads:\n")
+        for pi in range(len(apcie.ports)):
+            if not apcie.ports[pi].exists:
+                continue
+            probe_off = 0x8000 + pi * 0x8000  # slice[pi] head
+            addr = apcie.phy_ip_base + probe_off
+            vr_label = f"{step_id}.verify.port{pi}@0x{addr:x}"
+            with guarded(buf, vr_label, short_timeout=timeout):
+                try:
+                    v = p.read32(addr)
+                    buf.write(f"      port{pi}: read32(0x{addr:x}) = 0x{v:x}\n")
+                except Exception as e:
+                    buf.write(f"      port{pi}: read32(0x{addr:x}) RAISED: "
+                              f"{e.__class__.__name__}: {e}\n")
+            alive, delta = check_alive_fast(exc_running, timeout=timeout)
+            if not alive:
+                buf.write(f"    !!! m1n1 unresponsive after verify port{pi}\n")
+                _flush(f"phaseF.verify_dead.{step_id}.port{pi}")
+                return False
+            exc_running += delta
+        _flush(f"phaseF.done.{step_id}")
+        return True
+
     # ---- step 1: PMGR power enable
     # Gate 150 should already be ACTIVE from Phase D's parents-first
     # poke, so m1n1's internal pmgr_set_mode_recursive should complete
@@ -1989,20 +2118,27 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None):
         return
 
     # ---- step 6.g-h: FIRST phy_ip access ever from this script.
-    # If Phase F wedges here, the phy_base CLK handshake completed
-    # but phy_ip is still gated by something else. Log clearly.
+    # Uses phy_ip_tunables_filtered (defined below) which parses the
+    # tunables prop entry-by-entry and skips entries targeting an
+    # INACTIVE port slice. On j773g, port 1 has no pci-bridge1 in the
+    # ADT -- its downstream phy_ip slice is unpowered. Applying its
+    # 47 auspma entries the m1n1 way (via tunables_apply_local) writes
+    # into that slice and AXI-stalls the fabric. This wedged us at
+    # step 6.h on the 2026-07-11 run (confirmed via phaseF.post.6.g
+    # flush + no post.6.h flush + never-recovering m1n1).
+    #
+    # The upstream m1n1 fix for this would be a per-entry filter in
+    # pcie.c:518-525 for chips where the ADT can have missing bridges
+    # (t8132 is the first known case). Here we do the filter Python-
+    # side so we can iterate without a m1n1 rebuild/reflash cycle.
     buf.write("  ==> ABOUT TO TOUCH phy_ip_base FOR THE FIRST TIME.\n"
-              "     If Phase F wedges below, the CLK0/CLK1 handshake\n"
-              "     completed but phy_ip is still gated (SMC key, a\n"
-              "     phy_common poke we missed, or a per-port PHY that\n"
-              "     needs bringing up first). Next iteration will need\n"
-              "     to explore those.\n")
+              "     Entries in the INACTIVE port-1 slice (0x10000..0x18000)\n"
+              "     will be SKIPPED to avoid the AXI stall observed on\n"
+              "     the 2026-07-11 run. See phy-ip-report for entry list.\n")
 
-    if not tunables_step("6.g", "apcie-phy-ip-pll-tunables",
-                         _T8140_PHY_IP_IDX):
+    if not phy_ip_tunables_filtered("6.g", "apcie-phy-ip-pll-tunables"):
         return
-    if not tunables_step("6.h", "apcie-phy-ip-auspma-tunables",
-                         _T8140_PHY_IP_IDX):
+    if not phy_ip_tunables_filtered("6.h", "apcie-phy-ip-auspma-tunables"):
         return
 
     # ---- step 7: phy_common CLK mode set
