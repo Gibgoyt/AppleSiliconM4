@@ -835,6 +835,56 @@ def dump_extra_tunables_report(apcie, buf):
                       f"0x{target:09x}  {warning}\n")
         buf.write("\n")
 
+    # ---- RUN I: dump the tunables m1n1 DOES apply on the T8140
+    # codepath. Purpose: eyeball for any offset in the phy_shared
+    # window (0x8000..0xC000) or phy_common window (0x4000..0x8000)
+    # that could contain a hidden clock enable / PLL bring-up write
+    # we're missing. These are Phase F steps 2, 4, 5 (axi2af,
+    # common, phy) -- all safe to dump from ADT only.
+    buf.write("=== applied apcie tunables report (from ADT, no MMIO) "
+              "===\n")
+    buf.write("These are the tunable properties m1n1 pcie.c DOES apply\n"
+              "on the T8140 codepath. Listed so we can eyeball for\n"
+              "any hidden clock-enable / PLL-config write in the\n"
+              "phy_shared window that could be gating phy_ip.\n\n")
+    for prop in ("apcie-axi2af-tunables",
+                 "apcie-common-tunables",
+                 "apcie-phy-tunables"):
+        entries = apcie.apcie_tunables(u, prop)
+        buf.write(f"--- {prop} ({len(entries)} entries) ---\n")
+        if not entries:
+            buf.write("  (property missing from ADT)\n\n")
+            continue
+
+        idx, base, size, reason = _infer_tunable_target_reg(apcie, entries)
+        buf.write(f"  target inference: {reason}\n")
+        if idx is None:
+            buf.write("  --> can NOT confidently identify target reg\n\n")
+            continue
+        buf.write(f"  --> reg_idx={idx}, base=0x{base:x}, "
+                  f"size=0x{size:x}\n\n")
+
+        buf.write("  #  offset     sz  mask               "
+                  "value              -> target_addr    note\n")
+        for i, (off, size_bytes, mask, val) in enumerate(entries):
+            target = base + off
+            note = ""
+            # Flag entries that land in the phy_shared window
+            # (phy_packed + 0x8000..0xC000) or phy_common window
+            # (phy_packed + 0x4000..0x8000). Those are the two
+            # regions Phase F touches directly; a tunable write
+            # into either overlaps our step 6.a-6.f writes and
+            # may be a hidden step we're re-doing (or missing).
+            if idx == 2:
+                if 0x4000 <= off < 0x8000:
+                    note = "phy_common region"
+                elif 0x8000 <= off < 0xc000:
+                    note = "phy_shared region"
+            buf.write(f"  {i:3d} 0x{off:08x} {size_bytes:2d}  "
+                      f"0x{mask:016x} 0x{val:016x}    "
+                      f"0x{target:09x}  {note}\n")
+        buf.write("\n")
+
 
 # ---------------------------------- pre-pcie_init probes (phase 0/A/B/C)
 
@@ -2202,9 +2252,12 @@ _PHY_IP_DIAG_CHECKPOINTS = (
     "F.entry",
     "post-1.pmgr",
     "post-5.phy-tunables",
+    "post-5.5.extra-tunables",  # RUN J: right after cio3pllcore + pcieclkgen apply
     "post-6.b.CLK0ACK",
     "post-6.d.CLK1ACK",
     "post-6.f.T8140-marker",
+    "post-7.phycmn-early",      # RUN I: right after --phycmn-early's step-7 write
+    "post-6.i.phy4-x10-early",  # RUN L: right after --phy4-x10-early's phy_base+4=0x10
 )
 
 # APCIE_PHY_CTRL bit layout -- m1n1/src/pcie.c:38-43.
@@ -2239,7 +2292,9 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               extra_tunables=False, phycmn_first=False,
                               phy_ip_diag=False,
                               phy_ip_diag_at="post-6.f.T8140-marker",
-                              phyif_ctrl_run=False):
+                              phyif_ctrl_run=False,
+                              phycmn_early=False,
+                              phy4_x10_early=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -2662,6 +2717,12 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                         lambda pr=prop, i=idx:
                             p.tunables_apply_local(path, pr, i)):
                 return
+        # RUN J: probe checkpoint immediately after both extra
+        # tunables props applied. --phy-ip-diag-at=post-5.5.extra-
+        # tunables aims the single phy_ip probe here to test whether
+        # cio3pllcore + pcieclkgen supplied the missing PCIe clock/
+        # PLL config that ungates phy_ip on t8132.
+        diag("post-5.5.extra-tunables")
     else:
         buf.write("  --- 5.5.extra-tunables SKIPPED "
                   "(pass --extra-tunables to enable) ---\n")
@@ -2719,10 +2780,44 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     # affect functional correctness.
     time.sleep(0.001)
 
+    # ---- step 6.f pre-read: phy_shared+4 before the marker write.
+    # phy_shared+0 is proven reachable via steps 6.a-6.e (guarded
+    # set/poll on it converged); phy_shared+4 is in the same 4 KiB
+    # window, so this read is ~zero risk. RUN H's rc_base+0x024
+    # read-back proved the T81XX PHYIF_CTRL_RUN write didn't stick
+    # (pre=0, post=0). Same instrumentation on the T8140 marker
+    # write so we can rule in/out whether the T8140 branch's key
+    # write is being retained on t8132.
+    _ps4_addr = phy_shared_base + 4
+    buf.write(f"  [phy-shared-4-pre] read32(0x{_ps4_addr:x}) "
+              f"[phy_shared + 4]:\n")
+    _flush("phaseF.pre.6.f.readback-enter")
+    with guarded(buf, "6.f.readback-pre", short_timeout=timeout):
+        try:
+            _val_ps4_pre = p.read32(_ps4_addr)
+            buf.write(f"    val_pre = 0x{_val_ps4_pre:08x}\n")
+        except Exception as e:
+            buf.write(f"    pre-read RAISED: "
+                      f"{e.__class__.__name__}: {e}\n")
+    _flush("phaseF.pre.6.f.readback")
+
     # ---- step 6.f: T8140 marker write (phy_shared + 4 <- 0x01)
     if not step("6.f.set32(phy_shared+4, 0x01) [T8140 marker, pcie.c:492]",
                 lambda: p.set32(phy_shared_base + 4, 0x01)):
         return
+
+    # ---- step 6.f post-read: did BIT(0) stick? (RUN I)
+    buf.write(f"  [phy-shared-4-post] read32(0x{_ps4_addr:x}) "
+              f"[phy_shared + 4]:\n")
+    _flush("phaseF.post.6.f.readback-enter")
+    with guarded(buf, "6.f.readback-post", short_timeout=timeout):
+        try:
+            _val_ps4_post = p.read32(_ps4_addr)
+            buf.write(f"    val_post = 0x{_val_ps4_post:08x}\n")
+        except Exception as e:
+            buf.write(f"    post-read RAISED: "
+                      f"{e.__class__.__name__}: {e}\n")
+    _flush("phaseF.post.6.f.readback")
 
     # ---- step 6.f.5: EXPERIMENTAL T81XX PHYIF_CTRL_RUN write.
     # pcie.c has an XOR between the T81XX write (rc_base + 0x024 <-
@@ -2777,6 +2872,46 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                           f"{e.__class__.__name__}: {e}\n")
         _flush("phaseF.post.6.f.5.phyif-ctrl-post")
 
+    # ---- step 6.i.early: RUN L experiment. m1n1 pcie.c:528-530
+    # applies set32(phy_base + 4, 0x10) on T602X or T8122-compat
+    # ONLY -- t8132 (regs_t8140) skips it. In pcie.c's T8122 flow
+    # the write happens AFTER the phy_ip pll+auspma tunables, so
+    # it's not part of the phy_ip ungate on those chips. RUN L
+    # tests the hypothesis that on t8132 this write IS needed
+    # BEFORE phy_ip access -- placement here (after 6.f/6.f.5)
+    # is the earliest slot where phy_shared has been through the
+    # full CLK0/CLK1/RESET/marker sequence. phy_shared+4 was just
+    # written to (BIT(0) via step 6.f) and read back; setting
+    # BIT(4) additionally is low wedge risk.
+    if phy4_x10_early:
+        if not step("6.i.set32(phy_shared+4, 0x10) [T8122 line "
+                    "529, moved-early, RUN L]",
+                    lambda: p.set32(phy_shared_base + 4, 0x10)):
+            return
+        time.sleep(0.001)
+        diag("post-6.i.phy4-x10-early")
+
+    # ---- step 7.early: RUN I experiment. m1n1 pcie.c:535 does
+    # mask32(phy_common+0, MODE_MASK=0x3, MODE_ON=0x1) AFTER the
+    # phy_ip pll+auspma tunables (which is where t8132 wedges).
+    # Hypothesis: CLK_MODE=ON is the phy_ip ungate on t8132 and
+    # must run BEFORE phy_ip access, not after. --phycmn-first
+    # tests placing it before step 6.a; --phycmn-early tests
+    # placing it here -- as late as possible while still before
+    # any phy_ip touch. phy_common is proven reachable throughout
+    # Phase F (val=0x80300000 unchanged since F.entry per every
+    # RUN A-H log), so this mask32 write is low wedge risk.
+    if phycmn_early:
+        if phycmn_done:
+            buf.write("  --- 7.phycmn-early SKIPPED: --phycmn-first "
+                      "already applied CLK_MODE=ON before 6.a ---\n")
+            _flush("phaseF.skip.7.phycmn-early")
+        else:
+            if not do_phycmn():
+                return
+            phycmn_done = True
+        diag("post-7.phycmn-early")
+
     diag("post-6.f.T8140-marker")
 
     # ---- step 6.g-h: FIRST phy_ip access ever from this script.
@@ -2804,10 +2939,10 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
         return
 
     # ---- step 7: phy_common CLK mode set (unless --phycmn-first
-    # already applied it before step 6.a).
+    # or --phycmn-early already applied it earlier).
     if phycmn_done:
         buf.write("  --- 7.phy_common CLK MODE (already applied under "
-                  "--phycmn-first) ---\n")
+                  "--phycmn-first or --phycmn-early) ---\n")
     elif not do_phycmn():
         return
 
@@ -3582,10 +3717,36 @@ def main():
                          "--t8140-replay.")
     ap.add_argument("--phycmn-first", action="store_true",
                     help="Phase F ordering experiment: apply step 7 "
-                         "(phy_common CLK MODE=ON) BEFORE step 6.g "
-                         "(phy_ip tunables) instead of after. If the "
-                         "phy_common CLK MODE bit is the ungate for "
-                         "phy_ip, this reorder alone unblocks 6.g. "
+                         "(phy_common CLK MODE=ON) BEFORE step 6.a "
+                         "(the phy_shared CLK0REQ handshake) instead "
+                         "of after phy_ip tunables. Extremely early "
+                         "placement of CLK_MODE=ON. Requires "
+                         "--t8140-replay.")
+    ap.add_argument("--phycmn-early", action="store_true",
+                    help="RUN I: Phase F ordering experiment. Apply "
+                         "step 7 (phy_common CLK MODE=ON, pcie.c:535) "
+                         "AFTER step 6.f (T8140 marker) and its "
+                         "optional 6.f.5/6.i.early siblings but "
+                         "BEFORE any phy_ip access. If CLK_MODE=ON "
+                         "is the phy_ip ungate on t8132, this "
+                         "placement unblocks 6.g. Pair with "
+                         "--phy-ip-diag-at=post-7.phycmn-early to "
+                         "probe phy_ip immediately after this write. "
+                         "Mutually consistent with --phycmn-first "
+                         "(if both set, the first one wins and the "
+                         "second skips itself). Requires "
+                         "--t8140-replay.")
+    ap.add_argument("--phy4-x10-early", action="store_true",
+                    help="RUN L: Phase F experiment. On T8122-compat "
+                         "pcie.c does set32(phy_base+4, 0x10) AFTER "
+                         "phy_ip tunables (pcie.c:529). T8140 "
+                         "(t8132's codepath) skips this write. RUN L "
+                         "tests placing the write BEFORE phy_ip "
+                         "access instead: after 6.f/6.f.5, before "
+                         "diag. If phy_shared+4 BIT(4) gates phy_ip "
+                         "on t8132, this alone unblocks 6.g. Pair "
+                         "with --phy-ip-diag-at=post-6.i.phy4-x10-"
+                         "early to probe phy_ip right after. "
                          "Requires --t8140-replay.")
     ap.add_argument("--phyif-ctrl-run", action="store_true",
                     help="Phase F experiment: after step 6.f (T8140 "
@@ -3779,6 +3940,8 @@ def main():
                 log("Phase F: T8140 controller-init replay (pcie.c)"
                     f" [extra_tunables={args.extra_tunables}, "
                     f"phycmn_first={args.phycmn_first}, "
+                    f"phycmn_early={args.phycmn_early}, "
+                    f"phy4_x10_early={args.phy4_x10_early}, "
                     f"phy_ip_diag={args.phy_ip_diag}, "
                     f"phy_ip_diag_at={args.phy_ip_diag_at!r}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
@@ -3788,7 +3951,9 @@ def main():
                         phycmn_first=args.phycmn_first,
                         phy_ip_diag=args.phy_ip_diag,
                         phy_ip_diag_at=args.phy_ip_diag_at,
-                        phyif_ctrl_run=args.phyif_ctrl_run),
+                        phyif_ctrl_run=args.phyif_ctrl_run,
+                        phycmn_early=args.phycmn_early,
+                        phy4_x10_early=args.phy4_x10_early),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:
