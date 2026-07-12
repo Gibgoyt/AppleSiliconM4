@@ -65,6 +65,16 @@ case "${RUN^^}" in
                --extra-tunables
                --phy-ip-diag-at=post-5.5.extra-tunables)
         ;;
+    K)
+        # RUN K probes at the LATER of the two write points so if
+        # only the combination unblocks phy_ip, we see it here.
+        # post-7.phycmn-early fires after step 5.5 AND after 6.f
+        # AND after phycmn-early's CLK_MODE=ON write.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --extra-tunables
+               --phycmn-early
+               --phy-ip-diag-at=post-7.phycmn-early)
+        ;;
     *)
         echo "usage: $0 {I|J|K|L} [extra perstn.py args...]" >&2
         echo "" >&2
