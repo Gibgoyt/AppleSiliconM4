@@ -1947,6 +1947,99 @@ def probe_phy_common_reachability(apcie, buf, label, timeout=0.3,
         buf.write(f"    REACHABLE: val=0x{val:x} (delta=0)\n")
 
 
+# RUN O windows -- the four apcie MMIO blocks that Phase E + every
+# Phase F step to date have proven reachable. Read scan is safe here
+# because these are the SAME addresses that Phase E already read (or
+# that Phase F wrote to). Every offset is aligned + within the ADT-
+# declared size for that block. Widths chosen to (a) cover every
+# known control register we've seen used and (b) stay under the m1n1
+# UART round-trip budget (~64 reads per snapshot = ~50 ms of tx).
+_REACHABLE_SCAN_WINDOWS = (
+    # (attr on ApcieMap, first_off, last_off_exclusive, step)
+    ("rc_base",         0x00, 0x64, 4),   # 25 words: 0..0x60
+    ("phy_common_base", 0x00, 0x44, 4),   # 17 words: 0..0x40
+    # phy_shared uses phy_packed + 0x8000 -- special-cased below.
+    ("phy_shared",      0x00, 0x44, 4),   # 17 words: phy_packed+0x8000..
+    ("axi_base",        0x00, 0x44, 4),   # 17 words: 0..0x40
+)
+
+
+def probe_reachable_scan(apcie, buf, label, timeout=0.3, flush_fn=None):
+    """RUN O: dump a snapshot of every apcie MMIO word we've proven
+    reachable. Purpose: at each Phase F checkpoint, capture a full
+    row of state so cross-checkpoint diffs surface any bit that
+    toggled -- e.g. a phy_ip 'pll_locked' or 'phy_ready' status
+    reflected in rc_base, phy_common, or phy_shared.
+
+    RUN J observed phy_ip's fault mode flip from silent-AXI-stall to
+    Exception: SYNC after applying cio3pllcore + pcieclkgen to
+    rc_base. Something in those 8 writes changes reachable state;
+    this probe locates that change without ever touching phy_ip.
+    Since every window and every offset here is proven reachable
+    (Phase E confirmed rc/axi; step 5 wrote phy_common tunables;
+    steps 6.a-6.f wrote phy_shared), this probe cannot wedge.
+    """
+    buf.write(f"  [reachable-scan @ {label}]\n")
+    if flush_fn is not None:
+        flush_fn(f"phaseF.diag.{label}.reachable-scan-enter")
+    for attr, first, last, step in _REACHABLE_SCAN_WINDOWS:
+        # phy_shared_base isn't a field on ApcieMap; compute from
+        # phy_packed_base + 0x8000 (matches pcie.c:394).
+        if attr == "phy_shared":
+            base = apcie.phy_packed_base + 0x8000
+        else:
+            base = getattr(apcie, attr, None)
+            if base is None:
+                buf.write(f"    {attr:16s}: SKIP (attr missing)\n")
+                continue
+        buf.write(f"    {attr:16s} base=0x{base:x}:\n")
+        try:
+            exc_before = p.get_exc_count()
+        except Exception as e:
+            buf.write(f"      pre exc_count failed: "
+                      f"{e.__class__.__name__}: {e}; SKIP\n")
+            continue
+        stall = False
+        line = "      "
+        col = 0
+        for off in range(first, last, step):
+            addr = base + off
+            val = None
+            with guarded(buf, f"reachable-scan.{attr}+0x{off:02x}",
+                         short_timeout=timeout):
+                try:
+                    val = p.read32(addr)
+                except Exception:
+                    val = None
+            alive, delta = check_alive_fast(exc_before, timeout=timeout)
+            if not alive:
+                buf.write(line.rstrip() + "\n"
+                          if line.strip() else "")
+                buf.write(f"      AXI_STALL at +0x{off:02x} "
+                          f"(0x{addr:x}); ABORT window\n")
+                stall = True
+                break
+            exc_before += delta
+            if val is None:
+                cell = f"+0x{off:02x}=SLV      "
+            elif delta:
+                cell = f"+0x{off:02x}=E{delta:d}       "[:16]
+            else:
+                cell = f"+0x{off:02x}=0x{val:08x} "
+            line += cell
+            col += 1
+            if col == 4:
+                buf.write(line.rstrip() + "\n")
+                line = "      "
+                col = 0
+        if not stall and col:
+            buf.write(line.rstrip() + "\n")
+        if flush_fn is not None:
+            flush_fn(f"phaseF.diag.{label}.reachable-scan.{attr}")
+    if flush_fn is not None:
+        flush_fn(f"phaseF.diag.{label}.reachable-scan-done")
+
+
 def probe_pmgr_explore(u, buf, name_patterns=("PCIE", "PHY", "APCIE",
                                               "ANS", "DART_APCIE")):
     """Enumerate every PMGR gate in the SoC, filter by name (case-
@@ -2258,6 +2351,7 @@ _PHY_IP_DIAG_CHECKPOINTS = (
     "post-6.f.T8140-marker",
     "post-7.phycmn-early",      # RUN I: right after --phycmn-early's step-7 write
     "post-6.i.phy4-x10-early",  # RUN L: right after --phy4-x10-early's phy_base+4=0x10
+    "none",                     # RUN O sentinel: no phy_ip probe at any label
 )
 
 # APCIE_PHY_CTRL bit layout -- m1n1/src/pcie.c:38-43.
@@ -2295,7 +2389,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               phyif_ctrl_run=False,
                               phycmn_early=False,
                               phy4_x10_early=False,
-                              extra_tunables_only="both"):
+                              extra_tunables_only="both",
+                              reachable_scan=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -2418,19 +2513,28 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     def diag(label):
         """No-op unless --phy-ip-diag. At each Phase F checkpoint:
           1. phy_common+0 read -- safe alive check, always runs.
-          2. phy_ip+0 read -- runs ONLY at phy_ip_diag_at (default
+          2. reachable-scan of rc/phy_common/phy_shared/axi windows
+             -- runs at EVERY checkpoint iff --reachable-scan is
+             set. RUN O uses this for cross-checkpoint state diffs.
+             Reads only proven-reachable addresses; cannot wedge.
+          3. phy_ip+0 read -- runs ONLY at phy_ip_diag_at (default
              post-6.f.T8140-marker). RUN E proved any phy_ip read
              against unclocked hardware permanently wedges m1n1
              (AXI bus stall, not SYNC), so exactly one phy_ip
              data point per boot. Bisect across runs by re-running
-             with different --phy-ip-diag-at values.
+             with different --phy-ip-diag-at values. Use
+             --phy-ip-diag-at=none to skip the phy_ip probe
+             entirely (RUN O -- see reachable-scan instead).
 
-        Flushes after both so a wedge leaves the log ending at the
+        Flushes after each so a wedge leaves the log ending at the
         exact checkpoint that broke."""
         if not phy_ip_diag:
             return
         probe_phy_common_reachability(apcie, buf, label,
                                        timeout=timeout, flush_fn=_flush)
+        if reachable_scan:
+            probe_reachable_scan(apcie, buf, label,
+                                  timeout=timeout, flush_fn=_flush)
         if label == phy_ip_diag_at:
             probe_phy_ip_reachability(apcie, buf, label,
                                        timeout=timeout, flush_fn=_flush)
@@ -3791,6 +3895,26 @@ def main():
                          "T8140 marker AND the T81XX RUN. rc_base is "
                          "proven reachable throughout Phase F, so low "
                          "wedge risk. Requires --t8140-replay.")
+    ap.add_argument("--reachable-scan", action="store_true",
+                    help="RUN O: at each Phase F diag checkpoint, "
+                         "dump 4-byte read snapshots of the four "
+                         "apcie MMIO blocks Phase E has proven "
+                         "reachable (rc_base +0..0x60, phy_common "
+                         "+0..0x40, phy_shared +0..0x40, axi_base "
+                         "+0..0x40). Purpose: capture the full "
+                         "reachable state before and after step 5.5 "
+                         "extra-tunables (or any other checkpoint), "
+                         "so a cross-checkpoint diff reveals any bit "
+                         "that toggled. RUN J proved rc_base writes "
+                         "flip phy_ip's fault mode from silent stall "
+                         "to Exception: SYNC without ever touching "
+                         "phy_ip -- this scan locates the toggled "
+                         "bits. Every read target is proven "
+                         "reachable, so this cannot wedge. Pair "
+                         "with --phy-ip-diag-at=none to skip the "
+                         "phy_ip probe entirely and let the RUN "
+                         "complete regardless of phy_ip state. "
+                         "Requires --phy-ip-diag --t8140-replay.")
     ap.add_argument("--phy-ip-diag", action="store_true",
                     help="Phase F diagnostic sweep: probe "
                          "read32(phy_ip_base+0) at 6 points in Phase F "
@@ -3975,6 +4099,7 @@ def main():
                     f"phy4_x10_early={args.phy4_x10_early}, "
                     f"phy_ip_diag={args.phy_ip_diag}, "
                     f"phy_ip_diag_at={args.phy_ip_diag_at!r}, "
+                    f"reachable_scan={args.reachable_scan}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
@@ -3985,7 +4110,8 @@ def main():
                         phy_ip_diag_at=args.phy_ip_diag_at,
                         phyif_ctrl_run=args.phyif_ctrl_run,
                         phycmn_early=args.phycmn_early,
-                        phy4_x10_early=args.phy4_x10_early),
+                        phy4_x10_early=args.phy4_x10_early,
+                        reachable_scan=args.reachable_scan),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:

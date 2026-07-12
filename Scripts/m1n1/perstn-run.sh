@@ -43,6 +43,16 @@
 #            alone is sufficient). Reuses --extra-tunables-only from
 #            the RUN M framework -- dispatcher-only change.
 #
+#   RUN O -- --extra-tunables (both) + --reachable-scan + --phy-ip-
+#            diag-at=none. RUN O is wedge-immune: it dumps 4-byte
+#            read snapshots of rc_base +0..0x60, phy_common +0..0x40,
+#            phy_shared +0..0x40, axi_base +0..0x40 at EVERY Phase F
+#            diag checkpoint, and never reads phy_ip. Purpose: find
+#            the reachable bit(s) that toggle when RUN J's rc_base
+#            writes flip phy_ip's fault mode. Diff pre vs post 5.5
+#            checkpoints identifies status bits (pll_locked,
+#            phy_ready, etc.) we've been blind to.
+#
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
 # so the log always contains the full Phase 0..F trail. What differs
@@ -116,8 +126,20 @@ case "${RUN^^}" in
                --extra-tunables-only=pcieclkgen
                --phy-ip-diag-at=post-5.5.extra-tunables)
         ;;
+    O)
+        # RUN O: wedge-immune diff snapshot. Apply full extra-tunables
+        # (both cio3pllcore + pcieclkgen). Never probe phy_ip -- the
+        # sentinel 'none' checkpoint skips it. Instead --reachable-scan
+        # takes 4-byte snapshots of rc/phy_common/phy_shared/axi at
+        # every Phase F diag checkpoint. Cross-checkpoint diff surfaces
+        # the reachable bits toggled by the extra-tunables writes.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --extra-tunables
+               --reachable-scan
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
