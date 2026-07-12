@@ -36,6 +36,13 @@
 #            If it silent-stalls, cio3pllcore is not the trigger --
 #            proceed to RUN N.
 #
+#   RUN N -- --extra-tunables restricted to apcie-pcieclkgen-tunables
+#            only (1 write, rc_base+0 mask 0x3e0 <- 0x220). Complement
+#            of RUN M. Between RUNs M and N exactly one identifies
+#            the fault-mode flipper (or both do, indicating either
+#            alone is sufficient). Reuses --extra-tunables-only from
+#            the RUN M framework -- dispatcher-only change.
+#
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
 # so the log always contains the full Phase 0..F trail. What differs
@@ -98,8 +105,19 @@ case "${RUN^^}" in
                --extra-tunables-only=cio3pllcore
                --phy-ip-diag-at=post-5.5.extra-tunables)
         ;;
+    N)
+        # RUN N: complement of RUN M. Apply only the 1-entry pcieclkgen
+        # prop (rc_base+0 mask 0x3e0 <- 0x220), skip cio3pllcore. Same
+        # checkpoint as M/J so all three logs sit at the same probe
+        # site and the fault mode differences (silent / SYNC) surface
+        # cleanly on side-by-side comparison.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --extra-tunables
+               --extra-tunables-only=pcieclkgen
+               --phy-ip-diag-at=post-5.5.extra-tunables)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
