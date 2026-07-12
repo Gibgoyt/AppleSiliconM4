@@ -60,6 +60,11 @@ case "${RUN^^}" in
                --phycmn-early
                --phy-ip-diag-at=post-7.phycmn-early)
         ;;
+    J)
+        FLAGS=("${BASE_FLAGS[@]}"
+               --extra-tunables
+               --phy-ip-diag-at=post-5.5.extra-tunables)
+        ;;
     *)
         echo "usage: $0 {I|J|K|L} [extra perstn.py args...]" >&2
         echo "" >&2
