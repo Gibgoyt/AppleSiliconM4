@@ -1947,6 +1947,73 @@ def probe_phy_common_reachability(apcie, buf, label, timeout=0.3,
         buf.write(f"    REACHABLE: val=0x{val:x} (delta=0)\n")
 
 
+# RUN P: phy_ip write-probe target. First entry in apcie-phy-ip-pll-
+# tunables is at phy_ip_base + 0x38 (shared slice, mask 0x10000000).
+# We do a naked posted-write of 0 there; if phy_ip is on-fabric but
+# reset-asserted (as RUN J's SYNC-abort suggested), the write is
+# accepted and dropped. If phy_ip is fully unmapped/unclocked, the
+# posted write either drops silently (indistinguishable from success
+# from our side) or hangs the fabric like a read. Alive check
+# afterwards decides: alive -> phy_ip decodes writes, next lever is
+# a controlled write sequence via the tunable applicator (once we
+# find a way to bypass its RMW read); dead -> phy_ip is truly gated
+# and the ungate is upstream of any write.
+_PHY_IP_WRITE_PROBE_OFFSET = 0x38
+
+
+def probe_phy_ip_write_probe(apcie, buf, label, timeout=0.3,
+                              flush_fn=None):
+    """RUN P: naked posted-write of 0 to phy_ip_base + 0x38. Guarded,
+    alive-checked. Never does a read of phy_ip -- read is what has
+    stalled the fabric every RUN A-N.
+
+    Result vocabulary:
+        WROTE   -- posted write returned + alive check passed +
+                   exc_delta == 0. phy_ip is on-fabric for writes
+                   even if reads still fail. Follow-up: apply full
+                   pll+auspma tunables (but note the C-side applier
+                   does read-modify-write; may still stall on the
+                   internal read).
+        SYNC    -- exc_delta > 0. Fabric decoded the write and
+                   returned an error. Different from stall: the
+                   error path completed. Follow-up: identify the
+                   error class.
+        STALL   -- alive check failed after write. Posted writes
+                   don't normally stall unless the fabric is dead;
+                   this means the write path itself is unmapped.
+    """
+    addr = apcie.phy_ip_base + _PHY_IP_WRITE_PROBE_OFFSET
+    buf.write(f"  [phy-ip-write-probe @ {label}] "
+              f"write32(0x{addr:x}, 0) [phy_ip + 0x{_PHY_IP_WRITE_PROBE_OFFSET:02x}]:\n")
+    if flush_fn is not None:
+        flush_fn(f"phaseF.diag.{label}.phy-ip-write-enter")
+    try:
+        exc_before = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"    ERROR: pre exc_count failed: "
+                  f"{e.__class__.__name__}: {e}\n")
+        return
+    raised = None
+    with guarded(buf, f"phy-ip-write.{label}", short_timeout=timeout):
+        try:
+            p.write32(addr, 0)
+        except Exception as e:
+            raised = e
+    if raised is not None:
+        buf.write(f"    RAISED: {raised.__class__.__name__}: {raised}\n")
+        return
+    alive, delta = check_alive_fast(exc_before, timeout=timeout)
+    if not alive:
+        buf.write(f"    STALL: m1n1 UNRESPONSIVE after posted write\n")
+        return
+    if delta:
+        buf.write(f"    SYNC: fabric decoded write and errored, "
+                  f"delta={delta}\n")
+        return
+    buf.write(f"    WROTE: posted write completed (delta=0). phy_ip "
+              f"is on-fabric for writes.\n")
+
+
 # RUN O windows -- the four apcie MMIO blocks that Phase E + every
 # Phase F step to date have proven reachable. Read scan is safe here
 # because these are the SAME addresses that Phase E already read (or
@@ -2390,7 +2457,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               phycmn_early=False,
                               phy4_x10_early=False,
                               extra_tunables_only="both",
-                              reachable_scan=False):
+                              reachable_scan=False,
+                              phy_ip_write_probe=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -2536,8 +2604,18 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
             probe_reachable_scan(apcie, buf, label,
                                   timeout=timeout, flush_fn=_flush)
         if label == phy_ip_diag_at:
-            probe_phy_ip_reachability(apcie, buf, label,
-                                       timeout=timeout, flush_fn=_flush)
+            if phy_ip_write_probe:
+                # RUN P: naked posted write instead of read. Read
+                # has stalled every RUN A-N. Write path may still
+                # be reachable if RUN J's SYNC signal really means
+                # 'reset-asserted-but-decoded'.
+                probe_phy_ip_write_probe(apcie, buf, label,
+                                          timeout=timeout,
+                                          flush_fn=_flush)
+            else:
+                probe_phy_ip_reachability(apcie, buf, label,
+                                           timeout=timeout,
+                                           flush_fn=_flush)
         _flush(f"phaseF.diag.{label}")
 
     def step(label, fn):
@@ -3895,6 +3973,21 @@ def main():
                          "T8140 marker AND the T81XX RUN. rc_base is "
                          "proven reachable throughout Phase F, so low "
                          "wedge risk. Requires --t8140-replay.")
+    ap.add_argument("--phy-ip-write-probe", action="store_true",
+                    help="RUN P: at --phy-ip-diag-at swap the phy_ip "
+                         "read probe for a naked posted write32 to "
+                         "phy_ip_base + 0x38 (first pll tunable "
+                         "target). Every RUN A-N stalled on the "
+                         "first phy_ip READ. RUN J's Exception: "
+                         "SYNC at the read hinted phy_ip is on the "
+                         "fabric but errors internally; a naked "
+                         "posted write bypasses read stalls. Result "
+                         "WROTE means phy_ip is write-reachable "
+                         "even if reads stall -- next lever is a "
+                         "controlled write sequence via the tunable "
+                         "applicator. Result STALL/SYNC ties phy_ip "
+                         "access dead in both directions. Requires "
+                         "--phy-ip-diag --t8140-replay.")
     ap.add_argument("--reachable-scan", action="store_true",
                     help="RUN O: at each Phase F diag checkpoint, "
                          "dump 4-byte read snapshots of the four "
@@ -4100,6 +4193,7 @@ def main():
                     f"phy_ip_diag={args.phy_ip_diag}, "
                     f"phy_ip_diag_at={args.phy_ip_diag_at!r}, "
                     f"reachable_scan={args.reachable_scan}, "
+                    f"phy_ip_write_probe={args.phy_ip_write_probe}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
@@ -4111,7 +4205,8 @@ def main():
                         phyif_ctrl_run=args.phyif_ctrl_run,
                         phycmn_early=args.phycmn_early,
                         phy4_x10_early=args.phy4_x10_early,
-                        reachable_scan=args.reachable_scan),
+                        reachable_scan=args.reachable_scan,
+                        phy_ip_write_probe=args.phy_ip_write_probe),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:

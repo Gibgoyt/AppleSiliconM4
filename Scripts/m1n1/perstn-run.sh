@@ -53,6 +53,17 @@
 #            checkpoints identifies status bits (pll_locked,
 #            phy_ready, etc.) we've been blind to.
 #
+#   RUN P -- --extra-tunables (both) + --phy-ip-write-probe + --phy-
+#            ip-diag-at=post-5.5.extra-tunables. Same RUN J setup,
+#            but the destructive probe at post-5.5.extra-tunables
+#            is replaced with a naked posted write32 of 0 to phy_ip
+#            + 0x38 (first pll tunable target). Read stalled RUN J
+#            with SYNC; a posted write bypasses that. WROTE means
+#            phy_ip decodes writes even if reads stall -- next
+#            hypothesis: sequence the pll tunable writes via naked
+#            write32 (not the RMW applicator) to see whether phy_ip
+#            transitions to a state where reads succeed.
+#
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
 # so the log always contains the full Phase 0..F trail. What differs
@@ -138,8 +149,19 @@ case "${RUN^^}" in
                --reachable-scan
                --phy-ip-diag-at=none)
         ;;
+    P)
+        # RUN P: same setup as RUN J (both extra-tunables applied),
+        # but replace the destructive phy_ip read probe at post-5.5.
+        # extra-tunables with a naked posted write32 of 0 to phy_ip
+        # + 0x38. Diagnoses whether phy_ip is on-fabric for writes
+        # even in the RUN J state where reads SYNC-abort.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --extra-tunables
+               --phy-ip-write-probe
+               --phy-ip-diag-at=post-5.5.extra-tunables)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
