@@ -18,10 +18,18 @@ Shared (indices 0..6):
                                                      (apcie-phy-ip-* tunables
                                                      land here)
     [4] AXI          0x496000000   sz 0x1000000    -- AXI2AF fabric registers
-    [5] AXI subrange 0x495046200   sz 0x4000       -- purpose unknown, sits
-                                                     inside AXI window
-    [6] AXI subrange 0x495044000   sz 0x4000       -- purpose unknown, sits
-                                                     inside AXI window
+    [5] AXI subrange 0x495046200   sz 0x4000       -- purpose unknown; NOT
+                                                     inside axi_base (reg[4])
+                                                     -- separate 0x495xxxxxxx
+                                                     AXI window. RUN R
+                                                     candidate for CIO3 PLL
+                                                     Core target.
+    [6] AXI subrange 0x495044000   sz 0x4000       -- purpose unknown; NOT
+                                                     inside axi_base (reg[4])
+                                                     -- separate 0x495xxxxxxx
+                                                     AXI window. RUN R
+                                                     candidate for CIO3 PLL
+                                                     Core target.
 
 Per-port (6 entries each, indices 7..24; N = 0/1/2):
     [0] port_base       0x49N028000  sz 0x8000     -- port controller regs
@@ -235,6 +243,15 @@ class ApcieMap:
         self.axi_base = self.axi_size = 0
         self.axi_sub5_base = self.axi_sub5_size = 0   # reg[5]  0x495046200
         self.axi_sub6_base = self.axi_sub6_size = 0   # reg[6]  0x495044000
+        # RUN R first-touch guards. Set to True by probe_naked_write_test
+        # after a successful pre-read of the sub-block; consumed by
+        # probe_reachable_scan to gate whether the sub-block is included
+        # in the recurring scan set. Neither reg[5] nor reg[6] has been
+        # touched by any RUN <=Q, so the first read is a genuine first-
+        # touch and can AXI-stall. Guarding keeps early-checkpoint scans
+        # (F.entry, post-1.pmgr) safe.
+        self.axi_sub5_reachable = False
+        self.axi_sub6_reachable = False
         # Derived shared bases (match m1n1 t8140 path after the +0x8000 /
         # +0x4000 correction at pcie.c:394).
         self.phy_common_base = 0     # phy_packed + 0x4000
@@ -419,10 +436,10 @@ class ApcieMap:
                   f"sz 0x{self.axi_size:x}\n")
         out.write(f"  axi_sub5        = 0x{self.axi_sub5_base:x} "
                   f"sz 0x{self.axi_sub5_size:x}   "
-                  f"(inside AXI window; purpose unknown)\n")
+                  f"(reg[5]; separate 0x495xxxxxxx window; purpose unknown)\n")
         out.write(f"  axi_sub6        = 0x{self.axi_sub6_base:x} "
                   f"sz 0x{self.axi_sub6_size:x}   "
-                  f"(inside AXI window; purpose unknown)\n\n")
+                  f"(reg[6]; separate 0x495xxxxxxx window; purpose unknown)\n\n")
 
         for port in self.ports:
             port.describe(out)

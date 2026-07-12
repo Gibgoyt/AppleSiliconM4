@@ -1965,6 +1965,22 @@ def probe_phy_common_reachability(apcie, buf, label, timeout=0.3,
 #                             search space.
 _NAKED_WRITE_TARGETS = (
     # (block_attr, offset, value_to_write, source_tunable_note)
+    #
+    # RUN R prepends 4 first-touch candidates. Order matters: sub5/sub6
+    # come first so if either AXI-stalls on pre-read the abort happens
+    # before we touch the known-good rc/axi addresses (keeps their log
+    # clean for cross-RUN diff). rc_base+0x54 tests writability at a
+    # rc offset with a non-zero live value (0x140). rc_base+0x100
+    # tests cio3pllcore's last entry, extending our rc_base write
+    # coverage past the +0..0x40 window RUN Q sampled.
+    ("axi_sub5_base", 0x000, 0x00000a01,
+     "RUN R sub5 first-touch: cio3pllcore #0 candidate target A"),
+    ("axi_sub6_base", 0x000, 0x00000a01,
+     "RUN R sub6 first-touch: cio3pllcore #0 candidate target B"),
+    ("rc_base",  0x54,  0xffffffff,
+     "RUN R R/W-bitmask readback at rc_base+0x54 (live=0x140)"),
+    ("rc_base",  0x100, 0x000b40b4,
+     "RUN R cio3pllcore #6 rc_base candidate: mask 0xffffff <- 0xb40b4"),
     ("rc_base",  0x00,  0x00040a01,
      "cio3pllcore #0: mask 0xa0b <- 0xa01 on 0x00040000"),
     ("rc_base",  0x24,  0x00000800,
@@ -1978,10 +1994,22 @@ _NAKED_WRITE_TARGETS = (
 )
 
 
+# RUN R: which naked-write target attrs are gated by a first-touch
+# reachability flag on ApcieMap. When the naked-write pre-read of a
+# gated attr succeeds cleanly (val not None AND alive after read),
+# probe_naked_write_test flips the flag True so downstream reachable-
+# scan calls can safely widen to include the block. All non-gated
+# attrs are assumed reachable (Phase E already proved rc_base/axi_base).
+_NAKED_WRITE_FIRST_TOUCH_ATTRS = {
+    "axi_sub5_base": "axi_sub5_reachable",
+    "axi_sub6_base": "axi_sub6_reachable",
+}
+
+
 def probe_naked_write_test(apcie, buf, timeout=0.3, flush_fn=None):
-    """RUN Q: bypass m1n1's tunables_apply_local RMW and hit the same
-    addresses with naked posted write32(). Read pre AND post each
-    write. Result tags:
+    """RUN Q + RUN R: bypass m1n1's tunables_apply_local RMW and hit
+    the same addresses with naked posted write32(). Read pre AND post
+    each write. Result tags:
         STUCK   -- post == wrote. Fabric accepted the write. m1n1's
                    applicator was silently no-op'ing on this address.
         NO-OP   -- post == pre. Write either dropped or is R/O bits.
@@ -1989,20 +2017,29 @@ def probe_naked_write_test(apcie, buf, timeout=0.3, flush_fn=None):
                    write but only some bits, or bit fields are
                    read-only or hardware-cleared.
 
-    All targets are proven reachable (in RUN O's reachable-scan they
-    all read cleanly). Read/write via naked write32 -- no RMW inside
-    the applicator that could stall on a subtle sub-decoder.
+    RUN Q targets (rc/axi) were all proven reachable in RUN O's
+    reachable-scan. RUN R prepends first-touch targets (axi_sub5+0,
+    axi_sub6+0) that have never been touched by any RUN <=Q -- the
+    pre-read is the first-touch, and check_alive_fast catches an AXI
+    stall before the write step, ABORTing the whole test if that
+    happens. On a clean pre-read, the corresponding
+    apcie.axi_subN_reachable flag is flipped True so
+    probe_reachable_scan can safely widen its scan set.
 
     A per-target flush before/after so a wedge (should not happen)
     leaves us knowing exactly which address was in flight.
     """
-    buf.write("=== RUN Q naked-write test ===\n")
+    buf.write("=== naked-write test (RUN Q base + RUN R extensions) ===\n")
     buf.write("purpose: determine whether writes to rc_base/axi_base\n"
               "actually stick when we bypass m1n1 tunables_apply_local.\n"
               "RUN O's reachable-scan showed the applicator's writes\n"
               "to these blocks silently no-op'd; naked writes here\n"
               "answer whether the applicator is broken (writes will\n"
-              "stick) or the fabric drops all writes (they won't).\n\n")
+              "stick) or the fabric drops all writes (they won't).\n"
+              "RUN R adds first-touch probes for axi_sub5/sub6\n"
+              "(candidate CIO3 PLL Core target blocks) plus\n"
+              "additional rc_base offsets (0x54 R/W bitmap, 0x100\n"
+              "cio3pllcore #6 candidate).\n\n")
     if flush_fn is not None:
         flush_fn("phaseF.naked-write.enter")
     try:
@@ -2040,6 +2077,16 @@ def probe_naked_write_test(apcie, buf, timeout=0.3, flush_fn=None):
                 flush_fn(f"phaseF.naked-write.stall.pre.{tag}")
             return
         exc_running += delta
+
+        # RUN R: on a clean pre-read of a first-touch-gated block, flip
+        # the reachability flag so subsequent probe_reachable_scan calls
+        # can widen to include this attr. Skipped if the read raised or
+        # returned None.
+        flag_attr = _NAKED_WRITE_FIRST_TOUCH_ATTRS.get(block_attr)
+        if flag_attr is not None and pre_val is not None:
+            setattr(apcie, flag_attr, True)
+            buf.write(f"    first-touch OK: {flag_attr}=True "
+                      f"(reachable-scan will include {block_attr})\n")
 
         # write
         if flush_fn is not None:
@@ -2179,7 +2226,24 @@ _REACHABLE_SCAN_WINDOWS = (
     # phy_shared uses phy_packed + 0x8000 -- special-cased below.
     ("phy_shared",      0x00, 0x44, 4),   # 17 words: phy_packed+0x8000..
     ("axi_base",        0x00, 0x44, 4),   # 17 words: 0..0x40
+    # RUN R: sub5/sub6 windows. Gated by first-touch flags set in
+    # probe_naked_write_test. Before that flag flips (F.entry,
+    # post-1.pmgr, post-5.phy-tunables) the scan skips these blocks;
+    # after (post-5.75 onward), it includes them so we can see whether
+    # writes to them stick, whether they carry register-like state,
+    # and whether that state changes across checkpoints.
+    ("axi_sub5_base",   0x00, 0x44, 4),   # 17 words: 0..0x40 (guarded)
+    ("axi_sub6_base",   0x00, 0x44, 4),   # 17 words: 0..0x40 (guarded)
 )
+
+
+# RUN R: which scan attrs require a first-touch flag on ApcieMap to be
+# True before the block is included in a scan. Parallels
+# _NAKED_WRITE_FIRST_TOUCH_ATTRS but keyed by the scan-window attr name.
+_REACHABLE_SCAN_FIRST_TOUCH_GATES = {
+    "axi_sub5_base": "axi_sub5_reachable",
+    "axi_sub6_base": "axi_sub6_reachable",
+}
 
 
 def probe_reachable_scan(apcie, buf, label, timeout=0.3, flush_fn=None):
@@ -2201,6 +2265,15 @@ def probe_reachable_scan(apcie, buf, label, timeout=0.3, flush_fn=None):
     if flush_fn is not None:
         flush_fn(f"phaseF.diag.{label}.reachable-scan-enter")
     for attr, first, last, step in _REACHABLE_SCAN_WINDOWS:
+        # RUN R: skip windows whose block hasn't passed first-touch
+        # reachability yet. Prevents F.entry / post-1.pmgr scans from
+        # blindly reading axi_sub5/sub6 before we know they decode.
+        gate_flag = _REACHABLE_SCAN_FIRST_TOUCH_GATES.get(attr)
+        if gate_flag is not None and not getattr(apcie, gate_flag, False):
+            buf.write(f"    {attr:16s}: SKIP "
+                      f"(not first-touch verified; {gate_flag}=False)\n")
+            continue
+
         # phy_shared_base isn't a field on ApcieMap; compute from
         # phy_packed_base + 0x8000 (matches pcie.c:394).
         if attr == "phy_shared":

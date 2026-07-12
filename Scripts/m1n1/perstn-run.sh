@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R} [extra perstn.py args...]
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -75,6 +75,23 @@
 #            this block), or PARTIAL. --reachable-scan snapshots
 #            state at every checkpoint so we can see how naked
 #            writes propagate. No phy_ip touches.
+#
+#   RUN R -- same flag set as RUN Q, but the naked-write and reachable-
+#            scan targets have been widened at the source (perstn.py's
+#            _NAKED_WRITE_TARGETS + _REACHABLE_SCAN_WINDOWS). Hunts
+#            for the cio3pllcore target block by first-touch probing
+#            axi_sub5 (reg[5], 0x495046200) and axi_sub6 (reg[6],
+#            0x495044000). Both fit cio3pllcore's max_off=0x100. Also
+#            adds rc_base+0x54 (R/W bitmap readback at a known-live
+#            offset) and rc_base+0x100 (cio3pllcore #6 candidate on
+#            rc_base). Reachable-scan is first-touch-gated for
+#            sub5/sub6 so early checkpoints stay safe. Analyzes the
+#            log to decide RUN S: if sub5 or sub6 is writable, RUN S
+#            applies cio3pllcore + pcieclkgen there via naked mask-
+#            RMW; if not, RUN S falls back to the full 58-entry
+#            axi2af naked mask-RMW apply (bypassing the broken
+#            applicator that RUN Q showed is silently no-op'ing on
+#            reg_idx=4).
 #
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
@@ -184,8 +201,21 @@ case "${RUN^^}" in
                --reachable-scan
                --phy-ip-diag-at=none)
         ;;
+    R)
+        # RUN R: same flag set as RUN Q; the widening happens at the
+        # source (perstn.py's _NAKED_WRITE_TARGETS gains sub5+0/sub6+0
+        # first-touch probes plus rc_base+0x54/+0x100; the reachable
+        # scan gains sub5/sub6 windows, gated by the first-touch flags
+        # set inside probe_naked_write_test). No CLI-flag change vs
+        # RUN Q -- the letter selects the widened target set at build
+        # time.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test
+               --reachable-scan
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
