@@ -2294,7 +2294,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               phy_ip_diag_at="post-6.f.T8140-marker",
                               phyif_ctrl_run=False,
                               phycmn_early=False,
-                              phy4_x10_early=False):
+                              phy4_x10_early=False,
+                              extra_tunables_only="both"):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -2687,11 +2688,25 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     # Hypothesis: cio3pllcore + pcieclkgen provide the reference clock
     # phy_ip needs. Without them, step 6.g's mask32 at phy_ip_base+0x38
     # AXI-stalls (observed 2026-07-11).
+    #
+    # RUN M/N: --extra-tunables-only=cio3pllcore or =pcieclkgen filters
+    # the loop to one prop only. RUN J observed both applied at once
+    # flipped phy_ip fault mode from silent AXI-stall to Exception:
+    # SYNC. Bisect: whichever prop alone reproduces the SYNC is the
+    # smaller target for further per-entry bisection.
     if extra_tunables:
-        for step_id, prop in [
-            ("5.5.a", "apcie-cio3pllcore-tunables"),
-            ("5.5.b", "apcie-pcieclkgen-tunables"),
-        ]:
+        _extra_list = [
+            ("5.5.a", "apcie-cio3pllcore-tunables", "cio3pllcore"),
+            ("5.5.b", "apcie-pcieclkgen-tunables",  "pcieclkgen"),
+        ]
+        if extra_tunables_only != "both":
+            _extra_list = [e for e in _extra_list
+                           if e[2] == extra_tunables_only]
+            buf.write(f"  --- 5.5.extra-tunables bisection filter "
+                      f"({extra_tunables_only}): "
+                      f"{len(_extra_list)} of 2 props kept ---\n")
+            _flush(f"phaseF.5.5.filter.{extra_tunables_only}")
+        for step_id, prop, _key in _extra_list:
             entries = apcie.apcie_tunables(u, prop)
             if not entries:
                 apcie.phaseF_last_step = f"{step_id}.{prop}.absent"
@@ -3715,6 +3730,21 @@ def main():
                          "on t8132 they may be the missing PCIe clock / "
                          "PLL setup that ungates phy_ip. Requires "
                          "--t8140-replay.")
+    ap.add_argument("--extra-tunables-only",
+                    choices=("cio3pllcore", "pcieclkgen", "both"),
+                    default="both",
+                    help="RUN M/N bisection: apply ONE of the two "
+                         "--extra-tunables props, not both. RUN J "
+                         "(both applied) flipped phy_ip's fault mode "
+                         "from silent AXI-stall to Exception: SYNC "
+                         "-- one of the 8 writes is the trigger. "
+                         "cio3pllcore -> RUN M (7 writes to rc_base+"
+                         "{0,0x24,0x28,0x38,0x4c,0xe8,0x100}); "
+                         "pcieclkgen -> RUN N (1 write to rc_base+0 "
+                         "mask 0x3e0 <- 0x220). Whichever alone "
+                         "reproduces the SYNC identifies the smaller "
+                         "target for per-entry bisection. Requires "
+                         "--extra-tunables --t8140-replay.")
     ap.add_argument("--phycmn-first", action="store_true",
                     help="Phase F ordering experiment: apply step 7 "
                          "(phy_common CLK MODE=ON) BEFORE step 6.a "
@@ -3939,6 +3969,7 @@ def main():
             if args.t8140_replay:
                 log("Phase F: T8140 controller-init replay (pcie.c)"
                     f" [extra_tunables={args.extra_tunables}, "
+                    f"extra_tunables_only={args.extra_tunables_only!r}, "
                     f"phycmn_first={args.phycmn_first}, "
                     f"phycmn_early={args.phycmn_early}, "
                     f"phy4_x10_early={args.phy4_x10_early}, "
@@ -3948,6 +3979,7 @@ def main():
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
                         extra_tunables=args.extra_tunables,
+                        extra_tunables_only=args.extra_tunables_only,
                         phycmn_first=args.phycmn_first,
                         phy_ip_diag=args.phy_ip_diag,
                         phy_ip_diag_at=args.phy_ip_diag_at,

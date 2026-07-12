@@ -28,6 +28,14 @@
 #            whether this write, which T8140 skips entirely, is
 #            the phy_ip ungate on t8132.
 #
+#   RUN M -- --extra-tunables restricted to apcie-cio3pllcore-tunables
+#            only (7 writes to rc_base). Bisection of RUN J: which of
+#            cio3pllcore or pcieclkgen flipped phy_ip's fault mode
+#            from silent-AXI-stall to Exception: SYNC. If RUN M sees
+#            the SYNC, cio3pllcore is the trigger (small-N follow-up).
+#            If it silent-stalls, cio3pllcore is not the trigger --
+#            proceed to RUN N.
+#
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
 # so the log always contains the full Phase 0..F trail. What differs
@@ -80,8 +88,18 @@ case "${RUN^^}" in
                --phy4-x10-early
                --phy-ip-diag-at=post-6.i.phy4-x10-early)
         ;;
+    M)
+        # RUN M: bisect RUN J's SYNC trigger. Apply only the 7-entry
+        # cio3pllcore prop, skip the 1-entry pcieclkgen prop. Probe
+        # phy_ip at the same checkpoint as RUN J so the fault mode
+        # (silent stall vs SYNC) is directly comparable.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --extra-tunables
+               --extra-tunables-only=cio3pllcore
+               --phy-ip-diag-at=post-5.5.extra-tunables)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
