@@ -740,3 +740,5 @@ SKIPPED: p.pcie_init() raised -- m1n1 is not responding.
 === enable NIC ===
 No class-0x02 device found.
 ```
+**WEDGES RIGHT HERE!!**
+**WEDGES RIGHT HERE!!**

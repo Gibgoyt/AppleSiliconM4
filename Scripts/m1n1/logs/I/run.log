@@ -239,3 +239,5 @@ Starting endpoint #0x20 (smcep)
 [pcie_up] [flush:phaseF.diag.post-7.phycmn-early.phy-ip-enter] wrote partial log (42942 bytes) to /tmp/m4-recon/nic-runtime.txt
 
 
+**WEDGES RIGHT HERE!!**
+**WEDGES RIGHT HERE!!**
