@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S} [extra perstn.py args...]
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -92,6 +92,22 @@
 #            axi2af naked mask-RMW apply (bypassing the broken
 #            applicator that RUN Q showed is silently no-op'ing on
 #            reg_idx=4).
+#
+#   RUN S -- --naked-write-test + --axi2af-naked-apply +
+#            --pcieclkgen-naked-apply-to=axi_sub5_base +
+#            --reachable-scan + --phy-ip-diag-at=none. Applies the
+#            full 58-entry apcie-axi2af-tunables to axi_base via
+#            naked mask-RMW (bypassing m1n1's applicator, which
+#            RUN Q showed silently no-ops at reg_idx=4). Follows
+#            with the 1-entry apcie-pcieclkgen-tunables applied to
+#            axi_sub5 (RUN R identified sub5 as the CIO3 PLL Core
+#            target block). cio3pllcore is skipped because RUN R
+#            showed sub5 already carries cio3pllcore #0..#3 in the
+#            reset state (re-applying would be a no-op). Success
+#            criterion: step 6.g stops wedging at phy_ip_base+0x38.
+#            The reachable-scan captures state at post-5.8.a
+#            (post-axi2af) and post-5.8.b (post-pcieclkgen) so
+#            cross-checkpoint diff shows what those writes toggled.
 #
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
@@ -214,8 +230,23 @@ case "${RUN^^}" in
                --reachable-scan
                --phy-ip-diag-at=none)
         ;;
+    S)
+        # RUN S: naked mask-RMW apply of axi2af to axi_base +
+        # pcieclkgen to axi_sub5. --naked-write-test still runs first
+        # so its sub5 pre-read flips axi_sub5_reachable=True (which
+        # step 5.8.b requires before applying pcieclkgen). Cio3pllcore
+        # is deliberately skipped because RUN R showed sub5 already
+        # holds cio3pllcore #0..#3 in reset state -- re-applying is a
+        # no-op. Success criterion: 6.g no longer wedges.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test
+               --axi2af-naked-apply
+               --pcieclkgen-naked-apply-to=axi_sub5_base
+               --reachable-scan
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
