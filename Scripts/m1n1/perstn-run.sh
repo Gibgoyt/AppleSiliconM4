@@ -64,6 +64,18 @@
 #            write32 (not the RMW applicator) to see whether phy_ip
 #            transitions to a state where reads succeed.
 #
+#   RUN Q -- --naked-write-test + --reachable-scan + --phy-ip-diag-
+#            at=none. Wedge-immune bisection of RUN O's finding that
+#            the m1n1 tunable applicator's writes to rc_base and
+#            axi_base do NOT visibly change register state. Skips
+#            --extra-tunables and does naked posted write32 to each
+#            target address instead, with pre + post reads. Result
+#            tags per target: STUCK (write took effect, m1n1
+#            applicator is broken), NO-OP (fabric drops writes to
+#            this block), or PARTIAL. --reachable-scan snapshots
+#            state at every checkpoint so we can see how naked
+#            writes propagate. No phy_ip touches.
+#
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
 # so the log always contains the full Phase 0..F trail. What differs
@@ -160,8 +172,20 @@ case "${RUN^^}" in
                --phy-ip-write-probe
                --phy-ip-diag-at=post-5.5.extra-tunables)
         ;;
+    Q)
+        # RUN Q: naked-write bisection. Do NOT apply extra-tunables.
+        # After step 5, do a naked write32 to each rc_base/axi_base
+        # tunable target with the value the tunable would have set,
+        # then read back. --reachable-scan gives us full state at
+        # every checkpoint. --phy-ip-diag-at=none skips phy_ip -- this
+        # RUN completes cleanly regardless of phy_ip state.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test
+               --reachable-scan
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

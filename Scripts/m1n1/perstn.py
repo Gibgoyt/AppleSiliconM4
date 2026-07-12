@@ -1947,6 +1947,157 @@ def probe_phy_common_reachability(apcie, buf, label, timeout=0.3,
         buf.write(f"    REACHABLE: val=0x{val:x} (delta=0)\n")
 
 
+# RUN Q naked-write bisection targets. Each entry is (block, offset,
+# value_to_write, source_tunable_note). These are the addresses that
+# m1n1's tunables_apply_local wrote to during Phase F step 2 (axi2af)
+# and step 5.5 (cio3pllcore + pcieclkgen), whose values RUN O's
+# reachable-scan showed did NOT change (writes silently no-op'd).
+# Values are the exact write value each tunable was supposed to land
+# per RUN I's tunables recon report. RUN Q writes them naked (no RMW,
+# no tunable applicator) and reads back to determine whether:
+#   - naked writes stick   -> m1n1 tunables_apply_local is broken /
+#                             no-op'ing for these reg_idx values on
+#                             t8132; RUN R will use naked writes
+#                             instead of the applicator.
+#   - naked writes drop    -> the fabric itself is gating writes to
+#                             rc_base / axi_base; the ungate lever is
+#                             elsewhere, and RUN R needs a different
+#                             search space.
+_NAKED_WRITE_TARGETS = (
+    # (block_attr, offset, value_to_write, source_tunable_note)
+    ("rc_base",  0x00,  0x00040a01,
+     "cio3pllcore #0: mask 0xa0b <- 0xa01 on 0x00040000"),
+    ("rc_base",  0x24,  0x00000800,
+     "cio3pllcore #1: mask 0xc00 <- 0x800 on 0"),
+    ("rc_base",  0x28,  0x00000b00,
+     "cio3pllcore #2: mask 0xf00 <- 0xb00 on 0"),
+    ("rc_base",  0x38,  0x00000000,
+     "cio3pllcore #3: mask 0x20 <- 0 (already 0; no-op even if works)"),
+    ("axi_base", 0x00,  0x8000001c,
+     "axi2af #0: mask 0x800000ff <- 0x8000001c on 0x1c"),
+)
+
+
+def probe_naked_write_test(apcie, buf, timeout=0.3, flush_fn=None):
+    """RUN Q: bypass m1n1's tunables_apply_local RMW and hit the same
+    addresses with naked posted write32(). Read pre AND post each
+    write. Result tags:
+        STUCK   -- post == wrote. Fabric accepted the write. m1n1's
+                   applicator was silently no-op'ing on this address.
+        NO-OP   -- post == pre. Write either dropped or is R/O bits.
+        PARTIAL -- post != pre and post != wrote. Fabric accepted the
+                   write but only some bits, or bit fields are
+                   read-only or hardware-cleared.
+
+    All targets are proven reachable (in RUN O's reachable-scan they
+    all read cleanly). Read/write via naked write32 -- no RMW inside
+    the applicator that could stall on a subtle sub-decoder.
+
+    A per-target flush before/after so a wedge (should not happen)
+    leaves us knowing exactly which address was in flight.
+    """
+    buf.write("=== RUN Q naked-write test ===\n")
+    buf.write("purpose: determine whether writes to rc_base/axi_base\n"
+              "actually stick when we bypass m1n1 tunables_apply_local.\n"
+              "RUN O's reachable-scan showed the applicator's writes\n"
+              "to these blocks silently no-op'd; naked writes here\n"
+              "answer whether the applicator is broken (writes will\n"
+              "stick) or the fabric drops all writes (they won't).\n\n")
+    if flush_fn is not None:
+        flush_fn("phaseF.naked-write.enter")
+    try:
+        exc_running = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"  ERROR: initial exc_count failed: "
+                  f"{e.__class__.__name__}: {e}\n")
+        return
+
+    for block_attr, off, value, note in _NAKED_WRITE_TARGETS:
+        base = getattr(apcie, block_attr, None)
+        if base is None:
+            buf.write(f"  {block_attr}+0x{off:02x}: SKIP (attr missing)\n")
+            continue
+        addr = base + off
+        tag = f"{block_attr}+0x{off:02x}"
+        buf.write(f"  --- {tag} @ 0x{addr:x} ---\n")
+        buf.write(f"    source: {note}\n")
+
+        # pre-read
+        if flush_fn is not None:
+            flush_fn(f"phaseF.naked-write.pre.{tag}")
+        pre_val = None
+        with guarded(buf, f"naked-write.pre.{tag}",
+                     short_timeout=timeout):
+            try:
+                pre_val = p.read32(addr)
+            except Exception as e:
+                buf.write(f"    pre-read RAISED: "
+                          f"{e.__class__.__name__}: {e}\n")
+        alive, delta = check_alive_fast(exc_running, timeout=timeout)
+        if not alive:
+            buf.write(f"    STALL on pre-read; ABORT RUN Q\n")
+            if flush_fn is not None:
+                flush_fn(f"phaseF.naked-write.stall.pre.{tag}")
+            return
+        exc_running += delta
+
+        # write
+        if flush_fn is not None:
+            flush_fn(f"phaseF.naked-write.write.{tag}")
+        with guarded(buf, f"naked-write.write.{tag}",
+                     short_timeout=timeout):
+            try:
+                p.write32(addr, value)
+            except Exception as e:
+                buf.write(f"    write RAISED: "
+                          f"{e.__class__.__name__}: {e}\n")
+        alive, delta = check_alive_fast(exc_running, timeout=timeout)
+        if not alive:
+            buf.write(f"    STALL on write; ABORT RUN Q\n")
+            if flush_fn is not None:
+                flush_fn(f"phaseF.naked-write.stall.write.{tag}")
+            return
+        exc_running += delta
+
+        # post-read
+        if flush_fn is not None:
+            flush_fn(f"phaseF.naked-write.post.{tag}")
+        post_val = None
+        with guarded(buf, f"naked-write.post.{tag}",
+                     short_timeout=timeout):
+            try:
+                post_val = p.read32(addr)
+            except Exception as e:
+                buf.write(f"    post-read RAISED: "
+                          f"{e.__class__.__name__}: {e}\n")
+        alive, delta = check_alive_fast(exc_running, timeout=timeout)
+        if not alive:
+            buf.write(f"    STALL on post-read; ABORT RUN Q\n")
+            if flush_fn is not None:
+                flush_fn(f"phaseF.naked-write.stall.post.{tag}")
+            return
+        exc_running += delta
+
+        pre_s = f"0x{pre_val:08x}" if pre_val is not None else "?"
+        post_s = f"0x{post_val:08x}" if post_val is not None else "?"
+        if pre_val is None or post_val is None:
+            result = "READ_FAIL"
+        elif post_val == value:
+            result = "STUCK"
+        elif post_val == pre_val:
+            result = "NO-OP"
+        else:
+            result = "PARTIAL"
+        buf.write(f"    pre={pre_s} wrote=0x{value:08x} post={post_s}  "
+                  f"[{result}]\n")
+        if flush_fn is not None:
+            flush_fn(f"phaseF.naked-write.done.{tag}")
+
+    buf.write("\n")
+    if flush_fn is not None:
+        flush_fn("phaseF.naked-write.complete")
+
+
 # RUN P: phy_ip write-probe target. First entry in apcie-phy-ip-pll-
 # tunables is at phy_ip_base + 0x38 (shared slice, mask 0x10000000).
 # We do a naked posted-write of 0 there; if phy_ip is on-fabric but
@@ -2412,6 +2563,7 @@ _PHY_IP_DIAG_CHECKPOINTS = (
     "F.entry",
     "post-1.pmgr",
     "post-5.phy-tunables",
+    "post-5.75.naked-write-test", # RUN Q: right after the naked writes to rc/axi
     "post-5.5.extra-tunables",  # RUN J: right after cio3pllcore + pcieclkgen apply
     "post-6.b.CLK0ACK",
     "post-6.d.CLK1ACK",
@@ -2458,7 +2610,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               phy4_x10_early=False,
                               extra_tunables_only="both",
                               reachable_scan=False,
-                              phy_ip_write_probe=False):
+                              phy_ip_write_probe=False,
+                              naked_write_test=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -2864,6 +3017,25 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     if not tunables_step("5", "apcie-phy-tunables", _T8140_PHY_IDX):
         return
     diag("post-5.phy-tunables")
+
+    # ---- step 5.75: RUN Q naked-write bisection. Bypass m1n1
+    # tunables_apply_local and hit the same rc_base/axi_base target
+    # addresses with naked posted write32(). RUN O showed the
+    # applicator's writes to these blocks silently no-op'd (no state
+    # change on any reachable-scan). This tests whether that was the
+    # applicator or the fabric. Ordered after step 5 (phy-tunables)
+    # so it observes the same 'pre' state RUN O's post-5 snapshot did,
+    # and before step 5.5 (extra-tunables) so it can attempt the same
+    # writes as an independent path.
+    if naked_write_test:
+        try:
+            probe_naked_write_test(apcie, buf, timeout=timeout,
+                                    flush_fn=_flush)
+        except Exception as e:
+            buf.write(f"  probe_naked_write_test RAISED at top level: "
+                      f"{e.__class__.__name__}: {e}\n")
+            _flush("phaseF.naked-write.top-raise")
+        diag("post-5.75.naked-write-test")
 
     # ---- step 5.5: t8132-specific extra tunables (--extra-tunables).
     # These props are NOT applied by m1n1 pcie.c on any codepath.
@@ -3973,6 +4145,21 @@ def main():
                          "T8140 marker AND the T81XX RUN. rc_base is "
                          "proven reachable throughout Phase F, so low "
                          "wedge risk. Requires --t8140-replay.")
+    ap.add_argument("--naked-write-test", action="store_true",
+                    help="RUN Q: after step 5 (phy-tunables), do a "
+                         "naked posted write32 to each of the addresses "
+                         "that m1n1's tunables_apply_local writes to on "
+                         "step 2 (axi2af) and step 5.5 (cio3pllcore + "
+                         "pcieclkgen). Read pre AND post each write; "
+                         "result tag is STUCK (post==wrote), NO-OP "
+                         "(post==pre), or PARTIAL. RUN O showed the "
+                         "applicator's writes to rc_base and axi_base "
+                         "don't visibly change state. This test "
+                         "distinguishes 'applicator broken' (writes "
+                         "STUCK) from 'fabric drops writes' (writes "
+                         "NO-OP). Combine with --reachable-scan for "
+                         "before/after state diff. Requires "
+                         "--t8140-replay.")
     ap.add_argument("--phy-ip-write-probe", action="store_true",
                     help="RUN P: at --phy-ip-diag-at swap the phy_ip "
                          "read probe for a naked posted write32 to "
@@ -4194,6 +4381,7 @@ def main():
                     f"phy_ip_diag_at={args.phy_ip_diag_at!r}, "
                     f"reachable_scan={args.reachable_scan}, "
                     f"phy_ip_write_probe={args.phy_ip_write_probe}, "
+                    f"naked_write_test={args.naked_write_test}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
@@ -4206,7 +4394,8 @@ def main():
                         phycmn_early=args.phycmn_early,
                         phy4_x10_early=args.phy4_x10_early,
                         reachable_scan=args.reachable_scan,
-                        phy_ip_write_probe=args.phy_ip_write_probe),
+                        phy_ip_write_probe=args.phy_ip_write_probe,
+                        naked_write_test=args.naked_write_test),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:
