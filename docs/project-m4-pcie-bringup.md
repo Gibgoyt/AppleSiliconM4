@@ -290,4 +290,38 @@ Interpretation matrix for RUN 7:
 - **6.g wedges at NEW address** → partial ungate; the bit-5-only variant helped at least one earlier step. High-signal.
 - **SError inside 5.8.b** → the bit-5-only write triggers a fault that mask-RMW's superset write did not. Very unusual; would indicate the write ordering / mask boundary matters at the fabric level.
 
+**State as of 2026-07-21 (post RUN 7):**
+- **RUN 7 hypothesis FALSIFIED.** `--pcieclkgen-set5-only-to=axi_sub5_base` executed perfectly: `axi_sub5+0` went `0x00081f55` → `0x00081f75` (bit 5 STUCK, delta=`0x20`, guard delta=0) with **iBoot bits 6, 8 preserved end-to-end for the first time since RUN S** — and held through every later reachable-scan checkpoint. Yet step 6.g wedged IDENTICALLY: `RAISED at #0 (shared) 0x497040038: UartTimeout: Expected 1 bytes, got 0 bytes` (`Scripts/m1n1/logs/7/nic-runtime.txt:5295`). Full findings in `Scripts/m1n1/logs/7/findings.md`.
+- **Bits 6, 8 of `axi_sub5+0` are NOT phy_ip PLL/clock enables** (or not sufficient). The sub5+0 iBoot-bit-preservation axis is dead: RUN 4 preserved 8/10 bits, RUN 7 preserved all of them plus set bit 5 — identical wedge both times. The pcieclkgen mask-RMW clobber was not the confounding variable across RUNs S..6.
+- **Consolidated interpretation across A..7:** phy_ip is bidirectionally decode-locked from every fabric state we've built, now including the strongest (RUN 7: naked axi2af + bit-5-only pcieclkgen with iBoot bits intact + CLK0/1 ACKed + RESET clear + T8140 marker + CLK_MODE=ON + phy_shared+0 bit 9 SET). Remaining live hypotheses, ranked: (i) **candidate C `set32(phy_shared+4, 0x10)`** (RUN 8 = primary); (ii) **candidate D T602X-style `set32(phy_shared+0, 0x300)`** (bits 8+9 — bit 8 has never been set; RUN 9 fallback); (iii) C-side vs Python sequencing gap (barriers / back-to-back timing vs multi-ms proxy round-trips); (iv) PMGR/power-domain (some phy/auspma/cio PS register down at the wedge point — data collection starts in RUN 8).
+
+**Proposed RUN 8 plan (2026-07-21):**
+
+**RUN 8 = candidate C: `--phy4-x10-early` on the RUN 7 baseline.** The T602X/T8122-only `set32(phy_base+4, 0x10)` (pcie.c:529) that the T8140 codepath skips. RUN L tested it early-but-ALONE and wedged; it has never run combined with the current strongest baseline. Dispatcher-only for the hypothesis — the flag and its 6.i.early apply block already exist in perstn.py (from RUN L), firing after 6.f and before 7.early/6.5/6.g.
+
+Key ordering observation: with the RUN 8 flag set, the produced write order is `phy_shared+4 |= 0x10` (6.i) → phycmn MODE_ON (7.early) → `phy_shared+0 |= 0x200` (6.5) — which reproduces T8122's native pcie.c order 529 → 535 → 543-551, merely hoisted above the phy_ip tunables. RUN 8 therefore replays the entire T8122 tail in T8122 order before the first phy_ip touch.
+
+Expected transition: `phy_shared+4: 0x00000001` (post-6.f) → `0x00000011`. RUN L observed the same bits stick without faulting, so the write itself is proven STUCK-capable.
+
+Single-variable delta vs RUN 7: only `--phy4-x10-early` is added as a state-changing write. `--t8122-shared-post` and `--pcieclkgen-set5-only-to` are retained even though falsified as ungates (dropping either would be a second variable change). Additionally RUN 8 adds `--pmgr-pre6g-scan` — a strictly READ-ONLY PS-register sweep of every PMGR device named like APCIE/PCIE/PHY/AUSPMA/CIO immediately before step 6.g, diffed against the Phase 0 boot-time readout. Zero writes, flag-gated, flushed via `phaseF.pre.6.g.pmgr-scan` so it survives the wedge; feeds hypothesis (iv) if candidates C and D both fail.
+
+RUN 8 dispatch flags:
+```
+--no-pcie-init --preinit-probe --pmgr-enable --pmgr-per-port --gate-poke
+--phy-ip-probe --t8140-replay --phy-ip-diag --fuse-recon
+--naked-write-test-readonly --axi2af-naked-apply
+--pcieclkgen-set5-only-to=axi_sub5_base --reachable-scan --phycmn-early
+--phy4-x10-early --t8122-shared-post --phy-ip-diag-at=none
+--pmgr-pre6g-scan
+```
+
+RUN 8 wedge-immune posture: `--phy-ip-diag-at=none` retained. The existing `diag("post-6.i.phy4-x10-early")` checkpoint captures a full reachable-scan right after the new write at zero extra risk — watch `phy_shared+0x04` (expect `0x00000011`) and `phy_shared+0x08` (the T8122 poll target that has always read 0; a nonzero read there would be high-signal even if 6.g still wedges).
+
+Interpretation matrix for RUN 8:
+- **6.g STOPS wedging** → candidate C confirmed: bit 4 of `phy_shared+4` is the decode gate the T8140 codepath misses on t8132. Phase F continues automatically (6.h auspma tunables, steps 8/9/10 RC handshake, success banner). Follow-ups: next boot runs `p.pcie_init()` end-to-end; draft the m1n1 patch (add `phy_base+4 |= 0x10` before the phy_ip tunables in the t8132 path, plus the port-1 slice filter).
+- **6.g wedges identically** at `phy_ip+0x38` → candidate C falsified. RUN 9 = candidate D: T602X-style `set32(phy_shared+0, 0x300)` (pcie.c:549). Implementation: parametrize the 6.5 block value — new `--t8122-shared-post-val=0x300` (default `0x200`) threading through the existing block. Single-variable delta vs RUN 8.
+- **6.g wedges at a NEW address / new fault class** (e.g. SYNC instead of UartTimeout) → partial ungate; highest-signal outcome short of success. Analyze the new address against the tunables entry list before committing to RUN 9.
+- **SError/guard-delta inside 6.i itself** → bit 4 interacts with the combined state in a way RUN L's isolated test didn't show. Analyze before proceeding.
+- **If C and D both fail** → the Python-replayable pcie.c write set is exhausted. Follow-on axes, in order: (a) **sequencing gap** — port the port-1 slice filter into the m1n1 fork's `pcie_init_controller()` and let the C side run 6.g natively at CPU speed with barriers (one rebuild/reflash), or half-step: upload a tiny stub via the proxy and `p.call()` it so the tunable writes execute back-to-back on-CPU; (b) **PMGR angle** — driven by the RUN 8/9 pre-6.g sweep data: `pmgr_adt_power_enable` any matched device not at ACTUAL=0xf before 6.g.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
