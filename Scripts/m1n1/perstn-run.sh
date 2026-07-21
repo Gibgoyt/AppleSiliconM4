@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -22,7 +22,17 @@
 # to preserve iBoot's sub5+0 = 0x00081f55 PLL control word (which
 # every RUN S/1/2/3 was clobbering to 0x00000a01). Retires the
 # cio3pllcore search; tests whether the destructive probe has been
-# the confounding variable for the last 5 RUNs.
+# the confounding variable for the last 5 RUNs (FALSIFIED --
+# sub5+0 iBoot value preserved through post-5.75, pcieclkgen apply
+# landed cleanly at 0x00081e35, yet phy_ip+0x38 wedge unchanged;
+# destructive-probe hypothesis definitively ruled out). RUN 5 =
+# RUN 4 baseline + --phy-ip-write-probe with --phy-ip-diag-at=
+# post-7.phycmn-early. Tests whether phy_ip decodes POSTED writes
+# even when reads AXI-stall, from the cleanest fabric state ever
+# probed for write-decode (naked axi2af + naked pcieclkgen landed
+# at sub5, CLK_MODE=ON, iBoot mostly preserved). RUN P tested this
+# from a weaker broken-applicator baseline where no naked applies
+# had landed; RUN 5 tests from the strong state.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -485,8 +495,46 @@ case "${RUN^^}" in
                --phycmn-early
                --phy-ip-diag-at=none)
         ;;
+    5)
+        # RUN 5: RUN 4 baseline + --phy-ip-write-probe with --phy-ip-
+        # diag-at=post-7.phycmn-early. RUN 4 FALSIFIED the destructive-
+        # probe hypothesis (sub5+0=0x00081f55 iBoot value preserved via
+        # --naked-write-test-readonly; wedge at phy_ip+0x38 unchanged).
+        # RUN 5 tests whether phy_ip decodes POSTED writes even when
+        # reads AXI-stall, from the cleanest fabric state ever probed
+        # for write-decode (naked axi2af + naked pcieclkgen landed at
+        # sub5, CLK_MODE=ON, iBoot preserved except for pcieclkgen
+        # mask-0x3e0 bits 5-9). RUN P tested this from a weaker
+        # broken-applicator baseline where NO naked applies had landed;
+        # RUN 5 tests from the strong state. Binary result hard-forks
+        # the next 3-5 RUNs:
+        #   WROTE -> RUN 6 = naked-write32 replay of 29 apcie-phy-ip-
+        #            pll-tunables shared entries (write-only strategy,
+        #            a full new attack surface).
+        #   STALL -> phy_ip decode-locked in BOTH directions;
+        #            RUN 6 = candidate B (pcieclkgen bit-5-only) or
+        #            RUN 7 = candidate C (T8122 shared-init post
+        #            writes, pcie.c:543-551).
+        #   SYNC  -> writes decode but hit a live register with SError;
+        #            pins fault mode on writes at phy_ip+0x38.
+        # Wedge-immune posture: --phy-ip-write-probe replaces the
+        # destructive read at post-7.phycmn-early with a posted
+        # write32(phy_ip_base + 0x38, 0); a STALL costs no forward
+        # progress vs the existing 6.g wedge (phy_ip is already
+        # inaccessible there). Single-variable delta vs RUN 4:
+        # --phy-ip-write-probe added, diag-at moved from none to
+        # post-7.phycmn-early. Dispatcher-only, no perstn.py change.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test-readonly
+               --axi2af-naked-apply
+               --pcieclkgen-naked-apply-to=axi_sub5_base
+               --reachable-scan
+               --phycmn-early
+               --phy-ip-write-probe
+               --phy-ip-diag-at=post-7.phycmn-early)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
