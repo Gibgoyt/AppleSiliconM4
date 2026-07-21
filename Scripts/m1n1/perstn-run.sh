@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -32,7 +32,18 @@
 # probed for write-decode (naked axi2af + naked pcieclkgen landed
 # at sub5, CLK_MODE=ON, iBoot mostly preserved). RUN P tested this
 # from a weaker broken-applicator baseline where no naked applies
-# had landed; RUN 5 tests from the strong state.
+# had landed; RUN 5 tests from the strong state (FALSIFIED --
+# STALL branch: posted write32(phy_ip+0x38, 0) bus-hung m1n1
+# identically to the read wedge; phy_ip is BIDIRECTIONALLY decode-
+# locked from the RUN 4 baseline). RUN 6 = RUN 4 baseline +
+# --t8122-shared-post. RUN 5's post-7.phycmn-early reachable-scan
+# found phy_shared+0x8 = 0x00000000 (bit 0 CLEAR) and
+# phy_shared+0 = 0xf3c0301f (bits 8, 9 CLEAR). pcie.c:543-551 has
+# T8122/T602X/T6031 (but NOT T8140) run poll32(phy_shared+8, 1, 1,
+# 250000) then set32(phy_shared+0, 0x200) [bit 9, T8122]. We SKIP
+# the poll (would timeout) and do the set32 unconditionally.
+# Hypothesis: bit 9 of phy_shared+0 is a phy_ip decode-enable gate
+# T8140 doesn't have but T8132 needs.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -533,8 +544,47 @@ case "${RUN^^}" in
                --phy-ip-write-probe
                --phy-ip-diag-at=post-7.phycmn-early)
         ;;
+    6)
+        # RUN 6: RUN 4 baseline + --t8122-shared-post. RUN 5
+        # FALSIFIED the write-decode hypothesis (STALL branch --
+        # posted write32(phy_ip+0x38, 0) bus-hung m1n1 identically
+        # to every prior read wedge; phy_ip is bidirectionally
+        # decode-locked from the RUN 4 baseline). But RUN 5's
+        # post-7.phycmn-early reachable-scan produced a specific
+        # new data point: phy_shared+0x8 = 0x00000000 (bit 0
+        # CLEAR) and phy_shared+0 = 0xf3c0301f (bits 8, 9 CLEAR).
+        # pcie.c:543-551 has T8122/T602X/T6031 (but NOT T8140)
+        # run:
+        #     poll32(phy_shared+0x8, 1, 1, 250000)   ; wait
+        #     set32(phy_shared+0, 0x200)             ; T8122 bit 9
+        #     set32(phy_shared+0, 0x300)             ; T602X bit 8|9
+        # RUN 6's new --t8122-shared-post block SKIPS the poll
+        # (would just timeout 250 ms) and does the T8122-style
+        # set32(phy_shared+0, 0x200) unconditionally after step 7.
+        # Novel attack surface -- this pcie.c block has never
+        # been replayed on t8132 (T8140 codepath skips it).
+        # Hypothesis: bit 9 of phy_shared+0 is a phy_ip decode-
+        # enable gate T8140 lacks but T8132 needs. If true,
+        # step 6.g stops wedging for the first time in 23+ boots
+        # and Phase F may complete for the first time ever. If
+        # step 6.g still wedges identically, bit 9 is not the
+        # ungate and RUN 7 = candidate B (pcieclkgen-set5-only
+        # variant preserving iBoot bits 6, 8). Adds a new diag
+        # checkpoint post-6.5.t8122-shared-post. Wedge-immune
+        # posture retained: --phy-ip-diag-at=none, no phy_ip
+        # probe. Single-variable delta vs RUN 4: only
+        # --t8122-shared-post is added.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test-readonly
+               --axi2af-naked-apply
+               --pcieclkgen-naked-apply-to=axi_sub5_base
+               --reachable-scan
+               --phycmn-early
+               --t8122-shared-post
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

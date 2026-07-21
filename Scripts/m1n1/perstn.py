@@ -2881,6 +2881,7 @@ _PHY_IP_DIAG_CHECKPOINTS = (
     "post-6.d.CLK1ACK",
     "post-6.f.T8140-marker",
     "post-7.phycmn-early",      # RUN I: right after --phycmn-early's step-7 write
+    "post-6.5.t8122-shared-post", # RUN 6: right after --t8122-shared-post's set32(phy_shared+0, 0x200)
     "post-6.i.phy4-x10-early",  # RUN L: right after --phy4-x10-early's phy_base+4=0x10
     "none",                     # RUN O sentinel: no phy_ip probe at any label
 )
@@ -2927,7 +2928,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               naked_write_test_readonly=False,
                               axi2af_naked_apply=False,
                               pcieclkgen_naked_apply_to=None,
-                              cio3pllcore_naked_apply_to=None):
+                              cio3pllcore_naked_apply_to=None,
+                              t8122_shared_post=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -3702,6 +3704,90 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
         diag("post-7.phycmn-early")
 
     diag("post-6.f.T8140-marker")
+
+    # ---- step 6.5 (T8122 shared-init post) [RUN 6, pcie.c:543-551].
+    # T8122/T602X/T6031 do TWO writes here that T8140 skips entirely:
+    #   poll32(phy_base[0] + off + 0x8, 1, 1, 250000)  ; wait for status
+    #   set32(phy_base[phy] + APCIE_PHY_CTRL, 0x200)   ; T8122 only
+    #   set32(phy_base[phy] + APCIE_PHY_CTRL, 0x300)   ; T602X only
+    # RUN 5's reachable-scan captured phy_shared+0x8 = 0x00000000 at
+    # post-7.phycmn-early, so the C-side poll would timeout at 250 ms
+    # (bit 0 never becomes 1 from that state). Diag-log the pre-read;
+    # SKIP the actual poll to avoid the hang. Do the T8122-style
+    # set32(phy_shared+0, 0x200) unconditionally. Novel attack
+    # surface -- untested by RUNs A..5.
+    #
+    # Hypothesis: bit 9 of phy_shared+0 (0x200) is a phy_ip decode-
+    # enable gate that T8140 doesn't have but T8122/T8132 do. Setting
+    # it unlocks the phy_ip aperture that has been bidirectionally
+    # decode-locked in every prior RUN. RUN 5 confirmed phy_ip stays
+    # AXI-stalled from the strongest fabric state we've built (naked
+    # axi2af + naked pcieclkgen + CLK_MODE=ON), so something upstream
+    # of phy_ip is still gating. bit 9 of phy_shared+0 is the most
+    # actionable un-run write in pcie.c that could plausibly be that
+    # gate.
+    if t8122_shared_post:
+        buf.write("\n  --- 6.5.T8122-shared-post replay "
+                  "(pcie.c:543-551, T8140 codepath skips) ---\n")
+        try:
+            ps8_pre = p.read32(phy_shared_base + 0x8)
+        except Exception as e:
+            buf.write(f"    pre-read RAISED: "
+                      f"{e.__class__.__name__}: {e} -- aborting\n")
+            _flush("phaseF.6.5.t8122-shared-post.pre-read-RAISED")
+            return
+        buf.write(f"    pre-read: phy_shared+0x8 = 0x{ps8_pre:08x}\n")
+        if ps8_pre & 1:
+            buf.write("    bit 0 SET -- C-side poll would succeed "
+                      "instantly (surprising: RUN 5 saw 0x00000000 "
+                      "at post-7.phycmn-early; sequence-sensitive?)\n")
+        else:
+            buf.write("    bit 0 CLEAR -- C-side poll would timeout "
+                      "at 250 ms; SKIPPING poll (matches RUN 5 "
+                      "observation, avoids hang)\n")
+
+        try:
+            ps0_pre = p.read32(phy_shared_base + 0)
+        except Exception as e:
+            buf.write(f"    phy_shared+0 pre-read RAISED: "
+                      f"{e.__class__.__name__}: {e} -- aborting\n")
+            _flush("phaseF.6.5.t8122-shared-post.ps0-pre-RAISED")
+            return
+        buf.write(f"    pre-write: phy_shared+0x0 = 0x{ps0_pre:08x} "
+                  f"(bit 9 = {'SET' if ps0_pre & 0x200 else 'CLEAR'})\n")
+
+        if not step("6.5.set32(phy_shared+0, 0x200) [T8122 post-write]",
+                    lambda: p.set32(phy_shared_base + 0, 0x200)):
+            return
+
+        try:
+            ps0_post = p.read32(phy_shared_base + 0)
+            ps8_post = p.read32(phy_shared_base + 0x8)
+        except Exception as e:
+            buf.write(f"    post-read RAISED: "
+                      f"{e.__class__.__name__}: {e}\n")
+            _flush("phaseF.6.5.t8122-shared-post.post-read-RAISED")
+            return
+        buf.write(f"    post-write: phy_shared+0x0 = 0x{ps0_post:08x} "
+                  f"(delta=0x{ps0_post ^ ps0_pre:08x}, bit 9 = "
+                  f"{'SET' if ps0_post & 0x200 else 'CLEAR'})\n")
+        buf.write(f"    post-write: phy_shared+0x8 = 0x{ps8_post:08x} "
+                  f"(delta=0x{ps8_post ^ ps8_pre:08x})\n")
+
+        if ps0_post & 0x200:
+            if ps0_pre & 0x200:
+                buf.write("    RESULT: bit 9 was already set (iBoot or "
+                          "prior step); this write was a no-op\n")
+            else:
+                buf.write("    RESULT: bit 9 STUCK -- phy_shared+0 now "
+                          "has T8122 post-write applied. If bit 9 is "
+                          "the phy_ip decode gate, 6.g should stop "
+                          "wedging.\n")
+        else:
+            buf.write("    RESULT: bit 9 NOT STUCK -- write silently "
+                      "dropped by fabric. Hypothesis WEAKENED.\n")
+
+        diag("post-6.5.t8122-shared-post")
 
     # ---- step 6.g-h: FIRST phy_ip access ever from this script.
     # Uses phy_ip_tunables_filtered (defined below) which parses the
@@ -4653,6 +4739,28 @@ def main():
                          "proceed without gating because they were "
                          "proven reachable at Phase E. Requires "
                          "--t8140-replay.")
+    ap.add_argument("--t8122-shared-post", action="store_true",
+                    help="RUN 6: after step 6.f (T8140 marker) -- and "
+                         "after step 7 (phycmn-early) if --phycmn-"
+                         "early is also set -- run the T8122-style "
+                         "shared-init post-write from pcie.c:543-551 "
+                         "that the T8140 codepath skips: "
+                         "set32(phy_shared+0, 0x200) [bit 9]. RUN 5 "
+                         "reachable-scan proved phy_shared+0x8 = 0 "
+                         "at post-7.phycmn-early, so the C-side "
+                         "poll32(phy_shared+8, 1, 1, 250000) that "
+                         "gates the writes on the C side would just "
+                         "timeout -- we SKIP the poll (diag pre-read "
+                         "only) to avoid a 250 ms hang and do the "
+                         "set32 unconditionally. Hypothesis: bit 9 "
+                         "of phy_shared+0 is a phy_ip decode-enable "
+                         "gate T8140 lacks but T8122/T8132 need. If "
+                         "true, step 6.g stops wedging for the first "
+                         "time (23+ boots). If not, RUN 7 = "
+                         "candidate B (--pcieclkgen-set5-only). "
+                         "Adds a new diag checkpoint "
+                         "post-6.5.t8122-shared-post. Requires "
+                         "--t8140-replay.")
     ap.add_argument("--phy-ip-write-probe", action="store_true",
                     help="RUN P: at --phy-ip-diag-at swap the phy_ip "
                          "read probe for a naked posted write32 to "
@@ -4886,6 +4994,7 @@ def main():
                     f"{args.pcieclkgen_naked_apply_to!r}, "
                     f"cio3pllcore_naked_apply_to="
                     f"{args.cio3pllcore_naked_apply_to!r}, "
+                    f"t8122_shared_post={args.t8122_shared_post}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
@@ -4906,7 +5015,8 @@ def main():
                         pcieclkgen_naked_apply_to=
                             args.pcieclkgen_naked_apply_to,
                         cio3pllcore_naked_apply_to=
-                            args.cio3pllcore_naked_apply_to),
+                            args.cio3pllcore_naked_apply_to,
+                        t8122_shared_post=args.t8122_shared_post),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:
