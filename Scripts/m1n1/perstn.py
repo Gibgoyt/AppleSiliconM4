@@ -2421,6 +2421,16 @@ _REACHABLE_SCAN_WINDOWS = (
     # (attr on ApcieMap, first_off, last_off_exclusive, step)
     ("rc_base",         0x00, 0x64, 4),   # 25 words: 0..0x60
     ("phy_common_base", 0x00, 0x44, 4),   # 17 words: 0..0x40
+    # RUN 3: additional phy_common window covering the suspected
+    # CIO3PLL analog block. atc.c places CIO3PLL_CLK_CTRL at
+    # regs.core + 0x2a00 and CIO3PLL_DCO_NCTRL at +0x2a38 (atc.c:
+    # 112-114); phy_ip+0x38 (our persistent wedge) aligns exactly
+    # with the DCO NCTRL offset. If PCIe's phy_common is the
+    # analog-core-of-record for the PCIe CIO3PLL, then the pll's
+    # calibration + enable registers live in this range. 128 reads
+    # (~100 ms UART) captures pre/post state for RUN 3a's naked-
+    # apply of apcie-cio3pllcore-tunables to phy_common_base.
+    ("phy_common_base", 0x2a00, 0x2c00, 4),  # 128 words: 0x2a00..0x2c00
     # phy_shared uses phy_packed + 0x8000 -- special-cased below.
     ("phy_shared",      0x00, 0x44, 4),   # 17 words: phy_packed+0x8000..
     ("axi_base",        0x00, 0x44, 4),   # 17 words: 0..0x40
@@ -2484,7 +2494,8 @@ def probe_reachable_scan(apcie, buf, label, timeout=0.3, flush_fn=None):
             if base is None:
                 buf.write(f"    {attr:16s}: SKIP (attr missing)\n")
                 continue
-        buf.write(f"    {attr:16s} base=0x{base:x}:\n")
+        buf.write(f"    {attr:16s} base=0x{base:x} "
+                  f"+0x{first:x}..+0x{last:x}:\n")
         try:
             exc_before = p.get_exc_count()
         except Exception as e:
@@ -4573,25 +4584,31 @@ def main():
                          "--t8140-replay.")
     ap.add_argument("--cio3pllcore-naked-apply-to", default=None,
                     metavar="ATTR",
-                    help="RUN 2: after --pcieclkgen-naked-apply-to, "
-                         "apply the FULL 7-entry apcie-cio3pllcore-"
+                    help="Apply the FULL 7-entry apcie-cio3pllcore-"
                          "tunables via naked mask-RMW to the ApcieMap "
-                         "attribute named ATTR (e.g. axi_sub5_base). "
-                         "RUN R only verified entries #0..#3 (offsets "
-                         "0x00..0x38) SKIP-NOOP on sub5 -- entries #4 "
-                         "(+0x4c mask 0xff), #5 (+0xe8 mask 0xe0000), "
-                         "and #6 (+0x100 mask 0xffffff) were NEVER "
-                         "attempted on any base. These offsets sit "
-                         "outside the RUN R reachable-scan window. "
-                         "Hypothesis: #4..#6 configure the CIO3 PLL "
-                         "analog block (parallel to kboot_atc.c's "
-                         "tunable_CIO3PLL_CORE at ATC offset 0x2A00) "
-                         "and are the missing reference-clock config "
-                         "that leaves phy_ip un-clocked and AXI-"
-                         "stalling on first touch. m1n1's ADT-"
-                         "declared reg_idx is 1 (rc_base) but RUN Q "
-                         "showed that target R/O; ATTR override to "
-                         "axi_sub5_base is expected. Requires "
+                         "attribute named ATTR. RUN 2 tried ATTR="
+                         "axi_sub5_base and wedged phy_ip identically "
+                         "to every prior RUN (7 entries all SKIP-NOOP "
+                         "against sub5 pre-values -- iBoot already "
+                         "programmed sub5 to match, so the naked apply "
+                         "was a no-op). RUN 3 tries ATTR="
+                         "phy_common_base: atc.c:882-884 applies its "
+                         "common tunables to regs.core, and phy_common "
+                         "is the direct PCIe analog. atc.c:112-114 "
+                         "places CIO3PLL_CLK_CTRL at regs.core + "
+                         "0x2a00 and CIO3PLL_DCO_NCTRL at +0x2a38 -- "
+                         "the same +0x38 alignment as our persistent "
+                         "phy_ip wedge address. If cio3pllcore's 7 "
+                         "entries land STUCK on phy_common (they "
+                         "SKIP-NOOP'd on sub5), phy_common is the "
+                         "true target block and the reachable-scan "
+                         "widened window (phy_common +0x2a00..+0x2c00) "
+                         "captures the pre/post PLL analog state. "
+                         "Only axi_sub5_base and axi_sub6_base carry "
+                         "first-touch guards; other ATTR values "
+                         "(phy_common_base, rc_base, phy_shared) "
+                         "proceed without gating because they were "
+                         "proven reachable at Phase E. Requires "
                          "--t8140-replay.")
     ap.add_argument("--phy-ip-write-probe", action="store_true",
                     help="RUN P: at --phy-ip-diag-at swap the phy_ip "

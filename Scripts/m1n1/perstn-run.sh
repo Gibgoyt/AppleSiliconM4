@@ -3,15 +3,18 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
 # (1..N) begin a NEW series starting 2026-07-21 that iterates on top of
 # RUN S's naked mask-RMW apply findings until PCIe trains. RUN 1 =
 # RUN S + phycmn-early (FALSIFIED that CLK_MODE=ON is the co-factor).
-# RUN 2 = RUN 1 + full cio3pllcore naked apply (closes the RUN R gap
-# where entries #4..#6 were never attempted on any base).
+# RUN 2 = RUN 1 + full cio3pllcore naked apply to axi_sub5_base
+# (FALSIFIED -- all 7 entries SKIP-NOOP on sub5 because iBoot
+# pre-programmed the block; wedge unchanged at phy_ip+0x38). RUN 3 =
+# RUN 2 but redirects the naked cio3pllcore apply to phy_common_base
+# per the atc.c CIO3PLL analogy in docs/ref-asahi-t8132-pcie.md.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -142,34 +145,61 @@
 #            #5 (+0xe8 mask 0xe0000 <- 0x20000), and #6 (+0x100
 #            mask 0xffffff <- 0xb40b4) were NEVER applied on any
 #            base -- their offsets sit OUTSIDE the RUN R scan
-#            window (0..0x40). Entry #6 is a 24-bit config write
-#            -- the substantial PLL analog config. Hypothesis:
-#            #4..#6 configure the CIO3 PLL analog block (parallel
-#            to kboot_atc.c's tunable_CIO3PLL_CORE at ATC offset
-#            0x2A00) and are the missing reference-clock config
-#            that leaves phy_ip un-clocked and AXI-stalling on
-#            first touch. Same wedge-immune diag posture as RUNs
-#            S/1 (--reachable-scan + --phy-ip-diag-at=none). The
-#            reachable-scan window on axi_sub5/sub6 is widened
-#            from +0..+0x40 to +0..+0x100 so #4..#6 pre/post
-#            state is captured at every Phase F checkpoint,
-#            including the new post-5.8.c.cio3pllcore-naked-apply
-#            slot. Success criterion: step 6.g stops wedging at
-#            phy_ip_base+0x38. Interpretation matrix:
-#              - 6.g clean            -> cio3pllcore was the missing
-#                                        piece; proceed to Phase G
-#              - 6.g wedges, #4..#6
-#                STUCK on sub5        -> PLL now configured, some
-#                                        OTHER gate remains open;
-#                                        RUN 3 = findings.md A/B
-#              - 6.g wedges, #4..#6
-#                NO-OP on sub5        -> sub5 is the wrong target;
-#                                        RUN 3 = re-apply to
-#                                        axi_sub6_base
-#              - Any of #4..#6 raises
-#                SYNC / delta         -> hit a live register;
-#                                        directly informative,
-#                                        RUN 3 narrows on offset
+#            window (0..0x40). Result: FALSIFIED. All 7 entries
+#            SKIP-NOOP on sub5 (pre-values captured: #4 +0x4c
+#            pre=0x1f800094 matches want 0x94; #5 +0xe8 pre=
+#            0x01024201 matches want 0x20000; #6 +0x100 pre=
+#            0x030b40b4 matches want 0xb40b4). iBoot already
+#            programmed the CIO3 PLL analog block on sub5 before
+#            m1n1 ran -- so axi_sub5 is NOT the missing target
+#            for cio3pllcore. Wedge at phy_ip+0x38 unchanged.
+#
+#   RUN 3 -- RUN 2 baseline but redirects --cio3pllcore-naked-
+#            apply-to from axi_sub5_base to phy_common_base per
+#            the Asahi source hunt captured in docs/ref-asahi-
+#            t8132-pcie.md (Section 8.1). Rationale: atc.c:882-
+#            884 applies its common tunables to regs.core, and
+#            phy_common is the direct PCIe analog. atc.c:112-114
+#            places CIO3PLL_CLK_CTRL at regs.core + 0x2a00 and
+#            CIO3PLL_DCO_NCTRL at +0x2a38 -- the same +0x38
+#            alignment as our persistent phy_ip wedge address.
+#            If PCIe's phy_common is the analog-core-of-record
+#            for the PCIe CIO3PLL block, cio3pllcore's 7 entries
+#            should land STUCK on phy_common (they SKIP-NOOP'd
+#            on sub5 in RUN 2 because iBoot pre-programmed that
+#            block). Same wedge-immune diag posture as RUN 2
+#            (--reachable-scan + --phy-ip-diag-at=none). The
+#            reachable-scan window on phy_common has been
+#            widened at the source to include a second block at
+#            +0x2a00..+0x2c00 (128 words, ~100 ms UART) so the
+#            suspected CIO3PLL_CLK_CTRL (@+0x2a00) and
+#            CIO3PLL_DCO_NCTRL (@+0x2a38) region is captured
+#            pre/post the naked apply. Success criterion: step
+#            6.g stops wedging at phy_ip_base+0x38. Even on
+#            failure, differential data pin-points the target
+#            block. Interpretation matrix:
+#              - 6.g clean            -> phy_common is the target
+#                                        block AND cio3pllcore
+#                                        was the missing config;
+#                                        proceed to Phase G
+#              - 6.g wedges, entries
+#                STUCK on phy_common  -> phy_common IS the target
+#                                        block; some OTHER config
+#                                        (CIO3PLL_CLK enable pair
+#                                        per atc.c:1778-1779?) is
+#                                        still missing. RUN 4 =
+#                                        atc.c-style CIO3PLL clock
+#                                        enable at phy_common+0x2a00
+#              - 6.g wedges, entries
+#                SKIP-NOOP on phy_    -> phy_common ALSO already
+#                common                  pre-programmed by iBoot;
+#                                        RUN 4 = try rc_base then
+#                                        phy_shared as target
+#              - Any entry raises
+#                SYNC / delta         -> hit a live register in
+#                                        phy_common; directly
+#                                        informative, narrows the
+#                                        target block on offset
 #
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
@@ -345,6 +375,10 @@ case "${RUN^^}" in
         # state is captured at every Phase F checkpoint, including
         # the new post-5.8.c.cio3pllcore-naked-apply slot. Success
         # criterion: 6.g stops wedging at phy_ip_base+0x38.
+        # RESULT: FALSIFIED. All 7 entries SKIP-NOOP on sub5;
+        # iBoot pre-programmed sub5 to match cio3pllcore's target
+        # values (pre-values captured in docs/project-m4-pcie-
+        # bringup.md). Wedge at phy_ip+0x38 unchanged.
         FLAGS=("${BASE_FLAGS[@]}"
                --naked-write-test
                --axi2af-naked-apply
@@ -354,8 +388,44 @@ case "${RUN^^}" in
                --phycmn-early
                --phy-ip-diag-at=none)
         ;;
+    3)
+        # RUN 3: RUN 2 baseline but redirects the cio3pllcore
+        # naked apply from axi_sub5_base to phy_common_base per
+        # the Asahi source hunt in docs/ref-asahi-t8132-pcie.md
+        # Section 8.1. RUN 2 falsified sub5 as the cio3pllcore
+        # target (all 7 entries SKIP-NOOP against iBoot-pre-
+        # programmed sub5). RUN 3 tests the atc.c analogy:
+        # atc.c:882-884 applies common tunables to regs.core;
+        # phy_common is the direct PCIe analog. atc.c:112-114
+        # places CIO3PLL_CLK_CTRL at regs.core+0x2a00 and
+        # CIO3PLL_DCO_NCTRL at +0x2a38 -- the same +0x38 offset
+        # as our persistent phy_ip wedge address. If phy_common
+        # is the true target block, cio3pllcore's 7 entries
+        # should land STUCK (unlike sub5's SKIP-NOOP). Same
+        # wedge-immune diag posture as RUN 2 (--reachable-scan
+        # + --phy-ip-diag-at=none). Reachable-scan on phy_common
+        # is widened at the source with a second window at
+        # +0x2a00..+0x2c00 so pre/post state of the suspected
+        # CIO3PLL_CLK_CTRL (@+0x2a00) and CIO3PLL_DCO_NCTRL
+        # (@+0x2a38) region is captured at every Phase F
+        # checkpoint including post-5.8.c.cio3pllcore-naked-
+        # apply. Success criterion: 6.g stops wedging at
+        # phy_ip_base+0x38. Even on failure, the differential
+        # phy_common data pin-points whether phy_common is the
+        # target block (STUCK), whether iBoot already programmed
+        # phy_common too (SKIP-NOOP -> RUN 4 tries rc_base or
+        # phy_shared), or whether we hit a live register (SYNC).
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test
+               --axi2af-naked-apply
+               --pcieclkgen-naked-apply-to=axi_sub5_base
+               --cio3pllcore-naked-apply-to=phy_common_base
+               --reachable-scan
+               --phycmn-early
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
