@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -51,7 +51,14 @@
 # (set32(sub5+0, 0x20) -- bit 5 only, preserving iBoot bits 6, 8).
 # Hypothesis: bits 6, 8 are PLL enables that iBoot set and we've
 # been clearing every RUN S/1/2/3/4/5/6, causing phy_ip to have
-# no clock and AXI-stall on decode.
+# no clock and AXI-stall on decode (FALSIFIED -- bit 5 landed
+# STUCK at 0x00081f75 with iBoot bits 6, 8 preserved end-to-end,
+# yet 6.g wedged identically at phy_ip+0x38). RUN 8 = RUN 7
+# baseline + --phy4-x10-early (candidate C: T8122 pcie.c:529
+# set32(phy_shared+4, 0x10), which T8140 skips, hoisted before
+# the first phy_ip access) + read-only --pmgr-pre6g-scan
+# (PS-register sweep of apcie/pcie/phy/auspma/cio-named PMGR
+# devices just before 6.g).
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -628,8 +635,56 @@ case "${RUN^^}" in
                --t8122-shared-post
                --phy-ip-diag-at=none)
         ;;
+    8)
+        # RUN 8: RUN 7 baseline + --phy4-x10-early (candidate C).
+        # RUN 7 FALSIFIED candidate B: the bit-5-only pcieclkgen
+        # write landed STUCK (sub5+0: 0x00081f55 -> 0x00081f75,
+        # iBoot bits 6, 8 PRESERVED for the first time since RUN S)
+        # yet step 6.g wedged identically at phy_ip+0x38 entry #0
+        # (UartTimeout). Bits 6, 8 of sub5+0 are not the phy_ip
+        # clock/PLL enables (or not sufficient). Next-ranked
+        # hypothesis: set32(phy_shared+4, 0x10) -- T602X/T8122's
+        # pcie.c:529 write that the T8140 codepath skips. RUN L
+        # tested it early-but-ALONE and wedged; it has never run
+        # combined with the current strongest baseline (naked
+        # axi2af + set5-only pcieclkgen + CLK0/1 ACKed + RESET
+        # clear + T8140 marker + CLK_MODE=ON + phy_shared+0 bit 9).
+        # perstn.py's existing 6.i.early block fires after 6.f and
+        # before phycmn-early/6.5/6.g, which reproduces T8122's
+        # native relative order pcie.c:529 -> 535 -> 543-551,
+        # hoisted above the phy_ip tunables -- RUN 8 replays the
+        # whole T8122 tail in T8122 order before the first phy_ip
+        # touch. Expected transition: phy_shared+4 0x00000001 ->
+        # 0x00000011 (RUN L saw the same bits stick). Single-
+        # variable delta vs RUN 7: only --phy4-x10-early adds a
+        # state-changing write; --t8122-shared-post and
+        # --pcieclkgen-set5-only-to are retained even though
+        # falsified as ungates (dropping either would be a second
+        # variable change). Also adds --pmgr-pre6g-scan: a strictly
+        # READ-ONLY PS-register sweep of apcie/pcie/phy/auspma/cio-
+        # named PMGR devices immediately before 6.g, diffed against
+        # the Phase 0 readout (feeds the power-domain hypothesis if
+        # candidates C and D both fail). Wedge-immune posture
+        # retained: --phy-ip-diag-at=none; the post-6.i reachable-
+        # scan captures phy_shared (+0x8 included) right after the
+        # new write at zero extra risk. If 6.g goes clean: bit 4 of
+        # phy_shared+4 is the decode gate the T8140 codepath misses
+        # on t8132 -- m1n1 patch candidate. If 6.g wedges
+        # identically: candidate C falsified, RUN 9 = candidate D
+        # (T602X-style set32(phy_shared+0, 0x300), bits 8+9).
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test-readonly
+               --axi2af-naked-apply
+               --pcieclkgen-set5-only-to=axi_sub5_base
+               --reachable-scan
+               --phycmn-early
+               --phy4-x10-early
+               --t8122-shared-post
+               --phy-ip-diag-at=none
+               --pmgr-pre6g-scan)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

@@ -2930,7 +2930,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               pcieclkgen_naked_apply_to=None,
                               pcieclkgen_set5_only_to=None,
                               cio3pllcore_naked_apply_to=None,
-                              t8122_shared_post=False):
+                              t8122_shared_post=False,
+                              pmgr_pre6g_scan=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -3889,6 +3890,46 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     # pcie.c:518-525 for chips where the ADT can have missing bridges
     # (t8132 is the first known case). Here we do the filter Python-
     # side so we can iterate without a m1n1 rebuild/reflash cycle.
+
+    # ---- pre-6.g PMGR sweep (RUN 8, read-only). PS-register readout
+    # of every PMGR device whose name matches the APCIE/PCIE/PHY/
+    # AUSPMA/CIO families, taken immediately before the first phy_ip
+    # touch, diffed against the Phase 0 boot-time readout to spot
+    # domains that dropped since boot. Strictly read-only on PMGR PS
+    # registers (proven readable on every boot since Phase 0);
+    # flag-gated, so the single-variable-write discipline is
+    # untouched. Flushed before 6.g so the data survives the wedge.
+    if pmgr_pre6g_scan:
+        buf.write("  --- pre-6.g PMGR sweep (apcie/pcie/phy/auspma/"
+                  "cio families, read-only) ---\n")
+        dev_by_idx = getattr(apcie, "phase0_dev_by_idx", None)
+        if dev_by_idx is None:
+            _pmgr, dev_by_idx = _load_pmgr_devices(buf)
+        if dev_by_idx is None:
+            buf.write("    PMGR device list unavailable; sweep "
+                      "skipped\n")
+        else:
+            fams = ("APCIE", "PCIE", "PHY", "AUSPMA", "CIO")
+            phase0 = getattr(apcie, "phase0_gate_state", None) or {}
+            n_match = 0
+            for idx in sorted(dev_by_idx):
+                name = _decode_pmgr_name(dev_by_idx[idx]).upper()
+                if not any(f in name for f in fams):
+                    continue
+                n_match += 1
+                st = _read_pmgr_gate_state(dev_by_idx, idx, buf,
+                                           indent="    ")
+                p0 = phase0.get(idx)
+                if (st is not None and p0 is not None
+                        and st.get("actual") is not None
+                        and p0.get("actual") is not None
+                        and st["actual"] != p0["actual"]):
+                    buf.write(f"      ^^ DELTA vs Phase 0: actual "
+                              f"0x{p0['actual']:x} -> "
+                              f"0x{st['actual']:x}\n")
+            buf.write(f"    matched {n_match} PMGR devices\n")
+        _flush("phaseF.pre.6.g.pmgr-scan")
+
     buf.write("  ==> ABOUT TO TOUCH phy_ip_base FOR THE FIRST TIME.\n"
               "     Entries in the INACTIVE port-1 slice (0x10000..0x18000)\n"
               "     will be SKIPPED to avoid the AXI stall observed on\n"
@@ -4866,6 +4907,18 @@ def main():
                          "Adds a new diag checkpoint "
                          "post-6.5.t8122-shared-post. Requires "
                          "--t8140-replay.")
+    ap.add_argument("--pmgr-pre6g-scan", action="store_true",
+                    help="RUN 8: immediately before step 6.g (first "
+                         "phy_ip touch), do a READ-ONLY PS-register "
+                         "sweep of every PMGR device whose name "
+                         "matches APCIE/PCIE/PHY/AUSPMA/CIO and "
+                         "diff ACTUAL against the Phase 0 boot-time "
+                         "readout. Diagnoses whether a power/clock "
+                         "domain is down at the wedge point. Zero "
+                         "writes; survives the wedge via a "
+                         "dedicated flush "
+                         "(phaseF.pre.6.g.pmgr-scan). Requires "
+                         "--t8140-replay.")
     ap.add_argument("--phy-ip-write-probe", action="store_true",
                     help="RUN P: at --phy-ip-diag-at swap the phy_ip "
                          "read probe for a naked posted write32 to "
@@ -5105,6 +5158,7 @@ def main():
                     f"cio3pllcore_naked_apply_to="
                     f"{args.cio3pllcore_naked_apply_to!r}, "
                     f"t8122_shared_post={args.t8122_shared_post}, "
+                    f"pmgr_pre6g_scan={args.pmgr_pre6g_scan}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
@@ -5128,7 +5182,8 @@ def main():
                             args.pcieclkgen_set5_only_to,
                         cio3pllcore_naked_apply_to=
                             args.cio3pllcore_naked_apply_to,
-                        t8122_shared_post=args.t8122_shared_post),
+                        t8122_shared_post=args.t8122_shared_post,
+                        pmgr_pre6g_scan=args.pmgr_pre6g_scan),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:
