@@ -324,4 +324,33 @@ Interpretation matrix for RUN 8:
 - **SError/guard-delta inside 6.i itself** → bit 4 interacts with the combined state in a way RUN L's isolated test didn't show. Analyze before proceeding.
 - **If C and D both fail** → the Python-replayable pcie.c write set is exhausted. Follow-on axes, in order: (a) **sequencing gap** — port the port-1 slice filter into the m1n1 fork's `pcie_init_controller()` and let the C side run 6.g natively at CPU speed with barriers (one rebuild/reflash), or half-step: upload a tiny stub via the proxy and `p.call()` it so the tunable writes execute back-to-back on-CPU; (b) **PMGR angle** — driven by the RUN 8/9 pre-6.g sweep data: `pmgr_adt_power_enable` any matched device not at ACTUAL=0xf before 6.g.
 
+**State as of 2026-07-21 (post RUN 8):**
+- **RUN 8 hypothesis FALSIFIED.** `--phy4-x10-early` executed perfectly: `phy_shared+4` went `0x00000001` → `0x00000011` (bit 4 STUCK, guard delta=0, `Scripts/m1n1/logs/8/nic-runtime.txt:3975-3977`, post-scan line 4204). `phy_shared+0x8` stayed `0x00000000` — the T8122 poll target is not activated by bit 4 either. Step 6.g wedged IDENTICALLY: `RAISED at #0 (shared) 0x497040038: UartTimeout` (line 5773). Bit 4 of `phy_shared+4` is not the phy_ip decode gate, even with the full T8122 tail replayed in native order (529 → 535 → 543-551) before the phy_ip tunables. Full findings in `Scripts/m1n1/logs/8/findings.md`.
+- **First PMGR sweep dataset (new `--pmgr-pre6g-scan`, lines 5724-5765, 39 matched devices): every APCIE-family gate is ON (`actual=0xf`) at the wedge point** — APCIE_GP, APCIE_SYS_GP, APCIE_ST, APCIE_SYS_ST, APCIE_PHY_SW. The single DELTA vs Phase 0 (gate 151 APCIE_PHY_SW `0x4 → 0xf`) is the expected Phase D poke. All OFF devices are unrelated ATC*/DPTX/CIO Type-C tunnels; no `dev_disable`/`parent_off`/`RESET` flags anywhere in the apcie/phy family. **The PMGR/power-domain hypothesis is WEAKENED** — nothing observable in PS registers blocks phy_ip.
+- **Consolidated interpretation across A..8:** phy_ip is bidirectionally decode-locked from every state we can build, and the T8122/T602X pre-phy_ip write inventory in pcie.c is nearly exhausted — the ONLY un-replayed variant left is T602X's `set32(phy_shared+0, 0x300)` (bit 8 has never been set on t8132). Remaining live hypotheses, ranked: (i) **candidate D `0x300`** (RUN 9 = primary); (ii) **C-side vs Python sequencing gap** (RUN 10 axis: `p.call()` stub executing the 29 pll-tunable writes back-to-back on-CPU, then C-side native 6.g with the port-1 slice filter); (iii) PMGR angle — weakened, only viable via non-PS gating.
+
+**Proposed RUN 9 plan (2026-07-21):**
+
+**RUN 9 = candidate D: `--t8122-shared-post-val=0x300` on the RUN 8 baseline.** T602X's shared-init post-write variant (pcie.c:549, bits 8+9) vs the T8122 `0x200` (bit 9 only, pcie.c:551) that RUNs 6/7/8 applied. Implementation: the 6.5 block's write value is parametrized via a new `--t8122-shared-post-val` flag (default `0x200`, preserving RUN 6-8 behavior); step label, masked pre/post reporting, and STUCK classification generalize accordingly.
+
+Expected transition: `phy_shared+0: 0xf3c0301f → 0xf3c0331f` (bits 8+9 SET in one write, delta `0x300`).
+
+Single-variable delta vs RUN 8: only the 6.5 write value changes `0x200 → 0x300`. All falsified-but-retained flags kept (`--phy4-x10-early`, `--pcieclkgen-set5-only-to`, `--t8122-shared-post`) — dropping any would be a second variable change. `--pmgr-pre6g-scan` retained (read-only, free differential data each boot).
+
+RUN 9 dispatch flags:
+```
+--no-pcie-init --preinit-probe --pmgr-enable --pmgr-per-port --gate-poke
+--phy-ip-probe --t8140-replay --phy-ip-diag --fuse-recon
+--naked-write-test-readonly --axi2af-naked-apply
+--pcieclkgen-set5-only-to=axi_sub5_base --reachable-scan --phycmn-early
+--phy4-x10-early --t8122-shared-post --t8122-shared-post-val=0x300
+--phy-ip-diag-at=none --pmgr-pre6g-scan
+```
+
+Interpretation matrix for RUN 9:
+- **6.g STOPS wedging** → bit 8 (alone or with bit 9) is the phy_ip decode gate. Phase F continues automatically (6.h, RC handshake 8/9/10, success banner). Follow-ups: next boot `p.pcie_init()` end-to-end; m1n1 patch candidate (T602X-style post-write in the t8132 path + port-1 slice filter).
+- **6.g wedges identically** at `phy_ip+0x38` → candidate D falsified and **the Python-replayable pcie.c write set is EXHAUSTED**. RUN 10 = sequencing-gap axis: (a) cheapest half-step, no reflash — upload a tiny AArch64 stub via the proxy and `p.call()` it so the 29 apcie-phy-ip-pll-tunables writes execute back-to-back on-CPU with barriers (isolates the multi-ms USB round-trip variable); (b) full step — port the port-1 slice filter into the m1n1 fork's `pcie_init_controller()` (pcie.c:518-525 region) and let the C side run 6.g natively (one rebuild/reflash).
+- **6.g wedges at a NEW address / new fault class** → partial ungate; highest-signal outcome short of success. Analyze before RUN 10.
+- **SError inside 6.5 with 0x300** → bit 8 write faults where bit 9 didn't; high-signal — bit 8 touches something live.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
