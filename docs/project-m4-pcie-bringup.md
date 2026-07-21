@@ -248,4 +248,46 @@ Interpretation matrix for RUN 6:
 - **6.g wedges at a NEW address** or NEW error class → bit 9 partial ungate; something else still gates. New wedge address is high-signal.
 - **SError somewhere INSIDE `--t8122-shared-post`** → the specific write triggering SError is isolated by our guarded Python (something the C-side `dc25f2f` warning could not pin down). Diagnostic gold; adjust the block accordingly.
 
+**State as of 2026-07-21 (post RUN 6):**
+- **RUN 6 hypothesis FALSIFIED.** `--t8122-shared-post` (`set32(phy_shared+0, 0x200)`) executed perfectly: `phy_shared+0` went from `0xf3c0301f` → `0xf3c0321f` (delta=`0x00000200`, bit 9 STUCK), guard delta=0, no SError. But step 6.g wedges IDENTICALLY to every RUN A..5: `RAISED at #0 (shared) 0x497040038: UartTimeout: Expected 1 bytes, got 0 bytes`. Full findings in `Scripts/m1n1/logs/6/findings.md`.
+- **Bit 9 of `phy_shared+0` is NOT a phy_ip decode-enable gate.** We can set it, it stays set, phy_ip is still decode-locked. `phy_shared+0x8` bit 0 also unchanged post-write (0 → 0), so the T8122 poll-then-write handshake on t8132 needs some OTHER prerequisite we haven't identified. The pcie.c:543-551 block is not the missing step (at least the `set32(phy_shared+0, 0x200)` half of it).
+- **Phase F now walks 8 consecutive steps cleanly** (6.a → 6.b → 6.c → 6.d → 6.e → 6.f → 7 → 6.5) with guard delta=0 on every intermediate access. Wedge is fabric-level AXI stall on first phy_ip access, not internal SError.
+- **Post-6.5 reachable-scan captured** — cleanest post-6.5 state ever, `phy_shared+0=0xf3c0321f` (bit 9 now SET), `phy_common+0=0x80300001` (unchanged), everything else identical to post-7.phycmn-early. Direct proof the fabric route to phy_ip does NOT depend on bit 9 of phy_shared+0.
+- **Consolidated interpretation across A..6:** phy_ip is bidirectionally decode-locked from every fabric state we've built, including the strongest (RUN 6: naked axi2af + naked pcieclkgen + CLK_MODE=ON + T8140 marker + CLK0/1 ACKed + phy_shared+0 bit 9 SET). Remaining live hypotheses: (i) **pcieclkgen mask-RMW clobbers iBoot bits 6, 8 which are PLL enables** (RUN 7 = primary, direct test); (ii) `set32(phy_shared+4, 0x10)` (T602X/T8122 bit 4 write, `--phy4-x10-early`, queued RUN 8); (iii) T602X-style `set32(phy_shared+0, 0x300)` (bits 8+9 vs RUN 6's bit 9 alone, queued RUN 9); (iv) C-side barrier/DSB/ISB ordering (deferred until Python-side hypotheses exhaust).
+
+**Proposed RUN 7 plan (2026-07-21):**
+
+Three single-variable candidates ranked; RUN 7 = candidate B per the priority argument below.
+
+| Candidate | Change vs RUN 6 baseline | Hypothesis | perstn.py change? | Cost |
+|---|---|---|---|---|
+| **B (recommended)** | Add `--pcieclkgen-set5-only-to=axi_sub5_base`. Mutually exclusive with `--pcieclkgen-naked-apply-to`; replaces the mask-RMW (mask=0x3e0 val=0x220) with `set32(sub5+0, 0x20)`. Post-value = `0x00081f75` (all iBoot bits + bit 5), preserving iBoot bits 6, 8 that RUNs S/1/2/3/4/5/6 have all been clearing. | pcieclkgen's mask-RMW clears iBoot bits 6, 8 (both inside the 0x3e0 mask, neither set by value 0x220). If either is a PLL enable, phy_ip has no clock and fabric AXI-stalls on decode. Direct test of the PLL-enable-clobber axis. | Yes — new `--pcieclkgen-set5-only-to` flag + apply block (~25 lines) | Modest |
+| **A (drop pcieclkgen)** | Drop `--pcieclkgen-naked-apply-to=axi_sub5_base` entirely. Skips step 5.8.b. sub5+0 stays at iBoot value `0x00081f55`. | pcieclkgen was the confounding damage — skipping it preserves all iBoot state. 2-variable delta (loses pcieclkgen apply AND preserves iBoot bits) so less clean. | No — dispatcher-only | Cheap but less interpretable |
+| **C** | Add `--phy4-x10-early` (RUN L flag) on RUN 6 baseline. `set32(phy_shared+4, 0x10)` — the T602X/T8122 bit-4 write we skip. Direct parallel to RUN 6's bit-9 hypothesis but different offset. | Bit 4 of `phy_shared+4` is a T8122-only phy_ip decode-enable gate. RUN L tested it alone and wedged; combined with RUN 6 baseline is untested. | No — dispatcher-only | Cheap |
+
+**Selection: RUN 7 = candidate B.** Reasoning:
+1. **Strongest remaining single-variable hypothesis with hardware-plausible mechanism.** PCIe clock/gen block having enable bits at bits 6, 8 (positions inside the mask that pcieclkgen supplies value 0 for) is exactly the pattern where a tunable is meant to "select mode X while preserving hardware-configured enables Y" — and our applicator, by literally applying mask-RMW with the mask covering the enables, destroys them. iBoot pre-programmed `0x00081f55` with bits 6, 8 SET, our mask-RMW ALWAYS CLEARS them.
+2. **Every RUN S/1/2/3/4/5/6 has been doing this exact clobber.** If bits 6, 8 are PLL enables, we've been turning the PLL off since RUN S. The wedge signature (fabric never routes = no clock arriving at phy_ip block) matches.
+3. **Strict single-variable delta.** pcieclkgen's stated intent (setting bit 5) is preserved; only the destructive mask-RMW of bits 6, 8 is removed.
+4. Cost is modest (~25 lines perstn.py).
+5. If B works: bit 5 alone is enough, and pcieclkgen's mask-RMW has been the entire problem across 7 RUNs. New attack surface: audit every mask-RMW tunable for iBoot-bit clobbers.
+6. If B fails: bits 6, 8 are not PLL enables. RUN 8 = candidate C (`--phy4-x10-early` on RUN 6/7 baseline).
+
+RUN 7 dispatch flags:
+```
+--no-pcie-init --preinit-probe --pmgr-enable --pmgr-per-port --gate-poke
+--phy-ip-probe --t8140-replay --phy-ip-diag --fuse-recon
+--naked-write-test-readonly --axi2af-naked-apply
+--pcieclkgen-set5-only-to=axi_sub5_base --reachable-scan --phycmn-early
+--t8122-shared-post --phy-ip-diag-at=none
+```
+
+RUN 7 wedge-immune posture: `--phy-ip-diag-at=none` retained. Step 6.g runs. If bit 6 or bit 8 was the missing PLL enable, 6.g succeeds for the first time in 24+ boots and Phase F may complete.
+
+Interpretation matrix for RUN 7:
+- **6.g STOPS wedging** → pcieclkgen mask-RMW was the confounding variable across RUNs S/1/2/3/4/5/6. Continue Phase F. Possible first-ever completion of T8140 shared init.
+- **6.g wedges same** at `phy_ip+0x38` → bits 6, 8 not PLL enables (or not enough on their own). RUN 8 = candidate C (`--phy4-x10-early`).
+- **6.g wedges at NEW address** → partial ungate; the bit-5-only variant helped at least one earlier step. High-signal.
+- **SError inside 5.8.b** → the bit-5-only write triggers a fault that mask-RMW's superset write did not. Very unusual; would indicate the write ordering / mask boundary matters at the fabric level.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
