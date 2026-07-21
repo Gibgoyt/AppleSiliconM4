@@ -202,4 +202,50 @@ Interpretation matrix for RUN 5:
 - **SYNC (Exception: SYNC — the fault mode RUN J saw on reads)** → writes decode but hit a live register that actively responds with an SError. Highly informative — pins the fault mode on writes at `phy_ip+0x38` specifically.
 - **Any other outcome (e.g. probe raises + subsequent flow continues)** → new signal; interpret ad hoc.
 
+**State as of 2026-07-21 (post RUN 5):**
+- **RUN 5 hypothesis FALSIFIED (STALL branch).** The posted `write32(phy_ip_base + 0x38, 0)` at `post-7.phycmn-early` bus-hung m1n1 exactly like every prior read wedge at 6.g. `Scripts/m1n1/logs/5/nic-runtime.txt:4422` ends mid-line with no post-write log — UART froze the moment the write was issued. `run.log` final flush was `phaseF.diag.post-7.phycmn-early.phy-ip-write-enter` at 336398 bytes = exact file size. phy_ip is **bidirectionally decode-locked** from the RUN 4 baseline (naked axi2af + naked pcieclkgen landed + CLK_MODE=ON). Full findings in `Scripts/m1n1/logs/5/findings.md`.
+- **Write-only strategy branch eliminated.** WROTE was the outcome that would have opened the naked-write32 replay of 29 `apcie-phy-ip-pll-tunables` shared entries. STALL closes it definitively — writes AXI-stall the same as reads. Fabric never routes phy_ip transactions to a live slave from this state, so we don't even get an SError (unlike RUN J with `--extra-tunables` which reached `Exception: SYNC` from a weaker baseline).
+- **Phase F progressed further than any prior RUN.** For the first time we cleanly walked steps 6.a-6.f + step 7 (via `--phycmn-early`) and captured a full reachable-scan at `post-7.phycmn-early` (rc / phy_common / phy_shared / axi / axi_sub5 / axi_sub6, all offsets guarded delta=0). New differential data never previously captured at this checkpoint.
+- **THE key finding: `phy_shared+0x8 = 0x00000000` at post-7.phycmn-early** (`nic-runtime.txt:4215`). Bit 0 is CLEAR. pcie.c:543-551 has T8122/T602X/T6031 run `poll32(phy_shared+8, 1, 1, 250000)` here — that poll would time out at 250 ms on t8132 from this state. T8140 skips it entirely. Directly after the poll, T8122 does `set32(phy_shared+0, 0x200)` (bit 9); T602X does `set32(phy_shared+0, 0x300)` (bits 8+9). Currently `phy_shared+0 = 0xf3c0301f` — bits 8, 9 both CLEAR. Neither of these post-writes has ever run in our replay.
+- **Hypothesis for RUN 6:** bit 9 of `phy_shared+0` (`0x200`) is a phy_ip decode-enable gate that T8140 doesn't have but T8122/T8132 do. Setting `phy_shared+0 |= 0x200` after step 7 unlocks phy_ip decode. Skip the C-side poll (it would just timeout — bit 0 of `phy_shared+8` may become 1 only AFTER the bit-9 set, or may be a T8122-specific status bit that has no t8132 equivalent). Do the `set32` unconditionally. Novel attack surface — untested by RUNs A..5.
+- **Consolidated interpretation across A..5:** phy_ip is bidirectionally decode-locked from every fabric state we have reached, including the strongest state (RUN 5: naked axi2af + naked pcieclkgen + CLK_MODE=ON + T8140 marker + CLK0/1 ACKed). Remaining live hypotheses: (i) **T8122 shared-init post writes** (RUN 6 = primary; novel, based on new `phy_shared+8=0` data); (ii) **pcieclkgen bit-5-only variant** preserving iBoot bits 6, 8 (RUN 7 fallback if RUN 6 fails); (iii) C-side barrier/DSB/ISB ordering (deferred until Python-side hypotheses exhaust).
+
+**Proposed RUN 6 plan (2026-07-21):**
+
+Three single-variable candidates ranked; RUN 6 = candidate A per the priority argument below.
+
+| Candidate | Change vs RUN 4 baseline | Hypothesis | perstn.py change? | Cost |
+|---|---|---|---|---|
+| **A** | Add `--t8122-shared-post`. Injects between step 7 (phycmn-early) and step 6.g: pre-read `phy_shared+0x8` (log-only, skip poll since RUN 5 proved bit 0 clear), `set32(phy_shared+0, 0x200)`, post-read + verify, `diag("post-6.5.t8122-shared-post")`. Then step 6.g runs. | Bit 9 of `phy_shared+0` is a phy_ip decode-enable gate T8140 doesn't have but T8122/T8132 do. Setting it unlocks phy_ip. Novel attack surface — pcie.c:543-551 block never previously replayed by our script. | Yes — new step + `--t8122-shared-post` CLI flag + new `post-6.5.t8122-shared-post` diag checkpoint (~40 lines) | Medium |
+| **B** | Replace `--pcieclkgen-naked-apply-to=axi_sub5_base` (mask 0x3e0 value 0x220) with `set32(axi_sub5+0, 0x20)` (bit 5 only) | pcieclkgen's clobber of iBoot bits 6, 8 (both inside mask, both cleared by mask-RMW) destroys a PLL enable. Bit-5-only set32 preserves them while still setting bit 5 (what pcieclkgen wants). | Yes — new `--pcieclkgen-set5-only` mode (~15 lines) | Cheap |
+| **C** | Bundle A+B (both `--t8122-shared-post` AND `--pcieclkgen-set5-only`) | Both changes needed together | Yes — both above (~55 lines) | Medium |
+
+**Selection: RUN 6 = candidate A.** Reasoning:
+1. **RUN 5 produced a specific, actionable new data point** (`phy_shared+8 = 0`). Candidate A tests the direct hypothesis that data point suggests. Not testing it would waste the RUN 5 signal.
+2. Novel attack surface. Neither the T8140 replay nor any prior RUN A..5 has ever written `phy_shared+0 |= 0x200`. Any outcome is high-signal.
+3. B tests a variation of what RUN 4 already covered indirectly (iBoot bit preservation axis). RUN 4 preserved 8 of 10 iBoot bits and wedged. Preserving 2 more (bits 6, 8) is unlikely to be the axis — marginal information gain vs A.
+4. C violates single-variable-delta discipline. If it works, we don't know whether A alone or B alone or both were required — need extra RUNs to bisect. Keeping A and B separate preserves discipline: RUN 7 = B alone if A fails.
+5. Cost delta A vs B is small (~25 lines). Cost is not the deciding factor.
+
+RUN 6 dispatch flags:
+```
+--no-pcie-init --preinit-probe --pmgr-enable --pmgr-per-port --gate-poke
+--phy-ip-probe --t8140-replay --phy-ip-diag --fuse-recon
+--naked-write-test-readonly --axi2af-naked-apply
+--pcieclkgen-naked-apply-to=axi_sub5_base --reachable-scan --phycmn-early
+--t8122-shared-post --phy-ip-diag-at=none
+```
+
+RUN 6 wedge-immune posture: `--phy-ip-diag-at=none` retained. No phy_ip probe.
+Step 6.g runs (the FIRST phy_ip access from Python replay); if it succeeds,
+Phase F continues to steps 6.h / 7 / 8 / 9 / 10 and we may complete shared-init
+for the first time. If 6.g still wedges (same address, same UartTimeout), the
+bit-9 hypothesis is ruled out and RUN 7 = candidate B.
+
+Interpretation matrix for RUN 6:
+- **6.g STOPS wedging** (any progress past `phy_ip_base+0x38`) → bit 9 hypothesis confirmed; `set32(phy_shared+0, 0x200)` is the missing decode-enable. Continue Phase F to see how far we get. If Phase F completes shared-init, run `p.pcie_init()` next. New chapter opens.
+- **6.g wedges identically** at `phy_ip+0x38` → bit 9 not the ungate. RUN 7 = candidate B (`--pcieclkgen-set5-only`).
+- **6.g wedges at a NEW address** or NEW error class → bit 9 partial ungate; something else still gates. New wedge address is high-signal.
+- **SError somewhere INSIDE `--t8122-shared-post`** → the specific write triggering SError is isolated by our guarded Python (something the C-side `dc25f2f` warning could not pin down). Diagnostic gold; adjust the block accordingly.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
