@@ -1,9 +1,14 @@
 #!/bin/bash
 #
-# perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter.
+# perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1} [extra perstn.py args...]
+#
+# Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
+# scouting phase; I onward were single-hypothesis bisections). Numbers
+# (1..N) begin a NEW series starting 2026-07-21 that iterates on top of
+# RUN S's naked mask-RMW apply findings until PCIe trains.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -108,6 +113,23 @@
 #            The reachable-scan captures state at post-5.8.a
 #            (post-axi2af) and post-5.8.b (post-pcieclkgen) so
 #            cross-checkpoint diff shows what those writes toggled.
+#
+#   RUN 1 -- RUN S baseline + --phycmn-early. Smallest untried delta
+#            from the RUN S state. RUN I proved --phycmn-early's
+#            mask32(phy_common+0, MODE=ON) STICKS (phy_common+0
+#            0x80300000 -> 0x80300001) but alone did not ungate
+#            phy_ip; RUN S proved the naked-mask-RMW apply of
+#            axi2af (14 STUCK / 42 SKIP-NOOP / 2 NO-OP at
+#            axi_base+0x38/+0x40) plus pcieclkgen at axi_sub5+0
+#            (STUCK) also alone did not ungate phy_ip. RUN 1 tests
+#            the CO-application: CLK_MODE=ON after all the naked
+#            applies land, immediately before the phy_ip access.
+#            Same wedge-immune diag posture as RUN S (--reachable-
+#            scan + --phy-ip-diag-at=none). Success criterion:
+#            step 6.g stops wedging at phy_ip_base+0x38. Failure
+#            case is still informative because the reachable-scan
+#            captures state at every checkpoint including post-7.
+#            phycmn-early (which is a new snapshot combination).
 #
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
@@ -245,8 +267,28 @@ case "${RUN^^}" in
                --reachable-scan
                --phy-ip-diag-at=none)
         ;;
+    1)
+        # RUN 1: RUN S baseline + --phycmn-early. Tests whether
+        # CLK_MODE=ON, applied AFTER the naked axi2af + pcieclkgen
+        # applies and BEFORE the phy_ip access, is the missing
+        # co-factor that ungates phy_ip. Single-variable delta vs
+        # RUN S: only --phycmn-early is added. Neither RUN I
+        # (--phycmn-early alone) nor RUN S (naked applies alone)
+        # succeeded, so RUN 1 tests the combination that has never
+        # been tried. Wedge-immune diag posture kept identical to
+        # RUN S so cross-checkpoint diff vs RUN S surfaces exactly
+        # what the CLK_MODE=ON write toggles when the naked apply
+        # state has already landed.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test
+               --axi2af-naked-apply
+               --pcieclkgen-naked-apply-to=axi_sub5_base
+               --reachable-scan
+               --phycmn-early
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
