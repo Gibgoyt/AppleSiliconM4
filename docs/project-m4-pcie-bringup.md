@@ -160,4 +160,46 @@ RUN 4 wedge-immune posture: `--phy-ip-diag-at=none` + `--reachable-scan` retaine
 
 Implementation lives in `Scripts/m1n1/perstn.py` (probe signature + argparse + mutual-exclusion validation, ~35 lines) and `Scripts/m1n1/perstn-run.sh` (`case 4)` + header comment + usage extension, ~65 lines). Run with `./Scripts/m1n1/perstn-run.sh 4`.
 
+**State as of 2026-07-21 (post RUN 4):**
+- **RUN 4 hypothesis FALSIFIED.** Step 6.g still wedges at `phy_ip_base+0x38` (entry #0, `UartTimeout`, m1n1 UART-froze) identically to every RUN A..3. The destructive `--naked-write-test` sub5+0 clobber was NOT the confounding variable for RUNs S/1/2/3. Full findings + register-level diff tables in `Scripts/m1n1/logs/4/findings.md`.
+- **`--naked-write-test-readonly` refactor worked as designed.** `axi_sub5_reachable` and `axi_sub6_reachable` first-touch flags flipped True at the pre-read stage (nic-runtime.txt:1571-1580), enabling downstream reachable-scan windows AND step 5.8.b's pcieclkgen naked apply. `sub5+0 = 0x00081f55` (iBoot value) was PRESERVED through post-5.75 and post-5.8.a — direct proof the READ-ONLY variant satisfies the reachability gate without destroying iBoot state.
+- **pcieclkgen naked apply landed cleanly, but STILL clobbers 2 iBoot bits.** `#0 @ 0x495046200 mask=0x3e0 value=0x220 pre=0x00081f55 new=0x00081e35 post=0x00081e35 [STUCK]`. Bit math: iBoot bits 6, 8 fall inside the mask and get cleared; bit 5 gets set (from `value`); the eight iBoot bits outside the mask (0, 2, 4, 9, 10, 11, 12, 19) survive. Compare RUN 3 where the destructive probe left sub5+0 at `0x00000a01` (only 3 bits set) — RUN 4 preserved 8 of 10 iBoot bits and the wedge STILL fires at the same address.
+- **sub5+0 persistence: `0x00081e35` stable across post-5.8.b through post-6.f** (six checkpoints). Nothing between pcieclkgen apply and 6.g mutates it — not phy_shared CLK0/CLK1 ACK writes, not CLK_MODE=ON, not the T8140 phy_shared+4 marker. The mask-RMW state is what phy_ip sees at 6.g.
+- **axi2af naked apply: 15 STUCK / 2 NO-OP / 41 SKIP-NOOP** (nic-runtime.txt:2200-2205). Same offset-specific NO-OPs at `axi_base+0x38` and `+0x40` as RUNs S / 1 — both refuse bit-31 sets while adjacent `+0x3c` (same mask + same value) STUCK. The `+0x38` low-nibble alignment with the `phy_ip+0x38` wedge address is still suspicious.
+- **axi_base+0 bit-31 clear window mechanism is INDEPENDENT of `--naked-write-test`.** RUN 4 skipped the destructive write to axi_base+0 (READ-ONLY probe only pre-reads), yet bit 31 still gets set by axi2af entry #0 (post-write readback `STUCK`) and CLEARED again by the time post-5.8.a's reachable-scan runs. Confirms mechanism is either "clear-on-any-subsequent-write in the block" or "decay timer," not "the naked-write-test's final write clobbered it."
+- **Consolidated interpretation across A..4:** `phy_ip+0x38` is now the persistent wedge address across 22+ boots. Nothing tried has moved it. The remaining live hypotheses are: (i) pcieclkgen's mask-RMW clobbers iBoot bits 6 or 8 which are a PLL enable — a bit-5-only variant would test this; (ii) phy_ip is decode-locked in reads only, POSTED writes may still land — RUN P tested from a weaker state, RUN 4 has cleanest state ever; (iii) T8122 shared-init post writes (`poll phy_shared+0x8`, `set32 phy_shared+0 0x200`, pcie.c:543-551) — untested; (iv) C-side barrier/DSB/ISB ordering the Python replay does not model.
+
+**Proposed RUN 5 plan (2026-07-21):**
+
+Three single-variable candidates ranked; RUN 5 = candidate A per the priority argument below.
+
+| Candidate | Change vs RUN 4 baseline | Hypothesis | perstn.py change? | Cost |
+|---|---|---|---|---|
+| **A** | Add `--phy-ip-write-probe`. Change `--phy-ip-diag-at=none` to `--phy-ip-diag-at=post-7.phycmn-early`. | phy_ip decodes POSTED writes even when reads AXI-stall. RUN 4's state is the cleanest ever probed (naked axi2af + naked pcieclkgen at sub5+0 landed, CLK_MODE=ON). RUN P tested from a broken-applicator baseline where NO naked applies had landed — this state has never been probed for write-decode. Binary result: WROTE opens a "naked write32-only replay of apcie-phy-ip-pll-tunables" strategy (29 shared entries). STALL/SYNC definitively closes off write-only strategies. | No — dispatcher-only, flag already exists | Cheap |
+| **B** | Drop `--pcieclkgen-naked-apply-to=axi_sub5_base`, OR replace pcieclkgen's mask-RMW with a bit-5-only set32 that preserves iBoot bits 6, 8 | pcieclkgen's clobbering of iBoot bits 6, 8 is the missing config. Drop version has confound: iBoot's bit 5 stays 0 (which pcieclkgen wants set) — some part of pcieclkgen is needed. Narrow-mask variant (set bit 5 without clearing bits 6, 8) preserves more iBoot state and tests whether bit-5-set alone is enough. | Drop: dispatcher-only. Narrow: ~15 lines (new `--pcieclkgen-set5-only` mode) | Cheap-medium |
+| **C** | Add `--t8122-shared-post` running `poll(phy_shared+0x8, 1, 1, 250000)` + `set32(phy_shared+0, 0x200)` between step 6.f and 6.g (pcie.c:543-551) | T8122's post-phy-tunables writes T8140 skips gate phy_ip on t8132. `dc25f2f` warned this trips SError on the C side; guarded Python isolates the fault to a specific write. Untested by any prior RUN. | Yes — new step + CLI flag (~40 lines) | Medium |
+
+**Selection: RUN 5 = candidate A.** Reasoning:
+1. Only candidate that hard-forks the next 3-5 RUNs on a binary result. WROTE and STALL/SYNC lead to fundamentally different next-step strategies (naked-write replay of pll tunables vs upstream aperture search).
+2. Dispatcher-only. Fastest iteration. Flag already exists in perstn.py argparse.
+3. RUN 4's state (all naked applies landed, CLK_MODE=ON, iBoot bits mostly preserved) is the cleanest starting point for a write-decode probe we have ever had. Any WROTE result from this state is a strong signal.
+4. Does not rule out B or C — they are queued for RUN 6 / RUN 7 depending on RUN 5's outcome.
+
+RUN 5 dispatch flags:
+```
+--no-pcie-init --preinit-probe --pmgr-enable --pmgr-per-port --gate-poke
+--phy-ip-probe --t8140-replay --phy-ip-diag --fuse-recon
+--naked-write-test-readonly --axi2af-naked-apply
+--pcieclkgen-naked-apply-to=axi_sub5_base --reachable-scan --phycmn-early
+--phy-ip-write-probe --phy-ip-diag-at=post-7.phycmn-early
+```
+
+Success criterion: the `--phy-ip-write-probe`'s posted `write32(phy_ip_base + 0x38, 0)` at post-7.phycmn-early lands cleanly (WROTE, guard delta = 0). Failure informs whether phy_ip is decode-locked in both directions or only in reads.
+
+Interpretation matrix for RUN 5:
+- **WROTE (probe returns cleanly, guard delta = 0)** → phy_ip decodes posted writes in the RUN 4 state. RUN 6 = naked-write32 replay of the 29 apcie-phy-ip-pll-tunables shared entries (no readback, no RMW). If those land, RUN 7 = same for apcie-phy-ip-auspma-tunables. This is a full new attack surface.
+- **STALL (UartTimeout as at 6.g reads)** → phy_ip is bidirectionally decode-locked from the current fabric state. Refocuses on B (pcieclkgen bit-5-only), C (T8122 shared-init post), or upstream unlock hunt.
+- **SYNC (Exception: SYNC — the fault mode RUN J saw on reads)** → writes decode but hit a live register that actively responds with an SError. Highly informative — pins the fault mode on writes at `phy_ip+0x38` specifically.
+- **Any other outcome (e.g. probe raises + subsequent flow continues)** → new signal; interpret ad hoc.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
