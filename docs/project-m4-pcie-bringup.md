@@ -353,4 +353,34 @@ Interpretation matrix for RUN 9:
 - **6.g wedges at a NEW address / new fault class** → partial ungate; highest-signal outcome short of success. Analyze before RUN 10.
 - **SError inside 6.5 with 0x300** → bit 8 write faults where bit 9 didn't; high-signal — bit 8 touches something live.
 
+**State as of 2026-07-21 (post RUN 9):**
+- **RUN 9 hypothesis FALSIFIED.** `--t8122-shared-post-val=0x300` executed perfectly: `phy_shared+0` went `0xf3c0301f` → `0xf3c0331f` (bits 8+9 BOTH STUCK, delta=`0x300`, guard delta=0, `Scripts/m1n1/logs/9/nic-runtime.txt:5284-5290`). `phy_shared+0x8` stayed 0. Step 6.g wedged IDENTICALLY: `RAISED at #0 (shared) 0x497040038: UartTimeout` (line 5773). PMGR sweep identical to RUN 8 (all APCIE gates ON). The `rc_base+0x4c` cross-run delta is a free-running counter (increments within-run at every checkpoint) — noise. Full findings in `Scripts/m1n1/logs/9/findings.md`.
+- **Candidates A, B, C, D are all dead. The Python-replayable pcie.c write inventory is EXHAUSTED.** Every pre-phy_ip write from the T8140, T8122, and T602X branches has now been applied on t8132, verified STUCK, from the strongest state buildable (naked axi2af + bit-5-only pcieclkgen + CLK0/1 ACKed + RESET clear + marker 0x11 + CLK_MODE=ON + phy_shared+0 bits 8+9 + all APCIE PMGR gates ON). phy_ip remains bidirectionally decode-locked.
+- **Key insight for RUN 10:** proxy `read32`/`mask32` are executed by m1n1's CPU — "proxy vs on-CPU" is identical at the instruction level. The ONLY remaining sequencing variable is **inter-access timing**: pcie.c reaches the first phy_ip access microseconds after the CLK0/CLK1 REQ/ACK handshake and RESET deassert; the proxy replay takes seconds per step. If phy_ip decode has a post-handshake time window, every RUN A..9 blew through it.
+
+**Proposed RUN 10 plan (2026-07-21):**
+
+**RUN 10 = `--phy-ip-stub-apply=tail` on the RUN 9 baseline.** New machinery in perstn.py: an AArch64 stub assembled with `m1n1.asm.ARMAsm` (aarch64-linux-gnu cross toolchain, verified installed), uploaded via the `upload_and_call.py` pattern (`u.memalign` → `iface.writemem` → `p.dc_cvau` + `p.ic_ivau`), executed with `p.call(stub, table, n, tail, phy_shared_base, phy_common_base)`. The stub:
+1. (tail mode) re-runs the idempotent shared-init tail back-to-back, each step followed by `dsb sy`: CLK0REQ + bounded ACK poll, CLK1REQ + bounded ACK poll, RESET clear, `phy_shared+4 |= 0x11`, phycmn MODE_ON, `phy_shared+0 |= 0x300`;
+2. immediately applies the 29 apcie-phy-ip-pll-tunables mask-RMWs (then, in a second call, the 47 auspma entries) — 32-byte table entries `(absolute_addr, mask, value, size)`, sizes 1/2/4 handled, port-1-inactive slice filtered exactly like the Python path;
+3. returns `0xC0DE0000 | applied_count` on success, `0xDEAD0001/2` on CLK ACK poll timeout, `0xDEAD0003` on bad entry size. A wedge surfaces as UartTimeout on the `p.call` step, which is fully flushed beforehand (wedge-immune posture).
+
+Single-variable delta vs RUN 9: only the 6.g/6.h application method changes (plus the idempotent tail re-run microseconds before — same hypothesis axis). All RUN 9 flags retained.
+
+RUN 10 dispatch flags:
+```
+--no-pcie-init --preinit-probe --pmgr-enable --pmgr-per-port --gate-poke
+--phy-ip-probe --t8140-replay --phy-ip-diag --fuse-recon
+--naked-write-test-readonly --axi2af-naked-apply
+--pcieclkgen-set5-only-to=axi_sub5_base --reachable-scan --phycmn-early
+--phy4-x10-early --t8122-shared-post --t8122-shared-post-val=0x300
+--phy-ip-diag-at=none --pmgr-pre6g-scan --phy-ip-stub-apply=tail
+```
+
+Interpretation matrix for RUN 10:
+- **`0xC0DE001d` (29 applied) + live phy_ip verify reads** → BREAKTHROUGH: the post-handshake timing window was the gate all along. Phase F continues automatically (6.h stub, steps 8/9/10, success banner). Follow-ups: next boot `p.pcie_init()` end-to-end; the m1n1 C path needs no timing fix (it is already tight) — document the window and the port-1 slice filter as the t8132 patch.
+- **UartTimeout on the p.call step** → tight-timing axis falsified. With identical instructions, identical CPU, tight timing, all PS gates ON, and every pcie.c write applied, the conclusion is **phy_ip does not decode for the AP from any post-iBoot state constructible via pcie.c writes**. RUN 11+ axes: (a) **SMC/companion-processor ownership hunt** — does another agent (SMC, an ASC coprocessor) own PHY-IP init on t8132? Sweep SMC keys around PCIe/PHY power (`gP0d` family), ADT for ASC/coprocessor nodes tied to apcie, and the aperture's position relative to coprocessor address spaces; (b) **aperture/security recon** — ADT attributes, fabric routing, anything marking 0x497040000 as non-AP-accessible; (c) C-side native 6.g as final closure (low expectation — same instructions, same CPU).
+- **`0xDEAD0001/2`** → a tail step is NOT idempotent (CLK ACK lost on re-request) — unexpected and high-signal about the handshake semantics.
+- **SError/guard-delta instead of a hang** → first-ever fault syndrome from phy_ip; analyze the ESR/exception record.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
