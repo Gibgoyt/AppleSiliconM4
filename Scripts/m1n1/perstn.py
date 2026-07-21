@@ -41,6 +41,7 @@ import argparse
 import io
 import pathlib
 import re
+import struct
 import sys
 import time
 import traceback
@@ -53,6 +54,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from m1n1.setup import *          # noqa: F401,F403 -- exposes u, p, iface
 from m1n1.fw.smc import SMCClient
 from m1n1.proxy import GUARD
+from m1n1 import asm as m1n1_asm
 
 from pcie_regs import ApcieMap
 
@@ -2914,6 +2916,133 @@ def _poll32_bit(addr, mask, want, timeout_ms):
             return False, val, (time.monotonic() - started) * 1000.0
 
 
+# RUN 10: on-CPU stub that replays the shared-init tail (pcie.c 468-551,
+# idempotent) and then applies phy_ip tunable mask-RMWs back-to-back with
+# barriers, microseconds apart -- vs the multi-second proxy round-trip
+# gaps of the per-entry Python path. Proxy read32/mask32 execute on the
+# same CPU as this stub, so the ONLY variable is inter-access timing.
+#
+# Calling convention (p.call): x0=table addr, x1=entry count, x2=tail
+# flag (1 = replay tail first), x3=phy_shared_base, x4=phy_common_base.
+# Table entry = 32 bytes little-endian: (absolute_addr u64, mask u64,
+# value u64, size u64), size in {1, 2, 4}.
+# Returns: 0xC0DE0000 | applied_count on success;
+#          0xDEAD0001 = CLK0ACK poll timeout, 0xDEAD0002 = CLK1ACK poll
+#          timeout, 0xDEAD0003 = bad entry size.
+# ARMAsm's HEADER supplies _start: -- execution begins at the first
+# instruction. Position-independent (relative branches only, constants
+# via mov/movk -- no logical-immediate or literal-pool dependence).
+_PHY_IP_STUB_SRC = """
+    cbz x2, apply
+
+    // ---- tail replay (idempotent re-run of pcie.c 468-551) ----
+    // 6.a: phy_shared+0 |= CLK0REQ (bit 0)
+    ldr w5, [x3]
+    orr w5, w5, #1
+    str w5, [x3]
+    dsb sy
+    // 6.b: poll CLK0ACK (bit 2), bounded
+    mov x9, #0x100000
+poll0:
+    ldr w5, [x3]
+    tbnz w5, #2, poll0_done
+    subs x9, x9, #1
+    b.ne poll0
+    mov x0, #0xDEAD
+    lsl x0, x0, #16
+    orr x0, x0, #1
+    ret
+poll0_done:
+    // 6.c: phy_shared+0 |= CLK1REQ (bit 1)
+    ldr w5, [x3]
+    orr w5, w5, #2
+    str w5, [x3]
+    dsb sy
+    // 6.d: poll CLK1ACK (bit 3), bounded
+    mov x9, #0x100000
+poll1:
+    ldr w5, [x3]
+    tbnz w5, #3, poll1_done
+    subs x9, x9, #1
+    b.ne poll1
+    mov x0, #0xDEAD
+    lsl x0, x0, #16
+    orr x0, x0, #2
+    ret
+poll1_done:
+    // 6.e: phy_shared+0 &= ~RESET (bit 7)
+    ldr w5, [x3]
+    mov w6, #0x80
+    bic w5, w5, w6
+    str w5, [x3]
+    dsb sy
+    // 6.f + 6.i: phy_shared+4 |= 0x11 (T8140 marker + T8122 bit 4)
+    ldr w5, [x3, #4]
+    mov w6, #0x11
+    orr w5, w5, w6
+    str w5, [x3, #4]
+    dsb sy
+    // 7: phy_common+0 = (val & ~MODE_MASK(3)) | MODE_ON(1)
+    ldr w5, [x4]
+    mov w6, #0x3
+    bic w5, w5, w6
+    orr w5, w5, #1
+    str w5, [x4]
+    dsb sy
+    // 6.5: phy_shared+0 |= 0x300 (T602X shared-init post-write)
+    ldr w5, [x3]
+    mov w6, #0x300
+    orr w5, w5, w6
+    str w5, [x3]
+    dsb sy
+
+apply:
+    mov x10, #0
+    cbz x1, done
+loop:
+    ldp x5, x6, [x0]
+    ldp x7, x8, [x0, #16]
+    add x0, x0, #32
+    cmp x8, #4
+    b.eq do32
+    cmp x8, #2
+    b.eq do16
+    cmp x8, #1
+    b.eq do8
+    mov x0, #0xDEAD
+    lsl x0, x0, #16
+    orr x0, x0, #3
+    ret
+do32:
+    ldr w9, [x5]
+    bic w9, w9, w6
+    orr w9, w9, w7
+    str w9, [x5]
+    b next
+do16:
+    ldrh w9, [x5]
+    bic w9, w9, w6
+    orr w9, w9, w7
+    strh w9, [x5]
+    b next
+do8:
+    ldrb w9, [x5]
+    bic w9, w9, w6
+    orr w9, w9, w7
+    strb w9, [x5]
+next:
+    dsb sy
+    add x10, x10, #1
+    subs x1, x1, #1
+    b.ne loop
+done:
+    mov x0, #0xC0DE
+    lsl x0, x0, #16
+    orr x0, x0, x10
+    ret
+"""
+
+
 def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               extra_tunables=False, phycmn_first=False,
                               phy_ip_diag=False,
@@ -2932,7 +3061,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               cio3pllcore_naked_apply_to=None,
                               t8122_shared_post=False,
                               t8122_shared_post_val=0x200,
-                              pmgr_pre6g_scan=False):
+                              pmgr_pre6g_scan=False,
+                              phy_ip_stub_apply=None):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -3307,6 +3437,135 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                 _flush(f"phaseF.verify_dead.{step_id}.port{pi}")
                 return False
             exc_running += delta
+        _flush(f"phaseF.done.{step_id}")
+        return True
+
+    def phy_ip_stub_apply_run(step_id, prop, tail):
+        """RUN 10: apply an apcie-phy-ip-* tunables prop via the on-CPU
+        stub (_PHY_IP_STUB_SRC) instead of per-entry proxy calls.
+
+        Same ADT parse + port-slice filter as phy_ip_tunables_filtered
+        (INACTIVE port-1 entries are excluded from the table). The stub
+        executes all entries back-to-back with dsb sy barriers; with
+        tail=True it first re-runs the idempotent shared-init tail
+        (CLK0/CLK1 REQ+ACK, RESET clear, marker|0x11, MODE_ON, |0x300)
+        so the first phy_ip access lands microseconds -- not seconds --
+        after the handshake. Everything is flushed before the p.call so
+        a wedge leaves a complete log.
+        """
+        nonlocal exc_running
+        label = f"{step_id}.tunables {prop} (on-CPU stub, tail={tail})"
+        apcie.phaseF_last_step = label
+        buf.write(f"  --- {label} ---\n")
+        entries = apcie.apcie_tunables(u, prop)
+        if not entries:
+            buf.write(f"    SKIPPED: /arm-io/apcie has no property "
+                      f"{prop!r} (matches pcie.c adt_getprop skip).\n")
+            _flush(f"phaseF.skip.{step_id}")
+            return True
+
+        plan = []
+        skipped = 0
+        sizes = {}
+        for offset, size, mask, value in entries:
+            info = apcie.classify_phy_ip_offset(offset)
+            kind = info["kind"]
+            apply_it = (kind == "shared" or
+                        (kind == "port_slice" and info["port_active"]))
+            if apply_it:
+                plan.append((apcie.phy_ip_base + offset, mask, value,
+                             size))
+                sizes[size] = sizes.get(size, 0) + 1
+            else:
+                skipped += 1
+        buf.write(f"    plan: {len(plan)} entries to apply, {skipped} "
+                  f"skipped (inactive/out-of-window); sizes = "
+                  f"{ {f'{k}B': v for k, v in sorted(sizes.items())} }\n")
+        bad_sizes = [s for s in sizes if s not in (1, 2, 4)]
+        if bad_sizes:
+            buf.write(f"    ERROR: stub cannot handle entry sizes "
+                      f"{bad_sizes}; aborting {step_id}\n")
+            _flush(f"phaseF.err.{step_id}")
+            return False
+        _flush(f"phaseF.plan.{step_id}")
+
+        stub_addr = getattr(apcie, "phyip_stub_addr", None)
+        if stub_addr is None:
+            stub = m1n1_asm.ARMAsm(_PHY_IP_STUB_SRC, 0)
+            stub_addr = u.memalign(0x4000, len(stub.data))
+            iface.writemem(stub_addr, stub.data)
+            p.dc_cvau(stub_addr, len(stub.data))
+            p.ic_ivau(stub_addr, len(stub.data))
+            apcie.phyip_stub_addr = stub_addr
+            buf.write(f"    stub: {len(stub.data)} bytes uploaded to "
+                      f"0x{stub_addr:x} (dc_cvau + ic_ivau done)\n")
+        table = b"".join(struct.pack("<QQQQ", a, m, v, s)
+                         for a, m, v, s in plan)
+        table_addr = u.memalign(0x100, max(len(table), 8))
+        iface.writemem(table_addr, table)
+        p.dc_cvau(table_addr, max(len(table), 8))
+        buf.write(f"    table: {len(plan)} entries ({len(table)} bytes) "
+                  f"at 0x{table_addr:x}; first entry target "
+                  f"0x{plan[0][0]:x}\n" if plan else
+                  f"    table: empty\n")
+        _flush(f"phaseF.pre.{step_id}.stub-call")
+
+        ret_holder = {}
+
+        def _call():
+            r = p.call(stub_addr, table_addr, len(plan),
+                       1 if tail else 0, phy_shared_base,
+                       phy_common_base)
+            ret_holder["ret"] = r
+            return r
+
+        if not step(f"{step_id}.p.call(stub, {len(plan)} entries, "
+                    f"tail={int(tail)})", _call):
+            return False
+        ret = ret_holder.get("ret")
+        if ret is None:
+            buf.write("    STUB: no return value captured; aborting\n")
+            _flush(f"phaseF.stubnoret.{step_id}")
+            return False
+        hi, lo = (ret >> 16) & 0xffff, ret & 0xffff
+        if hi == 0xC0DE:
+            buf.write(f"    STUB SUCCESS: applied {lo}/{len(plan)} "
+                      f"entries on-CPU (ret=0x{ret:x})\n")
+        elif hi == 0xDEAD:
+            reason = {1: "CLK0ACK poll timeout",
+                      2: "CLK1ACK poll timeout",
+                      3: "bad entry size"}.get(lo, "unknown")
+            buf.write(f"    STUB TAIL FAILURE: code {lo} ({reason}) "
+                      f"(ret=0x{ret:x})\n")
+            _flush(f"phaseF.stubfail.{step_id}")
+            return False
+        else:
+            buf.write(f"    STUB UNEXPECTED RETURN: 0x{ret:x} -- "
+                      f"treating as failure\n")
+            _flush(f"phaseF.stubodd.{step_id}")
+            return False
+
+        buf.write("    verification reads (guarded):\n")
+        for probe_off in (0x38, 0x90, 0x1000):
+            addr = apcie.phy_ip_base + probe_off
+            vr_label = f"{step_id}.verify@0x{addr:x}"
+            with guarded(buf, vr_label, short_timeout=timeout):
+                try:
+                    v = p.read32(addr)
+                    buf.write(f"      read32(0x{addr:x}) = 0x{v:08x}\n")
+                except Exception as e:
+                    buf.write(f"      read32(0x{addr:x}) RAISED: "
+                              f"{e.__class__.__name__}: {e}\n")
+                    _flush(f"phaseF.verifyraise.{step_id}")
+                    return False
+            alive, delta = check_alive_fast(exc_running, timeout=timeout)
+            if not alive:
+                buf.write(f"    !!! m1n1 unresponsive after verify "
+                          f"0x{addr:x}\n")
+                _flush(f"phaseF.verify_dead.{step_id}")
+                return False
+            exc_running += delta
+        diag(f"post-{step_id}.stub-apply")
         _flush(f"phaseF.done.{step_id}")
         return True
 
@@ -3943,10 +4202,24 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
               "     will be SKIPPED to avoid the AXI stall observed on\n"
               "     the 2026-07-11 run. See phy-ip-report for entry list.\n")
 
-    if not phy_ip_tunables_filtered("6.g", "apcie-phy-ip-pll-tunables"):
-        return
-    if not phy_ip_tunables_filtered("6.h", "apcie-phy-ip-auspma-tunables"):
-        return
+    if phy_ip_stub_apply:
+        # RUN 10: on-CPU stub path. tail mode re-runs the shared-init
+        # tail back-to-back so the first phy_ip access lands
+        # microseconds after the CLK/RESET handshake.
+        if not phy_ip_stub_apply_run("6.g.stub",
+                                     "apcie-phy-ip-pll-tunables",
+                                     tail=(phy_ip_stub_apply == "tail")):
+            return
+        if not phy_ip_stub_apply_run("6.h.stub",
+                                     "apcie-phy-ip-auspma-tunables",
+                                     tail=False):
+            return
+    else:
+        if not phy_ip_tunables_filtered("6.g", "apcie-phy-ip-pll-tunables"):
+            return
+        if not phy_ip_tunables_filtered("6.h",
+                                        "apcie-phy-ip-auspma-tunables"):
+            return
 
     # ---- step 7: phy_common CLK mode set (unless --phycmn-first
     # or --phycmn-early already applied it earlier).
@@ -4926,6 +5199,26 @@ def main():
                          "t8132; candidate D tests whether bit 8 "
                          "(alone or with 9) is the phy_ip decode "
                          "gate. Requires --t8122-shared-post.")
+    ap.add_argument("--phy-ip-stub-apply", choices=("tail", "bare"),
+                    default=None,
+                    help="RUN 10: apply the phy_ip tunables (6.g pll + "
+                         "6.h auspma) via an on-CPU AArch64 stub "
+                         "(ARMAsm + p.call) instead of per-entry proxy "
+                         "calls. Proxy MMIO already executes on the "
+                         "same CPU, so the real variable is INTER-"
+                         "ACCESS TIMING: the proxy takes seconds "
+                         "between the phy_shared handshake and the "
+                         "first phy_ip access where pcie.c takes "
+                         "microseconds. 'tail' re-runs the idempotent "
+                         "shared-init tail (CLK0/CLK1 REQ+ACK, RESET "
+                         "clear, marker|0x11, MODE_ON, |0x300) "
+                         "immediately before the tunables, back-to-"
+                         "back with dsb sy barriers; 'bare' applies "
+                         "the tunables only. Port-1-inactive slice "
+                         "entries are filtered exactly like the "
+                         "Python path. Returns 0xC0DE0000|count on "
+                         "success, 0xDEAD000x on tail poll timeout / "
+                         "bad size. Requires --t8140-replay.")
     ap.add_argument("--pmgr-pre6g-scan", action="store_true",
                     help="RUN 8: immediately before step 6.g (first "
                          "phy_ip touch), do a READ-ONLY PS-register "
@@ -5180,6 +5473,7 @@ def main():
                     f"t8122_shared_post_val="
                     f"0x{args.t8122_shared_post_val:x}, "
                     f"pmgr_pre6g_scan={args.pmgr_pre6g_scan}, "
+                    f"phy_ip_stub_apply={args.phy_ip_stub_apply!r}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
@@ -5206,7 +5500,8 @@ def main():
                         t8122_shared_post=args.t8122_shared_post,
                         t8122_shared_post_val=
                             args.t8122_shared_post_val,
-                        pmgr_pre6g_scan=args.pmgr_pre6g_scan),
+                        pmgr_pre6g_scan=args.pmgr_pre6g_scan,
+                        phy_ip_stub_apply=args.phy_ip_stub_apply),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:

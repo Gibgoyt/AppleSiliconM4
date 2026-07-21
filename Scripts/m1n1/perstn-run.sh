@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -64,7 +64,15 @@
 # at the wedge point, weakening the power-domain hypothesis).
 # RUN 9 = RUN 8 baseline + --t8122-shared-post-val=0x300
 # (candidate D: T602X's pcie.c:549 set32(phy_shared+0, 0x300),
-# bits 8+9 -- bit 8 has never been set on t8132).
+# bits 8+9 -- bit 8 has never been set on t8132) (FALSIFIED --
+# bits 8+9 STUCK at 0xf3c0331f, 6.g wedged identically; the
+# Python-replayable pcie.c write set is now EXHAUSTED). RUN 10 =
+# RUN 9 baseline + --phy-ip-stub-apply=tail: on-CPU AArch64 stub
+# (ARMAsm + p.call) re-runs the idempotent shared-init tail and
+# applies the 29 pll tunable RMWs back-to-back with dsb sy
+# barriers, microseconds apart -- tests the tight-timing-window
+# hypothesis (proxy MMIO runs on the same CPU; only the seconds-
+# long inter-access gaps differ from pcie.c).
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -731,8 +739,59 @@ case "${RUN^^}" in
                --phy-ip-diag-at=none
                --pmgr-pre6g-scan)
         ;;
+    10)
+        # RUN 10: RUN 9 baseline + --phy-ip-stub-apply=tail (tight-
+        # timing-window hypothesis). RUN 9 FALSIFIED candidate D:
+        # set32(phy_shared+0, 0x300) landed STUCK (0xf3c0331f, bits
+        # 8+9 SET) yet 6.g wedged identically at phy_ip+0x38 entry
+        # #0 (UartTimeout). With candidates A-D dead, the Python-
+        # replayable pcie.c write set is EXHAUSTED. Key insight:
+        # proxy read32/mask32 are executed by m1n1's CPU too, so
+        # "proxy vs on-CPU" is identical at the instruction level --
+        # the ONLY remaining sequencing variable is INTER-ACCESS
+        # TIMING. pcie.c reaches the first phy_ip access
+        # microseconds after the CLK0/CLK1 REQ+ACK handshake and
+        # RESET deassert; our proxy replay takes SECONDS. If phy_ip
+        # decode has a post-handshake time window, every RUN A..9
+        # blew through it. RUN 10 uploads an AArch64 stub (ARMAsm,
+        # aarch64-linux-gnu toolchain, upload_and_call.py pattern:
+        # memalign + writemem + dc_cvau + ic_ivau + p.call) that
+        # (a) re-runs the idempotent shared-init tail back-to-back
+        # (CLK0REQ/ACK poll, CLK1REQ/ACK poll, RESET clear,
+        # marker|0x11, phycmn MODE_ON, |0x300 -- all with dsb sy)
+        # and (b) immediately applies the 29 pll tunable mask-RMWs,
+        # then the 47 auspma entries (port-1-inactive slice
+        # filtered, exactly like the Python path). Stub returns
+        # 0xC0DE0000|count on success, 0xDEAD000x on tail poll
+        # timeout / bad entry size; a wedge surfaces as UartTimeout
+        # on the p.call step (fully flushed beforehand). Single-
+        # variable delta vs RUN 9: only the 6.g/6.h application
+        # method (+ the idempotent tail re-run microseconds before
+        # -- same hypothesis axis). Interpretation: 0xC0DE001d +
+        # live phy_ip verify reads = BREAKTHROUGH (timing window
+        # confirmed; Phase F continues to 6.h/8/9/10);
+        # UartTimeout = tight-timing axis falsified -- phy_ip does
+        # not decode for the AP from ANY post-iBoot state pcie.c
+        # writes can build; RUN 11+ = SMC/companion-processor
+        # ownership hunt + aperture/security recon;
+        # 0xDEAD0001/2 = a tail step is NOT idempotent (high
+        # signal); SError/guard-delta = first-ever fault syndrome
+        # from phy_ip.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test-readonly
+               --axi2af-naked-apply
+               --pcieclkgen-set5-only-to=axi_sub5_base
+               --reachable-scan
+               --phycmn-early
+               --phy4-x10-early
+               --t8122-shared-post
+               --t8122-shared-post-val=0x300
+               --phy-ip-diag-at=none
+               --pmgr-pre6g-scan
+               --phy-ip-stub-apply=tail)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
