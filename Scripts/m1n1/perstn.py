@@ -2430,8 +2430,11 @@ _REACHABLE_SCAN_WINDOWS = (
     # after (post-5.75 onward), it includes them so we can see whether
     # writes to them stick, whether they carry register-like state,
     # and whether that state changes across checkpoints.
-    ("axi_sub5_base",   0x00, 0x44, 4),   # 17 words: 0..0x40 (guarded)
-    ("axi_sub6_base",   0x00, 0x44, 4),   # 17 words: 0..0x40 (guarded)
+    # RUN 2: sub5 widened from 0x44 -> 0x104 so cio3pllcore #4 (+0x4c),
+    # #5 (+0xe8), and #6 (+0x100) pre/post state is captured at every
+    # checkpoint. 65 reads adds ~50 ms of UART tx per snapshot -- fine.
+    ("axi_sub5_base",   0x00, 0x104, 4),  # 65 words: 0..0x100 (guarded)
+    ("axi_sub6_base",   0x00, 0x104, 4),  # 65 words: 0..0x100 (guarded)
 )
 
 
@@ -2836,6 +2839,7 @@ _PHY_IP_DIAG_CHECKPOINTS = (
     "post-5.phy-tunables",
     "post-5.75.naked-write-test", # RUN Q: right after the naked writes to rc/axi
     "post-5.5.extra-tunables",  # RUN J: right after cio3pllcore + pcieclkgen apply
+    "post-5.8.c.cio3pllcore-naked-apply",  # RUN 2: right after full cio3pllcore naked apply
     "post-6.b.CLK0ACK",
     "post-6.d.CLK1ACK",
     "post-6.f.T8140-marker",
@@ -2884,7 +2888,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               phy_ip_write_probe=False,
                               naked_write_test=False,
                               axi2af_naked_apply=False,
-                              pcieclkgen_naked_apply_to=None):
+                              pcieclkgen_naked_apply_to=None,
+                              cio3pllcore_naked_apply_to=None):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -3367,6 +3372,51 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                           f"{e.__class__.__name__}: {e}\n")
                 _flush("phaseF.naked-extra.pcieclkgen.top-raise")
         diag("post-5.8.b.pcieclkgen-naked-apply")
+
+    # ---- step 5.8.c: RUN 2 naked mask-RMW apply of the full 7-entry
+    # apcie-cio3pllcore-tunables prop. RUN R stopped after verifying
+    # cio3pllcore #0..#3 SKIP-NOOP on axi_sub5 (offsets 0x00, 0x24,
+    # 0x28, 0x38 -- all within the 0..0x40 reachable-scan window).
+    # Entries #4 (+0x4c mask 0xff), #5 (+0xe8 mask 0xe0000), and #6
+    # (+0x100 mask 0xffffff) were never scanned or applied on any
+    # base -- their offsets sit OUTSIDE RUN R's scan window. These
+    # are the substantial PLL analog config writes (24-bit config on
+    # #6). Hypothesis: they configure the CIO3 PLL analog block
+    # (matching kboot_atc.c's tunable_CIO3PLL_CORE at ATC offset
+    # 0x2A00), and their absence is why phy_ip has no working
+    # reference clock and AXI-stalls on first touch.
+    #
+    # Gate identical to pcieclkgen 5.8.b so sub5/sub6 first-touch
+    # proof is required. m1n1's ADT-declared reg_idx for
+    # apcie-cio3pllcore-tunables is 1 (rc_base); RUN Q proved that
+    # target R/O, so target-attr override to axi_sub5_base (or
+    # axi_sub6_base) is expected.
+    if cio3pllcore_naked_apply_to:
+        gate_map = {
+            "axi_sub5_base": "axi_sub5_reachable",
+            "axi_sub6_base": "axi_sub6_reachable",
+        }
+        gate_attr = gate_map.get(cio3pllcore_naked_apply_to)
+        if gate_attr is not None and not getattr(apcie, gate_attr, False):
+            buf.write(f"  --- 5.8.c.cio3pllcore: SKIP, "
+                      f"{gate_attr}=False (no first-touch proof; "
+                      f"run --naked-write-test first) ---\n")
+            _flush("phaseF.naked-extra.cio3pllcore.skip.no-first-touch")
+        else:
+            try:
+                probe_naked_extra_apply(
+                    apcie, buf,
+                    prop_name="apcie-cio3pllcore-tunables",
+                    target_attr=cio3pllcore_naked_apply_to,
+                    adt_declared_reg_idx=_T8140_RC_IDX,
+                    timeout=timeout,
+                    flush_fn=_flush)
+            except Exception as e:
+                buf.write(f"  probe_naked_extra_apply(cio3pllcore) "
+                          f"RAISED at top level: "
+                          f"{e.__class__.__name__}: {e}\n")
+                _flush("phaseF.naked-extra.cio3pllcore.top-raise")
+        diag("post-5.8.c.cio3pllcore-naked-apply")
 
     # ---- step 5.5: t8132-specific extra tunables (--extra-tunables).
     # These props are NOT applied by m1n1 pcie.c on any codepath.
@@ -4521,6 +4571,28 @@ def main():
                          "0x3e0 = 0x140 (not 0x220), so this is a "
                          "distinct config change. Requires "
                          "--t8140-replay.")
+    ap.add_argument("--cio3pllcore-naked-apply-to", default=None,
+                    metavar="ATTR",
+                    help="RUN 2: after --pcieclkgen-naked-apply-to, "
+                         "apply the FULL 7-entry apcie-cio3pllcore-"
+                         "tunables via naked mask-RMW to the ApcieMap "
+                         "attribute named ATTR (e.g. axi_sub5_base). "
+                         "RUN R only verified entries #0..#3 (offsets "
+                         "0x00..0x38) SKIP-NOOP on sub5 -- entries #4 "
+                         "(+0x4c mask 0xff), #5 (+0xe8 mask 0xe0000), "
+                         "and #6 (+0x100 mask 0xffffff) were NEVER "
+                         "attempted on any base. These offsets sit "
+                         "outside the RUN R reachable-scan window. "
+                         "Hypothesis: #4..#6 configure the CIO3 PLL "
+                         "analog block (parallel to kboot_atc.c's "
+                         "tunable_CIO3PLL_CORE at ATC offset 0x2A00) "
+                         "and are the missing reference-clock config "
+                         "that leaves phy_ip un-clocked and AXI-"
+                         "stalling on first touch. m1n1's ADT-"
+                         "declared reg_idx is 1 (rc_base) but RUN Q "
+                         "showed that target R/O; ATTR override to "
+                         "axi_sub5_base is expected. Requires "
+                         "--t8140-replay.")
     ap.add_argument("--phy-ip-write-probe", action="store_true",
                     help="RUN P: at --phy-ip-diag-at swap the phy_ip "
                          "read probe for a naked posted write32 to "
@@ -4746,6 +4818,8 @@ def main():
                     f"axi2af_naked_apply={args.axi2af_naked_apply}, "
                     f"pcieclkgen_naked_apply_to="
                     f"{args.pcieclkgen_naked_apply_to!r}, "
+                    f"cio3pllcore_naked_apply_to="
+                    f"{args.cio3pllcore_naked_apply_to!r}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
@@ -4762,7 +4836,9 @@ def main():
                         naked_write_test=args.naked_write_test,
                         axi2af_naked_apply=args.axi2af_naked_apply,
                         pcieclkgen_naked_apply_to=
-                            args.pcieclkgen_naked_apply_to),
+                            args.pcieclkgen_naked_apply_to,
+                        cio3pllcore_naked_apply_to=
+                            args.cio3pllcore_naked_apply_to),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:

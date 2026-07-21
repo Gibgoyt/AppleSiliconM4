@@ -3,12 +3,15 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
 # (1..N) begin a NEW series starting 2026-07-21 that iterates on top of
-# RUN S's naked mask-RMW apply findings until PCIe trains.
+# RUN S's naked mask-RMW apply findings until PCIe trains. RUN 1 =
+# RUN S + phycmn-early (FALSIFIED that CLK_MODE=ON is the co-factor).
+# RUN 2 = RUN 1 + full cio3pllcore naked apply (closes the RUN R gap
+# where entries #4..#6 were never attempted on any base).
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -130,6 +133,43 @@
 #            case is still informative because the reachable-scan
 #            captures state at every checkpoint including post-7.
 #            phycmn-early (which is a new snapshot combination).
+#
+#   RUN 2 -- RUN 1 baseline + --cio3pllcore-naked-apply-to=axi_sub5_
+#            base. Finishes what RUN S/R left half-done: RUN R
+#            probed cio3pllcore entries #0..#3 on sub5 and marked
+#            them SKIP-NOOP (pre-values already matched target),
+#            then STOPPED. Entries #4 (+0x4c mask 0xff <- 0x94),
+#            #5 (+0xe8 mask 0xe0000 <- 0x20000), and #6 (+0x100
+#            mask 0xffffff <- 0xb40b4) were NEVER applied on any
+#            base -- their offsets sit OUTSIDE the RUN R scan
+#            window (0..0x40). Entry #6 is a 24-bit config write
+#            -- the substantial PLL analog config. Hypothesis:
+#            #4..#6 configure the CIO3 PLL analog block (parallel
+#            to kboot_atc.c's tunable_CIO3PLL_CORE at ATC offset
+#            0x2A00) and are the missing reference-clock config
+#            that leaves phy_ip un-clocked and AXI-stalling on
+#            first touch. Same wedge-immune diag posture as RUNs
+#            S/1 (--reachable-scan + --phy-ip-diag-at=none). The
+#            reachable-scan window on axi_sub5/sub6 is widened
+#            from +0..+0x40 to +0..+0x100 so #4..#6 pre/post
+#            state is captured at every Phase F checkpoint,
+#            including the new post-5.8.c.cio3pllcore-naked-apply
+#            slot. Success criterion: step 6.g stops wedging at
+#            phy_ip_base+0x38. Interpretation matrix:
+#              - 6.g clean            -> cio3pllcore was the missing
+#                                        piece; proceed to Phase G
+#              - 6.g wedges, #4..#6
+#                STUCK on sub5        -> PLL now configured, some
+#                                        OTHER gate remains open;
+#                                        RUN 3 = findings.md A/B
+#              - 6.g wedges, #4..#6
+#                NO-OP on sub5        -> sub5 is the wrong target;
+#                                        RUN 3 = re-apply to
+#                                        axi_sub6_base
+#              - Any of #4..#6 raises
+#                SYNC / delta         -> hit a live register;
+#                                        directly informative,
+#                                        RUN 3 narrows on offset
 #
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
@@ -287,8 +327,35 @@ case "${RUN^^}" in
                --phycmn-early
                --phy-ip-diag-at=none)
         ;;
+    2)
+        # RUN 2: RUN 1 baseline + --cio3pllcore-naked-apply-to=
+        # axi_sub5_base. Applies the FULL 7-entry apcie-cio3pllcore-
+        # tunables via naked mask-RMW to axi_sub5. RUN R stopped
+        # after verifying entries #0..#3 SKIP-NOOP on sub5 (offsets
+        # 0x00, 0x24, 0x28, 0x38 -- all within RUN R's 0..0x40 scan
+        # window). Entries #4 (+0x4c mask 0xff <- 0x94), #5 (+0xe8
+        # mask 0xe0000 <- 0x20000), and #6 (+0x100 mask 0xffffff
+        # <- 0xb40b4) sit OUTSIDE that window and have NEVER been
+        # applied to any base. Entry #6 is a 24-bit config write --
+        # the substantial PLL analog config. Hypothesis: #4..#6
+        # configure the CIO3 PLL analog block and are the missing
+        # reference-clock config that leaves phy_ip un-clocked.
+        # Reachable-scan window on axi_sub5/sub6 was widened from
+        # 0..0x40 to 0..0x100 at the source so #4..#6 pre/post
+        # state is captured at every Phase F checkpoint, including
+        # the new post-5.8.c.cio3pllcore-naked-apply slot. Success
+        # criterion: 6.g stops wedging at phy_ip_base+0x38.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test
+               --axi2af-naked-apply
+               --pcieclkgen-naked-apply-to=axi_sub5_base
+               --cio3pllcore-naked-apply-to=axi_sub5_base
+               --reachable-scan
+               --phycmn-early
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
