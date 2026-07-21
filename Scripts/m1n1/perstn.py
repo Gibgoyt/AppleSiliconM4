@@ -2931,6 +2931,7 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               pcieclkgen_set5_only_to=None,
                               cio3pllcore_naked_apply_to=None,
                               t8122_shared_post=False,
+                              t8122_shared_post_val=0x200,
                               pmgr_pre6g_scan=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
@@ -3814,8 +3815,10 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     # actionable un-run write in pcie.c that could plausibly be that
     # gate.
     if t8122_shared_post:
+        val = t8122_shared_post_val
         buf.write("\n  --- 6.5.T8122-shared-post replay "
-                  "(pcie.c:543-551, T8140 codepath skips) ---\n")
+                  "(pcie.c:543-551, T8140 codepath skips; "
+                  f"val=0x{val:x}) ---\n")
         try:
             ps8_pre = p.read32(phy_shared_base + 0x8)
         except Exception as e:
@@ -3841,10 +3844,11 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
             _flush("phaseF.6.5.t8122-shared-post.ps0-pre-RAISED")
             return
         buf.write(f"    pre-write: phy_shared+0x0 = 0x{ps0_pre:08x} "
-                  f"(bit 9 = {'SET' if ps0_pre & 0x200 else 'CLEAR'})\n")
+                  f"(bits(0x{val:x}) = 0x{ps0_pre & val:x})\n")
 
-        if not step("6.5.set32(phy_shared+0, 0x200) [T8122 post-write]",
-                    lambda: p.set32(phy_shared_base + 0, 0x200)):
+        if not step(f"6.5.set32(phy_shared+0, 0x{val:x}) "
+                    "[T8122/T602X post-write]",
+                    lambda: p.set32(phy_shared_base + 0, val)):
             return
 
         try:
@@ -3856,23 +3860,27 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
             _flush("phaseF.6.5.t8122-shared-post.post-read-RAISED")
             return
         buf.write(f"    post-write: phy_shared+0x0 = 0x{ps0_post:08x} "
-                  f"(delta=0x{ps0_post ^ ps0_pre:08x}, bit 9 = "
-                  f"{'SET' if ps0_post & 0x200 else 'CLEAR'})\n")
+                  f"(delta=0x{ps0_post ^ ps0_pre:08x}, "
+                  f"bits(0x{val:x}) = 0x{ps0_post & val:x})\n")
         buf.write(f"    post-write: phy_shared+0x8 = 0x{ps8_post:08x} "
                   f"(delta=0x{ps8_post ^ ps8_pre:08x})\n")
 
-        if ps0_post & 0x200:
-            if ps0_pre & 0x200:
-                buf.write("    RESULT: bit 9 was already set (iBoot or "
-                          "prior step); this write was a no-op\n")
+        if (ps0_post & val) == val:
+            if (ps0_pre & val) == val:
+                buf.write(f"    RESULT: bits 0x{val:x} were already "
+                          "set (iBoot or prior step); this write was "
+                          "a no-op\n")
             else:
-                buf.write("    RESULT: bit 9 STUCK -- phy_shared+0 now "
-                          "has T8122 post-write applied. If bit 9 is "
-                          "the phy_ip decode gate, 6.g should stop "
-                          "wedging.\n")
+                buf.write(f"    RESULT: bits 0x{val:x} STUCK -- "
+                          "phy_shared+0 now has the shared-init "
+                          "post-write applied. If one of these bits "
+                          "is the phy_ip decode gate, 6.g should "
+                          "stop wedging.\n")
         else:
-            buf.write("    RESULT: bit 9 NOT STUCK -- write silently "
-                      "dropped by fabric. Hypothesis WEAKENED.\n")
+            buf.write(f"    RESULT: bits 0x{val:x} NOT (fully) STUCK "
+                      f"(post masked = 0x{ps0_post & val:x}) -- "
+                      "write silently dropped by fabric. Hypothesis "
+                      "WEAKENED.\n")
 
         diag("post-6.5.t8122-shared-post")
 
@@ -4907,6 +4915,17 @@ def main():
                          "Adds a new diag checkpoint "
                          "post-6.5.t8122-shared-post. Requires "
                          "--t8140-replay.")
+    ap.add_argument("--t8122-shared-post-val",
+                    type=lambda s: int(s, 0), default=0x200,
+                    help="RUN 9: value for the 6.5 "
+                         "set32(phy_shared+0, VAL) shared-init "
+                         "post-write. 0x200 = T8122 variant (bit 9, "
+                         "pcie.c:551; RUNs 6-8, FALSIFIED as the "
+                         "ungate). 0x300 = T602X variant (bits 8+9, "
+                         "pcie.c:549) -- bit 8 has NEVER been set on "
+                         "t8132; candidate D tests whether bit 8 "
+                         "(alone or with 9) is the phy_ip decode "
+                         "gate. Requires --t8122-shared-post.")
     ap.add_argument("--pmgr-pre6g-scan", action="store_true",
                     help="RUN 8: immediately before step 6.g (first "
                          "phy_ip touch), do a READ-ONLY PS-register "
@@ -5158,6 +5177,8 @@ def main():
                     f"cio3pllcore_naked_apply_to="
                     f"{args.cio3pllcore_naked_apply_to!r}, "
                     f"t8122_shared_post={args.t8122_shared_post}, "
+                    f"t8122_shared_post_val="
+                    f"0x{args.t8122_shared_post_val:x}, "
                     f"pmgr_pre6g_scan={args.pmgr_pre6g_scan}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
@@ -5183,6 +5204,8 @@ def main():
                         cio3pllcore_naked_apply_to=
                             args.cio3pllcore_naked_apply_to,
                         t8122_shared_post=args.t8122_shared_post,
+                        t8122_shared_post_val=
+                            args.t8122_shared_post_val,
                         pmgr_pre6g_scan=args.pmgr_pre6g_scan),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")

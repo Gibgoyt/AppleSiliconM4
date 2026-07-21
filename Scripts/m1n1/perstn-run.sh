@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -58,7 +58,13 @@
 # set32(phy_shared+4, 0x10), which T8140 skips, hoisted before
 # the first phy_ip access) + read-only --pmgr-pre6g-scan
 # (PS-register sweep of apcie/pcie/phy/auspma/cio-named PMGR
-# devices just before 6.g).
+# devices just before 6.g) (FALSIFIED -- phy_shared+4 went
+# 0x01 -> 0x11 STUCK, phy_shared+0x8 stayed 0, 6.g wedged
+# identically; PMGR sweep showed every APCIE-family gate ON
+# at the wedge point, weakening the power-domain hypothesis).
+# RUN 9 = RUN 8 baseline + --t8122-shared-post-val=0x300
+# (candidate D: T602X's pcie.c:549 set32(phy_shared+0, 0x300),
+# bits 8+9 -- bit 8 has never been set on t8132).
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -683,8 +689,50 @@ case "${RUN^^}" in
                --phy-ip-diag-at=none
                --pmgr-pre6g-scan)
         ;;
+    9)
+        # RUN 9: RUN 8 baseline + --t8122-shared-post-val=0x300
+        # (candidate D). RUN 8 FALSIFIED candidate C: the 6.i
+        # set32(phy_shared+4, 0x10) landed STUCK (0x01 -> 0x11),
+        # phy_shared+0x8 bit 0 never went active, and 6.g wedged
+        # identically at phy_ip+0x38 entry #0 (UartTimeout). The
+        # new pre-6.g PMGR sweep (39 matched devices) showed every
+        # APCIE-family gate ON (actual=0xf) at the wedge point --
+        # APCIE_GP / APCIE_SYS_GP / APCIE_ST / APCIE_SYS_ST /
+        # APCIE_PHY_SW -- so no observable power domain blocks
+        # phy_ip; the OFF devices are all unrelated ATC*/DPTX/CIO
+        # Type-C tunnels. Next-ranked hypothesis: T602X's variant
+        # of the shared-init post-write, set32(phy_shared+0, 0x300)
+        # (pcie.c:549, bits 8+9), vs the T8122 0x200 (bit 9 only,
+        # pcie.c:551) that RUNs 6/7/8 applied. Bit 8 has NEVER been
+        # set on t8132. Expected transition: phy_shared+0
+        # 0xf3c0301f -> 0xf3c0331f. Single-variable delta vs RUN 8:
+        # only the 6.5 write value changes 0x200 -> 0x300; every
+        # other flag retained (falsified-but-kept: --phy4-x10-early,
+        # --pcieclkgen-set5-only-to, --t8122-shared-post; read-only:
+        # --pmgr-pre6g-scan). Wedge-immune posture retained:
+        # --phy-ip-diag-at=none. If 6.g goes clean: bit 8 (alone or
+        # with 9) is the phy_ip decode gate -- m1n1 patch candidate.
+        # If 6.g wedges identically: candidate D falsified and the
+        # Python-replayable pcie.c write set is EXHAUSTED; RUN 10
+        # pivots to the sequencing-gap axis (upload a stub and
+        # p.call() it so the 29 pll-tunable writes execute
+        # back-to-back on-CPU with barriers; fallback: port the
+        # port-1 slice filter into m1n1's pcie_init_controller()
+        # and let the C side run 6.g natively).
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test-readonly
+               --axi2af-naked-apply
+               --pcieclkgen-set5-only-to=axi_sub5_base
+               --reachable-scan
+               --phycmn-early
+               --phy4-x10-early
+               --t8122-shared-post
+               --t8122-shared-post-val=0x300
+               --phy-ip-diag-at=none
+               --pmgr-pre6g-scan)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
