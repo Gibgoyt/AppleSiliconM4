@@ -2928,6 +2928,7 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               naked_write_test_readonly=False,
                               axi2af_naked_apply=False,
                               pcieclkgen_naked_apply_to=None,
+                              pcieclkgen_set5_only_to=None,
                               cio3pllcore_naked_apply_to=None,
                               t8122_shared_post=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
@@ -3412,6 +3413,91 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                           f"RAISED at top level: "
                           f"{e.__class__.__name__}: {e}\n")
                 _flush("phaseF.naked-extra.pcieclkgen.top-raise")
+        diag("post-5.8.b.pcieclkgen-naked-apply")
+
+    # ---- step 5.8.b (RUN 7 variant): --pcieclkgen-set5-only-to.
+    # RUN 6 FALSIFIED bit 9 of phy_shared+0. Remaining top hypothesis:
+    # pcieclkgen's mask-RMW (mask=0x3e0 val=0x220) clobbers iBoot
+    # bits 6, 8 in axi_sub5+0 (iBoot pre-value 0x00081f55). Both
+    # bits fall INSIDE the pcieclkgen mask and value 0x220 supplies
+    # 0 for them, so RUN S/1/2/3/4/5/6 all cleared them. If either
+    # is a PLL enable, phy_ip has no clock and fabric AXI-stalls
+    # on decode -- which matches the persistent 6.g wedge exactly.
+    #
+    # RUN 7 replaces the mask-RMW with set32(sub5+0, 0x20): sets
+    # only bit 5 (pcieclkgen's stated intent), preserves iBoot bits
+    # 6 and 8 (and every other iBoot bit outside bit 5). Same
+    # reachability gate + same diag checkpoint as the mask-RMW path
+    # so cross-run log alignment is trivial. Mutually exclusive with
+    # --pcieclkgen-naked-apply-to (argparse enforces).
+    if pcieclkgen_set5_only_to:
+        gate_map = {
+            "axi_sub5_base": "axi_sub5_reachable",
+            "axi_sub6_base": "axi_sub6_reachable",
+        }
+        gate_attr = gate_map.get(pcieclkgen_set5_only_to)
+        target_base = getattr(apcie, pcieclkgen_set5_only_to, None)
+        if target_base is None:
+            buf.write(f"  --- 5.8.b.pcieclkgen-set5-only: SKIP, "
+                      f"unknown attr {pcieclkgen_set5_only_to!r} on "
+                      f"ApcieMap ---\n")
+            _flush("phaseF.pcieclkgen-set5-only.unknown-attr")
+        elif gate_attr is not None and not getattr(apcie, gate_attr, False):
+            buf.write(f"  --- 5.8.b.pcieclkgen-set5-only: SKIP, "
+                      f"{gate_attr}=False (no first-touch proof; run "
+                      f"--naked-write-test or --naked-write-test-"
+                      f"readonly first) ---\n")
+            _flush("phaseF.pcieclkgen-set5-only.skip.no-first-touch")
+        else:
+            buf.write(f"\n  --- 5.8.b.pcieclkgen-set5-only (RUN 7: "
+                      f"bit-5-only set32 to {pcieclkgen_set5_only_to}, "
+                      f"preserving iBoot bits 6, 8) ---\n")
+            try:
+                pre = p.read32(target_base + 0)
+            except Exception as e:
+                buf.write(f"    pre-read RAISED: "
+                          f"{e.__class__.__name__}: {e} -- aborting\n")
+                _flush("phaseF.pcieclkgen-set5-only.pre-read-RAISED")
+                return
+            buf.write(f"    pre:  {pcieclkgen_set5_only_to}+0 = "
+                      f"0x{pre:08x}  "
+                      f"bit5={'SET' if pre & 0x20 else 'CLEAR'}  "
+                      f"bit6={'SET' if pre & 0x40 else 'CLEAR'}  "
+                      f"bit8={'SET' if pre & 0x100 else 'CLEAR'}  "
+                      f"bit9={'SET' if pre & 0x200 else 'CLEAR'}\n")
+            if not step(f"5.8.b.set32({pcieclkgen_set5_only_to}+0, "
+                        f"0x20) [bit-5-only]",
+                        lambda: p.set32(target_base + 0, 0x20)):
+                return
+            try:
+                post = p.read32(target_base + 0)
+            except Exception as e:
+                buf.write(f"    post-read RAISED: "
+                          f"{e.__class__.__name__}: {e}\n")
+                _flush("phaseF.pcieclkgen-set5-only.post-read-RAISED")
+                return
+            delta = post ^ pre
+            buf.write(f"    post: {pcieclkgen_set5_only_to}+0 = "
+                      f"0x{post:08x}  "
+                      f"bit5={'SET' if post & 0x20 else 'CLEAR'}  "
+                      f"bit6={'SET' if post & 0x40 else 'CLEAR'}  "
+                      f"bit8={'SET' if post & 0x100 else 'CLEAR'}  "
+                      f"bit9={'SET' if post & 0x200 else 'CLEAR'}  "
+                      f"(delta=0x{delta:08x})\n")
+            if delta == 0 and (pre & 0x20):
+                buf.write("    RESULT: bit 5 was ALREADY set (write "
+                          "was a no-op; iBoot state fully intact)\n")
+            elif delta == 0x20 and (post & 0x140) == (pre & 0x140):
+                buf.write("    RESULT: bit 5 STUCK cleanly; iBoot "
+                          "bits 6, 8 preserved (goal achieved -- "
+                          "single-bit delta vs RUN 4)\n")
+            elif delta == 0:
+                buf.write("    RESULT: bit 5 NOT SET -- write silently "
+                          "dropped by fabric. Hypothesis WEAKENED.\n")
+            else:
+                buf.write(f"    RESULT: unexpected delta 0x{delta:08x} "
+                          f"-- more than bit 5 changed (fabric side-"
+                          f"effect?)\n")
         diag("post-5.8.b.pcieclkgen-naked-apply")
 
     # ---- step 5.8.c: RUN 2 naked mask-RMW apply of the full 7-entry
@@ -4711,6 +4797,25 @@ def main():
                          "0x3e0 = 0x140 (not 0x220), so this is a "
                          "distinct config change. Requires "
                          "--t8140-replay.")
+    ap.add_argument("--pcieclkgen-set5-only-to", default=None,
+                    metavar="ATTR",
+                    help="RUN 7 candidate B: replace the pcieclkgen "
+                         "mask-RMW (mask=0x3e0 val=0x220) with a naked "
+                         "set32(ATTR+0, 0x20) that sets ONLY bit 5. "
+                         "iBoot pre-value at sub5+0 = 0x00081f55; the "
+                         "mask-RMW variant clobbers iBoot bits 6, 8 "
+                         "(both inside mask 0x3e0, both cleared by "
+                         "value 0x220 supplying 0 for them). If either "
+                         "is a PLL enable, phy_ip has no clock and "
+                         "AXI-stalls on decode -- matching the "
+                         "persistent 6.g wedge across RUNs S/1/2/3/4/"
+                         "5/6. RUN 7 tests preserving those bits. "
+                         "Post-value = 0x00081f75 (all iBoot bits + "
+                         "bit 5). Same reachability gate + same diag "
+                         "checkpoint (post-5.8.b.pcieclkgen-naked-"
+                         "apply) as the mask-RMW path. Mutually "
+                         "exclusive with --pcieclkgen-naked-apply-to. "
+                         "Requires --t8140-replay.")
     ap.add_argument("--cio3pllcore-naked-apply-to", default=None,
                     metavar="ATTR",
                     help="Apply the FULL 7-entry apcie-cio3pllcore-"
@@ -4851,6 +4956,9 @@ def main():
     if args.naked_write_test and args.naked_write_test_readonly:
         ap.error("--naked-write-test and --naked-write-test-readonly "
                  "are mutually exclusive")
+    if args.pcieclkgen_naked_apply_to and args.pcieclkgen_set5_only_to:
+        ap.error("--pcieclkgen-naked-apply-to and --pcieclkgen-set5-"
+                 "only-to are mutually exclusive")
 
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -4992,6 +5100,8 @@ def main():
                     f"axi2af_naked_apply={args.axi2af_naked_apply}, "
                     f"pcieclkgen_naked_apply_to="
                     f"{args.pcieclkgen_naked_apply_to!r}, "
+                    f"pcieclkgen_set5_only_to="
+                    f"{args.pcieclkgen_set5_only_to!r}, "
                     f"cio3pllcore_naked_apply_to="
                     f"{args.cio3pllcore_naked_apply_to!r}, "
                     f"t8122_shared_post={args.t8122_shared_post}, "
@@ -5014,6 +5124,8 @@ def main():
                         axi2af_naked_apply=args.axi2af_naked_apply,
                         pcieclkgen_naked_apply_to=
                             args.pcieclkgen_naked_apply_to,
+                        pcieclkgen_set5_only_to=
+                            args.pcieclkgen_set5_only_to,
                         cio3pllcore_naked_apply_to=
                             args.cio3pllcore_naked_apply_to,
                         t8122_shared_post=args.t8122_shared_post),

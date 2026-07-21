@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -43,7 +43,15 @@
 # 250000) then set32(phy_shared+0, 0x200) [bit 9, T8122]. We SKIP
 # the poll (would timeout) and do the set32 unconditionally.
 # Hypothesis: bit 9 of phy_shared+0 is a phy_ip decode-enable gate
-# T8140 doesn't have but T8132 needs.
+# T8140 doesn't have but T8132 needs (FALSIFIED -- bit 9 STUCK
+# cleanly, phy_shared+0 = 0xf3c0321f, but 6.g wedges identically
+# at phy_ip+0x38). RUN 7 = RUN 6 baseline but replaces the
+# pcieclkgen mask-RMW (mask=0x3e0 val=0x220, which clears iBoot
+# bits 6, 8) with --pcieclkgen-set5-only-to=axi_sub5_base
+# (set32(sub5+0, 0x20) -- bit 5 only, preserving iBoot bits 6, 8).
+# Hypothesis: bits 6, 8 are PLL enables that iBoot set and we've
+# been clearing every RUN S/1/2/3/4/5/6, causing phy_ip to have
+# no clock and AXI-stall on decode.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -583,8 +591,45 @@ case "${RUN^^}" in
                --t8122-shared-post
                --phy-ip-diag-at=none)
         ;;
+    7)
+        # RUN 7: RUN 6 baseline but replaces --pcieclkgen-naked-
+        # apply-to=axi_sub5_base (mask 0x3e0 val 0x220) with
+        # --pcieclkgen-set5-only-to=axi_sub5_base (set32(sub5+0,
+        # 0x20) -- bit 5 only). RUN 6 FALSIFIED the bit-9-of-
+        # phy_shared+0 hypothesis; bit 9 landed STUCK but phy_ip
+        # remained bidirectionally decode-locked. Remaining top
+        # hypothesis: pcieclkgen's mask-RMW has been clobbering
+        # iBoot bits 6, 8 in axi_sub5+0 on every RUN S/1/2/3/4/
+        # 5/6. iBoot pre-value 0x00081f55 has bits 6, 8 SET;
+        # mask 0x3e0 covers bits 5-9; value 0x220 supplies 0
+        # for bits 6, 8 -- so mask-RMW ALWAYS CLEARS them.
+        # If bit 6 or bit 8 is a PLL enable, phy_ip has no
+        # clock and every access AXI-stalls (matches the
+        # persistent wedge signature exactly). RUN 7 preserves
+        # bits 6, 8: post-value = 0x00081f75 (all iBoot bits +
+        # bit 5). Single-variable delta vs RUN 6: only the
+        # pcieclkgen mode switches from mask-RMW to bit-5-only;
+        # --t8122-shared-post is retained even though RUN 6
+        # proved it doesn't help (dropping it would be a second
+        # variable change). Success criterion: step 6.g stops
+        # wedging for the first time in 24+ boots. If it does,
+        # pcieclkgen's mask-RMW has been the confounding
+        # variable across 7 RUNs and we open a new attack
+        # surface: audit every mask-RMW tunable for iBoot-bit
+        # clobbers. If 6.g still wedges, bits 6/8 are not PLL
+        # enables and RUN 8 = candidate C (--phy4-x10-early).
+        # Wedge-immune posture retained: --phy-ip-diag-at=none.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test-readonly
+               --axi2af-naked-apply
+               --pcieclkgen-set5-only-to=axi_sub5_base
+               --reachable-scan
+               --phycmn-early
+               --t8122-shared-post
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
