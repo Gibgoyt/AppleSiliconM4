@@ -11,9 +11,11 @@ metadata:
 - ADT / geometry helpers: `Scripts/m1n1/pcie_regs.py`
 - Recon dumps: `m4_recon/` (nic-adt.txt etc.)
 
-**m1n1 fork (C tree):** `~/Projects/AsahiLinux/m4/m1n1`
+**m1n1 fork (C tree):** `~/Projects/C/embedded/m1n1` (sibling of `AppleSiliconM4/` in the workspace)
+- `perstn.py` derives this path as `pathlib.Path(__file__).resolve().parents[3] / "m1n1" / "proxyclient"`, so as long as m1n1 stays a sibling of AppleSiliconM4 the sys.path append resolves. If you move either tree, update `perstn.py` at the top-of-file `sys.path.append(...)`.
 - pcie.c is at `src/pcie.c`. The t8132 clause pins `state->pcie_regs = &regs_t8140` (search "apcie,t8132").
 - Proxy Python bindings: `proxyclient/m1n1/proxy.py`. `p.tunables_apply_local_addr` is BROKEN there (uses wrong constant) -- use `p.tunables_apply_local(path, prop, reg_idx)` and rely on num_phys==1 identity.
+- Historical note: prior to 2026-07-21 the fork lived at `~/Projects/AsahiLinux/m4/m1n1` and `perstn.py` hardcoded that home-relative path. The tree was moved into the C/embedded workspace between RUN S and RUN 1; the stale path caused RUN 1 to fail with `ModuleNotFoundError: No module named 'm1n1'` until perstn.py was updated to a script-relative path.
 
 **Runtime log (from perstn.sh):** `/tmp/m4-recon/nic-runtime.txt`. Gets truncated + rewritten on every flush. Every Phase F step now flushes pre+post so the file always ends with the exact step name the wedge hit.
 

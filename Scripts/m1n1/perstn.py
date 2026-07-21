@@ -46,8 +46,8 @@ import time
 import traceback
 from contextlib import contextmanager
 
-sys.path.append(str(pathlib.Path.home() /
-    "Projects/AsahiLinux/m4/m1n1/proxyclient"))
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[3] /
+    "m1n1" / "proxyclient"))
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 from m1n1.setup import *          # noqa: F401,F403 -- exposes u, p, iface
