@@ -2006,7 +2006,8 @@ _NAKED_WRITE_FIRST_TOUCH_ATTRS = {
 }
 
 
-def probe_naked_write_test(apcie, buf, timeout=0.3, flush_fn=None):
+def probe_naked_write_test(apcie, buf, timeout=0.3, flush_fn=None,
+                           write=True):
     """RUN Q + RUN R: bypass m1n1's tunables_apply_local RMW and hit
     the same addresses with naked posted write32(). Read pre AND post
     each write. Result tags:
@@ -2028,8 +2029,19 @@ def probe_naked_write_test(apcie, buf, timeout=0.3, flush_fn=None):
 
     A per-target flush before/after so a wedge (should not happen)
     leaves us knowing exactly which address was in flight.
+
+    RUN 4: when write=False, only the pre-read + first-touch-flag
+    flip run per target. The write + post-read + result-tag stages
+    are skipped. RUN 3's findings.md flagged that RUN R's first
+    sub5+0 write clobbers iBoot's 0x00081f55 PLL control word
+    (bits 2/4/6/8/12 outside cio3pllcore's mask) to 0x00000a01.
+    write=False preserves that iBoot state while still flipping the
+    axi_sub{5,6}_reachable flags that gate reachable-scan windowing
+    and step 5.8.b/5.8.c naked-extra applies.
     """
-    buf.write("=== naked-write test (RUN Q base + RUN R extensions) ===\n")
+    mode_tag = "" if write else " READ-ONLY (RUN 4: first-touch only, no writes)"
+    buf.write(f"=== naked-write test{mode_tag} "
+              f"(RUN Q base + RUN R extensions) ===\n")
     buf.write("purpose: determine whether writes to rc_base/axi_base\n"
               "actually stick when we bypass m1n1 tunables_apply_local.\n"
               "RUN O's reachable-scan showed the applicator's writes\n"
@@ -2039,7 +2051,13 @@ def probe_naked_write_test(apcie, buf, timeout=0.3, flush_fn=None):
               "RUN R adds first-touch probes for axi_sub5/sub6\n"
               "(candidate CIO3 PLL Core target blocks) plus\n"
               "additional rc_base offsets (0x54 R/W bitmap, 0x100\n"
-              "cio3pllcore #6 candidate).\n\n")
+              "cio3pllcore #6 candidate).\n")
+    if not write:
+        buf.write("RUN 4: write stage suppressed. Pre-read still flips\n"
+                  "axi_sub{5,6}_reachable on success so downstream\n"
+                  "reachable-scan + naked-extra applies can proceed\n"
+                  "without destroying iBoot's sub5+0 PLL control word.\n")
+    buf.write("\n")
     if flush_fn is not None:
         flush_fn("phaseF.naked-write.enter")
     try:
@@ -2087,6 +2105,14 @@ def probe_naked_write_test(apcie, buf, timeout=0.3, flush_fn=None):
             setattr(apcie, flag_attr, True)
             buf.write(f"    first-touch OK: {flag_attr}=True "
                       f"(reachable-scan will include {block_attr})\n")
+
+        if not write:
+            pre_s = f"0x{pre_val:08x}" if pre_val is not None else "?"
+            buf.write(f"    pre={pre_s}  [READ-ONLY: write suppressed "
+                      f"(RUN 4); would have written 0x{value:08x}]\n")
+            if flush_fn is not None:
+                flush_fn(f"phaseF.naked-write.done.{tag}")
+            continue
 
         # write
         if flush_fn is not None:
@@ -2898,6 +2924,7 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               reachable_scan=False,
                               phy_ip_write_probe=False,
                               naked_write_test=False,
+                              naked_write_test_readonly=False,
                               axi2af_naked_apply=False,
                               pcieclkgen_naked_apply_to=None,
                               cio3pllcore_naked_apply_to=None):
@@ -3316,10 +3343,11 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
     # so it observes the same 'pre' state RUN O's post-5 snapshot did,
     # and before step 5.5 (extra-tunables) so it can attempt the same
     # writes as an independent path.
-    if naked_write_test:
+    if naked_write_test or naked_write_test_readonly:
         try:
             probe_naked_write_test(apcie, buf, timeout=timeout,
-                                    flush_fn=_flush)
+                                    flush_fn=_flush,
+                                    write=naked_write_test)
         except Exception as e:
             buf.write(f"  probe_naked_write_test RAISED at top level: "
                       f"{e.__class__.__name__}: {e}\n")
@@ -4552,6 +4580,21 @@ def main():
                          "NO-OP). Combine with --reachable-scan for "
                          "before/after state diff. Requires "
                          "--t8140-replay.")
+    ap.add_argument("--naked-write-test-readonly", action="store_true",
+                    help="RUN 4: same target list as --naked-write-test "
+                         "but READ-ONLY -- do only the pre-read (which "
+                         "flips axi_sub{5,6}_reachable on success) and "
+                         "skip the destructive full-word write. RUN 3 "
+                         "findings showed --naked-write-test's sub5+0 "
+                         "first-touch clobbers iBoot's 0x00081f55 PLL "
+                         "control word to 0x00000a01 (bits 2/4/6/8/12 "
+                         "outside cio3pllcore's mask). This flag "
+                         "preserves that iBoot state while still "
+                         "enabling reachable-scan windowing and "
+                         "step 5.8.b/5.8.c naked-extra applies (whose "
+                         "gate checks the same reachability flag). "
+                         "Requires --t8140-replay. Mutually exclusive "
+                         "with --naked-write-test.")
     ap.add_argument("--axi2af-naked-apply", action="store_true",
                     help="RUN S: after step 5.75 (naked-write-test), "
                          "apply the full 58-entry apcie-axi2af-tunables "
@@ -4697,6 +4740,10 @@ def main():
                          "apcie-phy-ip-pll-tunables shared-slice.")
     args = ap.parse_args()
 
+    if args.naked_write_test and args.naked_write_test_readonly:
+        ap.error("--naked-write-test and --naked-write-test-readonly "
+                 "are mutually exclusive")
+
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     runtime_path = out / "nic-runtime.txt"
@@ -4832,6 +4879,8 @@ def main():
                     f"reachable_scan={args.reachable_scan}, "
                     f"phy_ip_write_probe={args.phy_ip_write_probe}, "
                     f"naked_write_test={args.naked_write_test}, "
+                    f"naked_write_test_readonly="
+                    f"{args.naked_write_test_readonly}, "
                     f"axi2af_naked_apply={args.axi2af_naked_apply}, "
                     f"pcieclkgen_naked_apply_to="
                     f"{args.pcieclkgen_naked_apply_to!r}, "
@@ -4851,6 +4900,8 @@ def main():
                         reachable_scan=args.reachable_scan,
                         phy_ip_write_probe=args.phy_ip_write_probe,
                         naked_write_test=args.naked_write_test,
+                        naked_write_test_readonly=
+                            args.naked_write_test_readonly,
                         axi2af_naked_apply=args.axi2af_naked_apply,
                         pcieclkgen_naked_apply_to=
                             args.pcieclkgen_naked_apply_to,

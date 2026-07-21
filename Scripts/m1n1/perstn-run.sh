@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -14,7 +14,15 @@
 # (FALSIFIED -- all 7 entries SKIP-NOOP on sub5 because iBoot
 # pre-programmed the block; wedge unchanged at phy_ip+0x38). RUN 3 =
 # RUN 2 but redirects the naked cio3pllcore apply to phy_common_base
-# per the atc.c CIO3PLL analogy in docs/ref-asahi-t8132-pcie.md.
+# per the atc.c CIO3PLL analogy in docs/ref-asahi-t8132-pcie.md
+# (FALSIFIED -- phy_common +0x2a00..+0x2c00 all zero, cio3pllcore
+# 1 PARTIAL / 5 NO-OP / 1 SKIP-NOOP; target-block brute-forcing
+# retired). RUN 4 = RUN 1 baseline but replaces the DESTRUCTIVE
+# --naked-write-test with a new READ-ONLY --naked-write-test-readonly
+# to preserve iBoot's sub5+0 = 0x00081f55 PLL control word (which
+# every RUN S/1/2/3 was clobbering to 0x00000a01). Retires the
+# cio3pllcore search; tests whether the destructive probe has been
+# the confounding variable for the last 5 RUNs.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -163,43 +171,71 @@
 #            places CIO3PLL_CLK_CTRL at regs.core + 0x2a00 and
 #            CIO3PLL_DCO_NCTRL at +0x2a38 -- the same +0x38
 #            alignment as our persistent phy_ip wedge address.
-#            If PCIe's phy_common is the analog-core-of-record
-#            for the PCIe CIO3PLL block, cio3pllcore's 7 entries
-#            should land STUCK on phy_common (they SKIP-NOOP'd
-#            on sub5 in RUN 2 because iBoot pre-programmed that
-#            block). Same wedge-immune diag posture as RUN 2
-#            (--reachable-scan + --phy-ip-diag-at=none). The
-#            reachable-scan window on phy_common has been
-#            widened at the source to include a second block at
-#            +0x2a00..+0x2c00 (128 words, ~100 ms UART) so the
-#            suspected CIO3PLL_CLK_CTRL (@+0x2a00) and
-#            CIO3PLL_DCO_NCTRL (@+0x2a38) region is captured
-#            pre/post the naked apply. Success criterion: step
-#            6.g stops wedging at phy_ip_base+0x38. Even on
-#            failure, differential data pin-points the target
-#            block. Interpretation matrix:
-#              - 6.g clean            -> phy_common is the target
-#                                        block AND cio3pllcore
-#                                        was the missing config;
-#                                        proceed to Phase G
-#              - 6.g wedges, entries
-#                STUCK on phy_common  -> phy_common IS the target
-#                                        block; some OTHER config
-#                                        (CIO3PLL_CLK enable pair
-#                                        per atc.c:1778-1779?) is
-#                                        still missing. RUN 4 =
-#                                        atc.c-style CIO3PLL clock
-#                                        enable at phy_common+0x2a00
-#              - 6.g wedges, entries
-#                SKIP-NOOP on phy_    -> phy_common ALSO already
-#                common                  pre-programmed by iBoot;
-#                                        RUN 4 = try rc_base then
-#                                        phy_shared as target
-#              - Any entry raises
-#                SYNC / delta         -> hit a live register in
-#                                        phy_common; directly
-#                                        informative, narrows the
-#                                        target block on offset
+#            RESULT: FALSIFIED. cio3pllcore apply on phy_common
+#            landed 0 STUCK / 1 PARTIAL / 5 NO-OP / 1 SKIP-NOOP;
+#            widened reachable-scan phy_common +0x2a00..+0x2c00
+#            (128 words) read all zeros -- no CIO3PLL block
+#            discoverable at that offset in phy_common's window.
+#            The atc.c layout does not port to PCIe's phy_common
+#            on t8132. Target-block search for cio3pllcore is now
+#            EXHAUSTED across all four candidate blocks (sub5,
+#            sub6, rc_base, phy_common); local naked-apply
+#            brute-forcing is retired. Wedge at phy_ip+0x38
+#            unchanged. See Scripts/m1n1/logs/3/findings.md and
+#            docs/project-m4-pcie-bringup.md for full analysis.
+#
+#   RUN 4 -- RUN 1 baseline (RUN S + phycmn-early) but replaces
+#            --naked-write-test with --naked-write-test-readonly.
+#            RUN 3's log analysis (nic-runtime.txt:1567-1573)
+#            surfaced that every RUN S/1/2/3's first-touch probe
+#            on axi_sub5+0 was DESTRUCTIVE: iBoot's pre-programmed
+#            sub5+0 = 0x00081f55 PLL control word (bits 0/2/4/6/
+#            8-12/19 populated) was clobbered to 0x00000a01 by
+#            the full-word write, losing bits 2/4/6/8/10/12/19
+#            (all outside cio3pllcore's target mask). If any of
+#            those lost bits is a PLL enable or reference-clock
+#            select, we have been gating our own PLL off before
+#            Phase F even starts for the last 5 RUNs.
+#            --naked-write-test-readonly runs the same target
+#            list but does ONLY the pre-read stage (which flips
+#            axi_sub{5,6}_reachable on success); the write +
+#            post-read stages are skipped. This preserves the
+#            iBoot state AND still enables the reachable-scan
+#            widening + step 5.8.b (pcieclkgen naked apply on
+#            axi_sub5) whose gates check the same reachability
+#            flag. Everything else identical to RUN 1: same
+#            --axi2af-naked-apply, --pcieclkgen-naked-apply-to=
+#            axi_sub5_base, --phycmn-early, --reachable-scan,
+#            --phy-ip-diag-at=none. Single-variable delta vs
+#            RUN 1: only the destructive full-word write to
+#            sub5+0 is gone.
+#            Success criterion: step 6.g stops wedging at
+#            phy_ip_base+0x38. Interpretation matrix:
+#              - 6.g clean               -> sub5+0 clobber was
+#                                            the blocker for
+#                                            RUNs S/1/2/3;
+#                                            proceed to Phase G
+#              - 6.g wedges, sub5+0
+#                shows iBoot 0x81f55
+#                preserved except for
+#                pcieclkgen mask-0x3e0  -> destructive-probe
+#                bits (~0x81f75)          hypothesis definitively
+#                                          ruled out; RUN 5 =
+#                                          --phy-ip-write-probe
+#                                          from cleaner state
+#              - 6.g wedges, sub5+0
+#                shows unexpected       -> pcieclkgen mask-RMW
+#                state (e.g. pcieclkgen   was somehow gated on
+#                bits didn't stick)       destructive probe
+#                                          landing first;
+#                                          refocus on write-
+#                                          order interaction
+#              - Pre-read STALLs on
+#                sub5+0                 -> sub5 unreachable
+#                                          without prior write
+#                                          (fabric quirk); RUN 5
+#                                          reverts --naked-write-
+#                                          test and reconsiders
 #
 # All RUNs share the same base flags (no-pcie-init + preinit-probe
 # + pmgr-enable + gate-poke + t8140-replay + phy-ip-diag + fuse-recon)
@@ -424,8 +460,33 @@ case "${RUN^^}" in
                --phycmn-early
                --phy-ip-diag-at=none)
         ;;
+    4)
+        # RUN 4: RUN 1 baseline but replaces --naked-write-test
+        # with --naked-write-test-readonly. RUN 3 findings.md
+        # surfaced that every RUN S/1/2/3 was destructively
+        # clobbering iBoot's sub5+0 = 0x00081f55 PLL control word
+        # to 0x00000a01 via the full-word first-touch probe. The
+        # new READ-ONLY mode does only the pre-read (which flips
+        # axi_sub{5,6}_reachable) and skips the write, preserving
+        # iBoot state while still enabling downstream reachable-
+        # scan widening AND step 5.8.b (pcieclkgen naked apply
+        # at axi_sub5, gated on the same reachability flag).
+        # Single-variable delta vs RUN 1: only the destructive
+        # write to sub5+0 is gone. Success criterion: step 6.g
+        # stops wedging. Failure with sub5+0 preserved except
+        # for pcieclkgen mask-0x3e0 bits definitively rules out
+        # the destructive-probe hypothesis and unblocks RUN 5 =
+        # --phy-ip-write-probe from a cleaner state.
+        FLAGS=("${BASE_FLAGS[@]}"
+               --naked-write-test-readonly
+               --axi2af-naked-apply
+               --pcieclkgen-naked-apply-to=axi_sub5_base
+               --reachable-scan
+               --phycmn-early
+               --phy-ip-diag-at=none)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
