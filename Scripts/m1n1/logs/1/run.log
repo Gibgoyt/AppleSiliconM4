@@ -1,0 +1,518 @@
+[ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/perstn-run.sh 1
+[sudo] password for ahmed: 
+TTY> Initialized dockchannel UART at 0x388128000
+TTY> Device info:
+TTY>   Model: Mac16,10
+TTY>   Target: J773g
+TTY>   Board-ID: 0x2a
+TTY>   Chip-ID: 0x8132
+TTY> 
+TTY> CPU init (MIDR: 0x611f0531 smp_id:0x6)...
+TTY>   CPU part: 0x53 rev: 0x11
+TTY>   CPU: M4 Donan (P core)
+TTY> 
+TTY> boot_args at 0x10003d68000
+TTY>   revision:     3
+TTY>   version:      2
+TTY>   virt_base:    0x110f0000
+TTY>   phys_base:    0x100010f0000
+TTY>   mem_size:     0x3df834000
+TTY>   top_of_kdata: 0x10003d78000
+TTY>   video:
+TTY>     base:       0x103e5234000
+TTY>     display:    0x1
+TTY>     stride:     0xa00
+TTY>     width:      640
+TTY>     height:     1136
+TTY>     depth:      32bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0x1351c000
+TTY>   devtree_size: 0x68000
+TTY>   cmdline:      
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x400000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 v1.6.0-rc1-56-g6b277bc
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the MIT license
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: 15.1 (iBoot-11881.41.5)
+TTY> System FW version: 15.1 (iBoot-11881.41.5)
+TTY> Heap base: 0x10003d78000
+TTY> MCC: Unsupported version:mcc,t8132
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x103e0924000
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c50000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c60000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c70000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c80000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1cb0000000 (0x14000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff1c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe6c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe4c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffddc000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffdbc000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffd4c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30000180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 3 @ 0x381000000
+TTY> AIC: AIC3 with 1/2 dies, 2048/4096 IRQs, reg_size:40004, config:10000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> Primary WDT register @ 0x3882b0000
+TTY> Primary WDT disabled
+TTY> Secondary WDT register @ 0x3882b8008
+TTY> Secondary WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: initialized, 392 devices on 1 dies found.
+TTY> display: Display is external
+TTY> display: Dummy framebuffer found, initializing display
+TTY> dart: dart /arm-io/dart-dcp at 0x30a340000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0 at 0x30a300000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0.0.0 L1 0 is real-time at 0x103fff1c000
+TTY> dart: allocating L2 tbl at 0, 1 to 0x103fff24000
+TTY> dcp: Mapping segment #2 100036ec000 -> 100036ec000 [24000]
+TTY> rtkit(dcp): booting with version 12
+TTY> rtkit(dcp): unknown system endpoint 0x0a
+TTY> rtkit(dcp): pre-allocated buffer (ep 0x1, dva 0x100025eb000, phys 0x103e51a3000)
+TTY> rtkit(dcp): unknown oslog message 105ff8010002604
+TTY> rtkit(dcp): unknown oslog message 3010042100000a1
+TTY> rtkit(dcp): unknown oslog message 4000020d51e4021
+TTY> rtkit(dcp): unknown oslog message 4000040d28078a1
+TTY> rtkit(dcp): unknown oslog message 4000060d51e4001
+TTY> AFK: ring buffer size mismatch
+TTY> AFK: ring buffer size mismatch
+TTY> dcp-iboot: failed to initialize disp0 service
+TTY> display: failed to initialize DCP iBoot interface
+TTY> rtkit(dcp): IOP crashed!
+TTY> rtkit(dcp): == CRASH INFO ==
+TTY> rtkit(dcp):   Message 1: ASSERT!Messenger.c:299 0xc0000000000000 0x7 
+TTY> rtkit(dcp):   0x43766572
+TTY> rtkit(dcp):   0x4374696d
+TTY> rtkit(dcp):   0x43637374
+TTY> rtkit(dcp):   0x4372746b
+TTY> rtkit(dcp):   0x43617343
+TTY> rtkit(dcp):   0x436d6278
+TTY> rtkit(dcp):   0x43636470
+TTY> rtkit(dcp):   0x43706374
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp): IOP died during shutdown
+TTY> fb init: 640x1136 (32) [s=640] @0x103e5234000
+TTY> fb console: max rows 35, max cols 40
+TTY> fb: display logo
+TTY> cpufreq: Chip 0x8132 is unsupported
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j773g
+TTY> Unknown payload at 0x100036ec000 (magic: 5b41464b)
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x402f80000 is a t8110
+TTY> USB0: initialized at 0x10004166030
+TTY> dart: dart /arm-io/dart-usb1 at 0x40af80000 is a t8110
+TTY> USB1: initialized at 0x10004166360
+TTY> dart: dart /arm-io/dart-usb2 at 0x412f80000 is a t8110
+TTY> USB2: initialized at 0x10004166690
+TTY> dart: dart /arm-io/dart-usb3 at 0x41af80000 is a t8110
+TTY> USB3: initialized at 0x100041669c0
+TTY> Running proxy...
+m1n1 base: 0x100035e0000
+Fetching ADT (0x00068000 bytes)...
+[pcie_up] === Phase 3.3 pcie_up ===
+[pcie_up] building ApcieMap from ADT...
+[pcie_up] [flush:adt-map] wrote partial log (2430 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] dumping apcie-phy-ip-{pll,auspma}-tunables report...
+[pcie_up] [flush:phy-ip-report] wrote partial log (18440 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] dumping apcie-{cio3pllcore,pcieclkgen}-tunables report...
+[pcie_up] [flush:extra-tunables-report] wrote partial log (26107 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] SMC power on apcie fabric...
+[mgmt] Starting via message
+[mgmt] Supported versions 12 .. 12
+[mgmt] Adding endpoint 0x0
+[mgmt] Adding endpoint 0x1
+[mgmt] Adding endpoint 0x2
+[mgmt] Adding endpoint 0x3
+[mgmt] Adding endpoint 0x4
+[mgmt] Adding endpoint 0x8
+[mgmt] Adding endpoint 0x20
+Starting endpoint #0x1 (crash)
+Starting endpoint #0x2 (syslog)
+Starting endpoint #0x3 (kdebug)
+Starting endpoint #0x4 (iorep)
+Starting endpoint #0x8 (iorep)
+[crash] buf prealloc at dva 0x38de5c000
+[iorep] buf prealloc 0x38de61000 / 0x38de61000
+[iorep] start
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[mgmt] IOP power state is now 0x20
+[syslog] count 32, entrysize 96
+[syslog] buf prealloc at dva 0x38de60000
+[iorep] buf prealloc 0xff800038de66000 / 0xff800038de66000
+unknown message: 0x31f10428986d339 / 0x408c0000000008 (EP=0x8)
+unknown message: 0x40000209630790a / 0x309c0000000008 (EP=0x8)
+unknown message: 0x40000402572ab9b / 0x20ac0000000008 (EP=0x8)
+unknown message: 0x400006003168728 / 0x10bc0000000008 (EP=0x8)
+[mgmt] AP power state is now 0x20
+[mgmt] Startup complete
+Starting endpoint #0x20 (smcep)
+[smcep] Starting up
+[mgmt] Stopping via message
+[mgmt] AP power state is now 0x10
+[mgmt] IOP power state is now 0x10
+[pcie_up] [flush:smc-power] wrote partial log (26253 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] CLKREQ assert on gpio0 pin 162...
+[pcie_up] CLKREQ: drive gpio0[162] low (assert)
+[pcie_up] [flush:clkreq] wrote partial log (26399 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] PERSTN deassert on gpio0 pin 165...
+[pcie_up] PERSTN cold reset: drive gpio0[165] low
+[pcie_up] PERSTN: drive gpio0[165] high
+[pcie_up] [flush:perstn] wrote partial log (26664 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] Phase 0: PMGR gate readout (no apcie MMIO)...
+[pcie_up] [flush:phase0-pmgr-state] wrote partial log (27303 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] Phase 0.5: PMGR parent-chain readout (no apcie MMIO)...
+[pcie_up] [flush:phase0.5-parents] wrote partial log (31514 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] Phase A: single pre-PMGR probe at phy_ip_base+0...
+[pcie_up] [flush:phaseA-preinit-single] wrote partial log (32554 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] Phase D: direct PS-register poke for gate 151...
+[pcie_up] [flush:phaseD-gate151-poke] wrote partial log (33305 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] Phase E: post-Phase-D rc/axi sanity probe...
+[pcie_up] [flush:phaseE-rc-axi-sanity] wrote partial log (34562 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] ADT fuse recon: searching for missing t8132 fuse-bits programming source...
+[pcie_up] [flush:fuse-recon] wrote partial log (38908 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] Phase F: T8140 controller-init replay (pcie.c) [extra_tunables=False, extra_tunables_only='both', phycmn_first=False, phycmn_early=True, phy4_x10_early=False, phy_ip_diag=True, phy_ip_diag_at='none', reachable_scan=True, phy_ip_write_probe=False, naked_write_test=True, axi2af_naked_apply=True, pcieclkgen_naked_apply_to='axi_sub5_base', phyif_ctrl_run=False]...
+[pcie_up] [flush:phaseF.diag.F.entry.phy-common-enter] wrote partial log (39525 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.F.entry.reachable-scan-enter] wrote partial log (39667 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.F.entry.reachable-scan.rc_base] wrote partial log (42098 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.F.entry.reachable-scan.phy_common_base] wrote partial log (43901 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.F.entry.reachable-scan.phy_shared] wrote partial log (45619 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.F.entry.reachable-scan.axi_base] wrote partial log (47303 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.F.entry.reachable-scan-done] wrote partial log (47463 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.F.entry] wrote partial log (47463 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.1.pmgr_adt_power_enable('/arm-io] wrote partial log (47514 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.1.pmgr_adt_power_enable('/arm-io] wrote partial log (47613 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-1.pmgr.phy-common-enter] wrote partial log (47668 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-1.pmgr.reachable-scan-enter] wrote partial log (47818 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-1.pmgr.reachable-scan.rc_base] wrote partial log (50249 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-1.pmgr.reachable-scan.phy_common_base] wrote partial log (52052 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-1.pmgr.reachable-scan.phy_shared] wrote partial log (53770 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-1.pmgr.reachable-scan.axi_base] wrote partial log (55454 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-1.pmgr.reachable-scan-done] wrote partial log (55614 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-1.pmgr] wrote partial log (55614 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.2.tunables apcie-axi2af-tunables] wrote partial log (55667 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.2.tunables apcie-axi2af-tunables] wrote partial log (55768 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.3.write32(rc_base+0x4, 0) [pcie.] wrote partial log (55821 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.3.write32(rc_base+0x4, 0) [pcie.] wrote partial log (55913 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.skip.4] wrote partial log (56105 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.5.tunables apcie-phy-tunables re] wrote partial log (56155 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.5.tunables apcie-phy-tunables re] wrote partial log (56253 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.phy-tunables.phy-common-enter] wrote partial log (56316 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.phy-tunables.reachable-scan-enter] wrote partial log (56482 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.phy-tunables.reachable-scan.rc_base] wrote partial log (58913 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.phy-tunables.reachable-scan.phy_common_base] wrote partial log (60716 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.phy-tunables.reachable-scan.phy_shared] wrote partial log (62434 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.phy-tunables.reachable-scan.axi_base] wrote partial log (64118 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.phy-tunables.reachable-scan-done] wrote partial log (64278 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.phy-tunables] wrote partial log (64278 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.enter] wrote partial log (64829 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.pre.axi_sub5_base+0x00] wrote partial log (64942 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.write.axi_sub5_base+0x00] wrote partial log (65114 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.post.axi_sub5_base+0x00] wrote partial log (65200 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.done.axi_sub5_base+0x00] wrote partial log (65346 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.pre.axi_sub6_base+0x00] wrote partial log (65459 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.write.axi_sub6_base+0x00] wrote partial log (65631 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.post.axi_sub6_base+0x00] wrote partial log (65717 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.done.axi_sub6_base+0x00] wrote partial log (65865 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.pre.rc_base+0x54] wrote partial log (65970 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.write.rc_base+0x54] wrote partial log (66048 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.post.rc_base+0x54] wrote partial log (66128 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.done.rc_base+0x54] wrote partial log (66268 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.pre.rc_base+0x100] wrote partial log (66383 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.write.rc_base+0x100] wrote partial log (66462 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.post.rc_base+0x100] wrote partial log (66543 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.done.rc_base+0x100] wrote partial log (66684 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.pre.rc_base+0x00] wrote partial log (66783 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.write.rc_base+0x00] wrote partial log (66861 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.post.rc_base+0x00] wrote partial log (66941 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.done.rc_base+0x00] wrote partial log (67081 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.pre.rc_base+0x24] wrote partial log (67171 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.write.rc_base+0x24] wrote partial log (67249 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.post.rc_base+0x24] wrote partial log (67329 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.done.rc_base+0x24] wrote partial log (67469 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.pre.rc_base+0x28] wrote partial log (67559 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.write.rc_base+0x28] wrote partial log (67637 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.post.rc_base+0x28] wrote partial log (67717 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.done.rc_base+0x28] wrote partial log (67857 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.pre.rc_base+0x38] wrote partial log (67970 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.write.rc_base+0x38] wrote partial log (68048 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.post.rc_base+0x38] wrote partial log (68128 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.done.rc_base+0x38] wrote partial log (68268 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.pre.axi_base+0x00] wrote partial log (68367 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.write.axi_base+0x00] wrote partial log (68446 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.post.axi_base+0x00] wrote partial log (68527 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.done.axi_base+0x00] wrote partial log (68668 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-write.complete] wrote partial log (68669 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test.phy-common-enter] wrote partial log (68739 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test.reachable-scan-enter] wrote partial log (68919 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test.reachable-scan.rc_base] wrote partial log (71350 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test.reachable-scan.phy_common_base] wrote partial log (73153 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test.reachable-scan.phy_shared] wrote partial log (74871 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test.reachable-scan.axi_base] wrote partial log (76555 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test.reachable-scan.axi_sub5_base] wrote partial log (78324 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test.reachable-scan.axi_sub6_base] wrote partial log (80093 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test.reachable-scan-done] wrote partial log (80093 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.75.naked-write-test] wrote partial log (80093 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.apcie-axi2af-tunables.enter] wrote partial log (80393 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#0@0x0] wrote partial log (80393 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#0@0x0] wrote partial log (80569 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#1@0x4] wrote partial log (80569 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#1@0x4] wrote partial log (80662 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#1@0x4] wrote partial log (80757 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#1@0x4] wrote partial log (80961 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#2@0x8] wrote partial log (80961 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#2@0x8] wrote partial log (81054 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#2@0x8] wrote partial log (81149 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#2@0x8] wrote partial log (81353 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#3@0xc] wrote partial log (81353 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#3@0xc] wrote partial log (81446 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#3@0xc] wrote partial log (81541 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#3@0xc] wrote partial log (81745 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#4@0x10] wrote partial log (81745 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#4@0x10] wrote partial log (81839 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#4@0x10] wrote partial log (81935 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#4@0x10] wrote partial log (82140 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#5@0x14] wrote partial log (82140 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#5@0x14] wrote partial log (82234 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#5@0x14] wrote partial log (82330 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#5@0x14] wrote partial log (82535 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#6@0x18] wrote partial log (82535 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#6@0x18] wrote partial log (82629 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#6@0x18] wrote partial log (82725 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#6@0x18] wrote partial log (82930 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#7@0x1c] wrote partial log (82930 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#7@0x1c] wrote partial log (83024 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#7@0x1c] wrote partial log (83120 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#7@0x1c] wrote partial log (83325 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#8@0x20] wrote partial log (83325 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#8@0x20] wrote partial log (83419 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#8@0x20] wrote partial log (83515 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#8@0x20] wrote partial log (83720 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#9@0x24] wrote partial log (83720 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#9@0x24] wrote partial log (83814 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#9@0x24] wrote partial log (83910 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#9@0x24] wrote partial log (84115 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#10@0x28] wrote partial log (84115 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#10@0x28] wrote partial log (84210 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#10@0x28] wrote partial log (84307 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#10@0x28] wrote partial log (84513 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#11@0x2c] wrote partial log (84513 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#11@0x2c] wrote partial log (84608 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#11@0x2c] wrote partial log (84705 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#11@0x2c] wrote partial log (84911 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#12@0x30] wrote partial log (84911 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#12@0x30] wrote partial log (85006 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#12@0x30] wrote partial log (85103 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#12@0x30] wrote partial log (85309 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#13@0x34] wrote partial log (85309 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#13@0x34] wrote partial log (85404 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#13@0x34] wrote partial log (85501 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#13@0x34] wrote partial log (85707 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#14@0x38] wrote partial log (85707 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#14@0x38] wrote partial log (85802 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#14@0x38] wrote partial log (85899 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#14@0x38] wrote partial log (86105 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#15@0x3c] wrote partial log (86105 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#15@0x3c] wrote partial log (86200 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#15@0x3c] wrote partial log (86297 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#15@0x3c] wrote partial log (86503 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#16@0x40] wrote partial log (86503 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-axi2af-tunables#16@0x40] wrote partial log (86598 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-axi2af-tunables#16@0x40] wrote partial log (86695 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#16@0x40] wrote partial log (86901 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#17@0x100] wrote partial log (86901 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#17@0x100] wrote partial log (87068 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#18@0x104] wrote partial log (87068 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#18@0x104] wrote partial log (87242 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#19@0x108] wrote partial log (87242 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#19@0x108] wrote partial log (87418 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#20@0x304] wrote partial log (87418 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#20@0x304] wrote partial log (87596 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#21@0x314] wrote partial log (87596 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#21@0x314] wrote partial log (87775 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#22@0x31c] wrote partial log (87775 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#22@0x31c] wrote partial log (87954 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#23@0x324] wrote partial log (87954 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#23@0x324] wrote partial log (88133 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#24@0x348] wrote partial log (88133 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#24@0x348] wrote partial log (88308 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#25@0x34c] wrote partial log (88308 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#25@0x34c] wrote partial log (88483 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#26@0x408] wrote partial log (88483 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#26@0x408] wrote partial log (88659 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#27@0x948] wrote partial log (88659 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#27@0x948] wrote partial log (88835 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#28@0xa48] wrote partial log (88835 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#28@0xa48] wrote partial log (89010 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#29@0xb48] wrote partial log (89010 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#29@0xb48] wrote partial log (89186 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#30@0xe00] wrote partial log (89186 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#30@0xe00] wrote partial log (89365 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#31@0xe04] wrote partial log (89365 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#31@0xe04] wrote partial log (89534 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#32@0x4008] wrote partial log (89534 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#32@0x4008] wrote partial log (89700 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#33@0x400c] wrote partial log (89700 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#33@0x400c] wrote partial log (89866 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#34@0x4014] wrote partial log (89866 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#34@0x4014] wrote partial log (90032 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#35@0x4018] wrote partial log (90032 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#35@0x4018] wrote partial log (90198 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#36@0x401c] wrote partial log (90198 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#36@0x401c] wrote partial log (90364 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#37@0x4020] wrote partial log (90364 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#37@0x4020] wrote partial log (90537 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#38@0x4024] wrote partial log (90537 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#38@0x4024] wrote partial log (90710 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#39@0x4028] wrote partial log (90710 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#39@0x4028] wrote partial log (90883 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#40@0x402c] wrote partial log (90883 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#40@0x402c] wrote partial log (91056 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#41@0x4030] wrote partial log (91056 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#41@0x4030] wrote partial log (91229 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#42@0x4034] wrote partial log (91229 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#42@0x4034] wrote partial log (91402 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#43@0x10f8] wrote partial log (91402 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#43@0x10f8] wrote partial log (91568 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#44@0x11f8] wrote partial log (91568 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#44@0x11f8] wrote partial log (91734 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#45@0x12f8] wrote partial log (91734 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#45@0x12f8] wrote partial log (91900 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#46@0x13f8] wrote partial log (91900 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#46@0x13f8] wrote partial log (92066 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#47@0x14f8] wrote partial log (92066 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#47@0x14f8] wrote partial log (92232 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#48@0x10fc] wrote partial log (92232 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#48@0x10fc] wrote partial log (92398 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#49@0x11fc] wrote partial log (92398 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#49@0x11fc] wrote partial log (92564 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#50@0x12fc] wrote partial log (92564 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#50@0x12fc] wrote partial log (92730 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#51@0x13fc] wrote partial log (92730 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#51@0x13fc] wrote partial log (92896 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#52@0x14fc] wrote partial log (92896 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#52@0x14fc] wrote partial log (93062 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#53@0x20028] wrote partial log (93062 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#53@0x20028] wrote partial log (93232 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#54@0x2002c] wrote partial log (93232 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#54@0x2002c] wrote partial log (93399 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#55@0x20030] wrote partial log (93399 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#55@0x20030] wrote partial log (93567 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#56@0x20034] wrote partial log (93567 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#56@0x20034] wrote partial log (93735 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-axi2af-tunables#57@0x20058] wrote partial log (93735 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-axi2af-tunables#57@0x20058] wrote partial log (93904 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.apcie-axi2af-tunables.complete] wrote partial log (94085 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply.phy-common-enter] wrote partial log (94158 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply.reachable-scan-enter] wrote partial log (94344 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply.reachable-scan.rc_base] wrote partial log (96775 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply.reachable-scan.phy_common_base] wrote partial log (98578 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply.reachable-scan.phy_shared] wrote partial log (100296 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply.reachable-scan.axi_base] wrote partial log (101980 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply.reachable-scan.axi_sub5_base] wrote partial log (103749 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply.reachable-scan.axi_sub6_base] wrote partial log (105518 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply.reachable-scan-done] wrote partial log (105518 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.a.axi2af-naked-apply] wrote partial log (105518 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.apcie-pcieclkgen-tunables.enter] wrote partial log (105836 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.pre.apcie-pcieclkgen-tunables#0@0x0] wrote partial log (105836 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.write.apcie-pcieclkgen-tunables#0@0x0] wrote partial log (105933 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.post.apcie-pcieclkgen-tunables#0@0x0] wrote partial log (106032 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.done.apcie-pcieclkgen-tunables#0@0x0] wrote partial log (106230 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.naked-extra.apcie-pcieclkgen-tunables.complete] wrote partial log (106419 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply.phy-common-enter] wrote partial log (106496 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply.reachable-scan-enter] wrote partial log (106690 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply.reachable-scan.rc_base] wrote partial log (109121 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply.reachable-scan.phy_common_base] wrote partial log (110924 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply.reachable-scan.phy_shared] wrote partial log (112642 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply.reachable-scan.axi_base] wrote partial log (114326 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply.reachable-scan.axi_sub5_base] wrote partial log (116095 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply.reachable-scan.axi_sub6_base] wrote partial log (117864 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply.reachable-scan-done] wrote partial log (117864 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-5.8.b.pcieclkgen-naked-apply] wrote partial log (117864 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.skip.5.5] wrote partial log (117935 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.a.set32(phy_shared+0, CLK0REQ=] wrote partial log (117985 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.a.set32(phy_shared+0, CLK0REQ=] wrote partial log (118092 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.b.poll_CLK0ACK] wrote partial log (118176 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.b.poll_CLK0ACK] wrote partial log (118280 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK.phy-common-enter] wrote partial log (118340 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK.reachable-scan-enter] wrote partial log (118500 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK.reachable-scan.rc_base] wrote partial log (120931 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK.reachable-scan.phy_common_base] wrote partial log (122734 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK.reachable-scan.phy_shared] wrote partial log (124452 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK.reachable-scan.axi_base] wrote partial log (126136 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK.reachable-scan.axi_sub5_base] wrote partial log (127905 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK.reachable-scan.axi_sub6_base] wrote partial log (129674 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK.reachable-scan-done] wrote partial log (129674 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.b.CLK0ACK] wrote partial log (129674 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.c.set32(phy_shared+0, CLK1REQ=] wrote partial log (129724 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.c.set32(phy_shared+0, CLK1REQ=] wrote partial log (129831 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.d.poll_CLK1ACK] wrote partial log (129915 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.d.poll_CLK1ACK] wrote partial log (130019 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK.phy-common-enter] wrote partial log (130079 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK.reachable-scan-enter] wrote partial log (130239 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK.reachable-scan.rc_base] wrote partial log (132670 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK.reachable-scan.phy_common_base] wrote partial log (134473 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK.reachable-scan.phy_shared] wrote partial log (136191 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK.reachable-scan.axi_base] wrote partial log (137875 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK.reachable-scan.axi_sub5_base] wrote partial log (139644 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK.reachable-scan.axi_sub6_base] wrote partial log (141413 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK.reachable-scan-done] wrote partial log (141413 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.d.CLK1ACK] wrote partial log (141413 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.e.clear32(phy_shared+0, RESET=] wrote partial log (141463 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.e.clear32(phy_shared+0, RESET=] wrote partial log (141570 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.f.readback-enter] wrote partial log (141629 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.f.readback] wrote partial log (141720 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.f.set32(phy_shared+4, 0x01) [T] wrote partial log (141787 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.f.set32(phy_shared+4, 0x01) [T] wrote partial log (141902 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.f.readback-enter] wrote partial log (141962 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.f.readback] wrote partial log (142055 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.7.mask32(phy_common+0, MODE_MASK] wrote partial log (142116 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.7.mask32(phy_common+0, MODE_MASK] wrote partial log (142234 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early.phy-common-enter] wrote partial log (142297 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early.reachable-scan-enter] wrote partial log (142463 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early.reachable-scan.rc_base] wrote partial log (144894 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early.reachable-scan.phy_common_base] wrote partial log (146697 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early.reachable-scan.phy_shared] wrote partial log (148415 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early.reachable-scan.axi_base] wrote partial log (150099 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early.reachable-scan.axi_sub5_base] wrote partial log (151868 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early.reachable-scan.axi_sub6_base] wrote partial log (153637 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early.reachable-scan-done] wrote partial log (153637 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-7.phycmn-early] wrote partial log (153637 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker.phy-common-enter] wrote partial log (153702 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker.reachable-scan-enter] wrote partial log (153872 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker.reachable-scan.rc_base] wrote partial log (156303 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker.reachable-scan.phy_common_base] wrote partial log (158106 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker.reachable-scan.phy_shared] wrote partial log (159824 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker.reachable-scan.axi_base] wrote partial log (161508 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker.reachable-scan.axi_sub5_base] wrote partial log (163277 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker.reachable-scan.axi_sub6_base] wrote partial log (165046 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker.reachable-scan-done] wrote partial log (165046 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.diag.post-6.f.T8140-marker] wrote partial log (165046 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.plan.6.g] wrote partial log (165396 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.raise.6.g.0] wrote partial log (165478 bytes) to /tmp/m4-recon/nic-runtime.txt 
+**HANGS RIGHT HERE!!**
