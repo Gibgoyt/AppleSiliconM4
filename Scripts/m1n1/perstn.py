@@ -39,6 +39,7 @@ Usage:
 
 import argparse
 import io
+import os
 import pathlib
 import re
 import struct
@@ -77,6 +78,28 @@ PCI_SUBORDINATE   = 0x1a   # bridge only
 PCI_CMD_IO     = 0x0001
 PCI_CMD_MEM    = 0x0002
 PCI_CMD_BM     = 0x0004
+
+
+def _usb_product_string():
+    """Read the m1n1 USB gadget's product string via sysfs for the tty
+    named by M1N1DEVICE (default /dev/ttyACM0). Returns e.g.
+    'm1n1 uartproxy v1.6.0-rc1-59-g' or None if unavailable. Used by
+    --require-build to catch stale enrollments before any device state
+    changes (RUN 13 lesson)."""
+    dev = os.environ.get("M1N1DEVICE", "/dev/ttyACM0").split(":")[0]
+    name = os.path.basename(dev)
+    try:
+        iface_dir = pathlib.Path(f"/sys/class/tty/{name}/device").resolve()
+    except OSError:
+        return None
+    for cand in (iface_dir, iface_dir.parent, iface_dir.parent.parent):
+        f = cand / "product"
+        try:
+            if f.exists():
+                return f.read_text().strip()
+        except OSError:
+            continue
+    return None
 
 
 def log(msg):
@@ -5382,6 +5405,13 @@ def main():
                          "dedicated flush "
                          "(phaseF.pre.6.g.pmgr-scan). Requires "
                          "--t8140-replay.")
+    ap.add_argument("--require-build", default=None, metavar="SUBSTR",
+                    help="RUN 14: abort (exit 2) before any device "
+                         "state changes unless the m1n1 USB product "
+                         "string contains SUBSTR (e.g. 'rc1-59-g'). "
+                         "Catches stale enrollments -- RUN 13 burned a "
+                         "boot silently re-running RUN 12 because the "
+                         "staged build was never kmutil-enrolled.")
     ap.add_argument("--post-init-phy-ip", action="store_true",
                     help="RUN 13: after a successful p.pcie_init() "
                          "(patched m1n1 7728fb0 SKIPS the phy-ip "
@@ -5488,6 +5518,31 @@ def main():
     if args.pcieclkgen_naked_apply_to and args.pcieclkgen_set5_only_to:
         ap.error("--pcieclkgen-naked-apply-to and --pcieclkgen-set5-"
                  "only-to are mutually exclusive")
+
+    # RUN 14: stale-binary guard. RUN 13 burned a boot silently
+    # re-running RUN 12 because the new m1n1 build was staged but never
+    # enrolled. The USB product string carries the build version
+    # (truncated ~30 chars, e.g. "m1n1 uartproxy v1.6.0-rc1-59-g"), so
+    # match on a substring like "rc1-59-g". Runs BEFORE any device
+    # state changes.
+    if args.require_build:
+        product = _usb_product_string()
+        if product is None:
+            log(f"WARNING: cannot read the USB product string to verify "
+                f"the enrolled build (--require-build="
+                f"{args.require_build!r}); continuing UNVERIFIED")
+        elif args.require_build not in product:
+            log("=" * 64)
+            log("FATAL: enrolled m1n1 build mismatch!")
+            log(f"  expected substring: {args.require_build!r}")
+            log(f"  USB product string: {product!r}")
+            log("  The staged build at /tmp/m4-serve was NOT enrolled.")
+            log("  Re-enroll via 1TR kmutil, power-cycle, and re-run.")
+            log("=" * 64)
+            sys.exit(2)
+        else:
+            log(f"require-build OK: {product!r} contains "
+                f"{args.require_build!r}")
 
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -5715,8 +5770,10 @@ def main():
             log(f"p.pcie_init raised: {e.__class__.__name__}: {e}")
             traceback.print_exc(limit=5)
             log("post-timeout recovery probe (up to 30 s)...")
+            flush("pcie-init-timeout")
             for _i in range(30):
                 time.sleep(1.0)
+                log(f"  recovery probe {_i + 1}/30...")
                 if check_alive(timeout=1.0):
                     buf.write(f"  m1n1 ALIVE again {_i + 1}s after the "
                               f"timeout -- request was slow or the "

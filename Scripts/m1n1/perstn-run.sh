@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -107,7 +107,17 @@
 # proven 2026-07-11 recipe; auspma Python-side with the
 # port-slice filter), then tier-3 dumps + LTSSM kick + ECAM
 # walk. pcie_init now runs with a 60 s UART timeout + 30 s
-# post-timeout liveness recovery.
+# post-timeout liveness recovery (STALE BINARY -- the 7728fb0
+# build was staged but never enrolled; banner still
+# 56-g6b277bc-dirty, no skip-printf anywhere; RUN 13 was a
+# byte-identical re-run of RUN 12, no new hardware data).
+# RUN 14 = RUN 13 done properly: m1n1 8a569ad (= 7728fb0 skip +
+# PCIE_BC flushed breadcrumbs at every init stage, banner
+# v1.6.0-rc1-59-g8a569ad) enrolled for real, enforced by the new
+# --require-build=rc1-59-g guard (aborts pre-SMC on mismatch);
+# --gate-poke dropped (Phase D was the one state-changing
+# pre-init step the proven pcie_up_1 boot didn't have; pcie.c
+# does its own pmgr enable).
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -933,8 +943,38 @@ case "${RUN^^}" in
                --tier3
                --post-init-phy-ip)
         ;;
+    14)
+        # RUN 14: RUN 13 done properly. RUN 13 burned a boot on a
+        # STALE BINARY (banner still 56-g6b277bc-dirty -- the
+        # tunables-skip build was staged but never kmutil-enrolled;
+        # byte-identical re-run of RUN 12, ordering fix untested).
+        # REQUIRES m1n1 8a569ad enrolled first (kmutil from 1TR;
+        # /tmp/m4-serve has m1n1.bin + m1n1.macho; banner MUST read
+        # v1.6.0-rc1-59-g8a569ad after boot). Hardening vs RUN 13:
+        #   * --require-build=rc1-59-g -- perstn.py aborts BEFORE
+        #     any device state change if the m1n1 USB product
+        #     string doesn't match (no more silent stale boots).
+        #   * m1n1 8a569ad adds PCIE_BC flushed breadcrumbs
+        #     (printf + iodev_console_flush, the exception-handler
+        #     delivery path) at every pcie_init stage -- if it
+        #     still wedges, the last breadcrumb names the exact
+        #     stage despite console-ring buffering.
+        #   * --gate-poke DROPPED: Phase D's direct gate-151 poke
+        #     was the one state-changing pre-init step the proven
+        #     pcie_up_1 boot (p.pcie_init() -> 0) didn't have;
+        #     pcie.c:425 does its own pmgr_adt_power_enable.
+        # Experiment unchanged from RUN 13: tunables-skip pcie_init
+        # (should return 0 like pcie_up_1) + --post-init-phy-ip
+        # (pll via C applicator reg_idx=3, auspma Python-filtered)
+        # + tier-3 dumps (Tier 3a phy_ip harvest) + LTSSM kick +
+        # ECAM walk (NIC vendor/device ID = goal).
+        FLAGS=(--preinit-probe
+               --tier3
+               --post-init-phy-ip
+               --require-build=rc1-59-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
