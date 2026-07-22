@@ -4444,7 +4444,7 @@ def post_init_phy_ip_apply(apcie, buf, timeout=0.3, flush_fn=None):
     return True
 
 
-def dump_pcie_regs(apcie, buf, tag="post-init", tier=1):
+def dump_pcie_regs(apcie, buf, tag="post-init", tier=1, phyextra=False):
     """Dump PCIe controller state, gated by safety tier.
 
     tier=1 (DEFAULT, always safe):
@@ -4572,13 +4572,23 @@ def dump_pcie_regs(apcie, buf, tag="post-init", tier=1):
             _read32_live(lt + 0x14, f"port{i} LTSSM +0x14", buf)
             _read32_live(lt + 0x1c, f"port{i} LTSSM +0x1c", buf)
             _read32_live(lt + 0x20, f"port{i} LTSSM +0x20", buf)
-            _read32_live(phyx + 0x000, f"port{i} phy_extra +0x000", buf)
-            _read32_live(phyx + 0x004, f"port{i} phy_extra +0x004", buf)
-            _read32_live(phyx + 0x008, f"port{i} phy_extra +0x008", buf)
-            _read32_live(ctrl + 0x000, f"port{i} ctrl_lo +0x000", buf)
-            _read32_live(ctrl + 0x004, f"port{i} ctrl_lo +0x004", buf)
-            _read32_live(ctrl + 0x008, f"port{i} ctrl_lo +0x008", buf)
-            _read32_live(ctrl + 0x100, f"port{i} ctrl_lo +0x100", buf)
+            # phy_extra/ctrl_lo AXI-stall and WEDGED m1n1 in RUN 18
+            # (port0 phy_extra+0x000 = 0x497048000), costing the LTSSM
+            # kick + ECAM walk. Gated OFF unless --tier3-phyextra, the
+            # same way Tier 3a (phy_ip) is gated above. The LTSSM reads
+            # above did not wedge, so they stay unconditional.
+            if not phyextra:
+                buf.write(f"  port{i} phy_extra/ctrl_lo SKIPPED "
+                          f"(would AXI-stall -- RUN 18 lesson; pass "
+                          f"--tier3-phyextra to force)\n")
+            else:
+                _read32_live(phyx + 0x000, f"port{i} phy_extra +0x000", buf)
+                _read32_live(phyx + 0x004, f"port{i} phy_extra +0x004", buf)
+                _read32_live(phyx + 0x008, f"port{i} phy_extra +0x008", buf)
+                _read32_live(ctrl + 0x000, f"port{i} ctrl_lo +0x000", buf)
+                _read32_live(ctrl + 0x004, f"port{i} ctrl_lo +0x004", buf)
+                _read32_live(ctrl + 0x008, f"port{i} ctrl_lo +0x008", buf)
+                _read32_live(ctrl + 0x100, f"port{i} ctrl_lo +0x100", buf)
     except DumpAborted:
         log("  dump aborted (m1n1 wedged)")
         buf.write(f"[dump_pcie_regs] aborted -- m1n1 not responding\n")
@@ -4598,6 +4608,105 @@ def _linksts_decode(v):
     if v & (1 << 25): bits.append("bit25")
     if v & (1 << 31): bits.append("bit31")
     return "|".join(bits) if bits else "none"
+
+
+# ---------------------------------------------------------------- refclk handshake
+
+# APCIE_PHY_LANE_CFG bits, from Linux pcie-apple.c (PHY window + 0x000).
+# The per-port PHY_LANE_CFG register is phy_base + 0x000 (RUN 18's Tier-2
+# dump read it as 0x2300066f on both ports, so the window is reachable).
+PHY_LANE_CFG_REFCLK0REQ = 1 << 0
+PHY_LANE_CFG_REFCLK0ACK = 1 << 2
+PHY_LANE_CFG_REFCLK1REQ = 1 << 1
+PHY_LANE_CFG_REFCLK1ACK = 1 << 3
+PHY_LANE_CFG_REFCLKEN   = (1 << 9) | (1 << 10)
+PHY_LANE_CFG_REFCLKCGEN = (1 << 30) | (1 << 31)
+
+
+def setup_refclk(apcie, buf, port_indices=None, refclk_cgen=False,
+                 poll_us=100, timeout_us=50000):
+    """apple_pcie_setup_refclk analog (RUN 19): per-port REFCLK REQ->ACK
+    handshake on phy_base + 0x000 (PHY_LANE_CFG). t602x/t8122/t8132 flavor
+    -- skips the t8103-only PHY_LANE_CTL CFGACC and PORT_REFCLK steps.
+
+    perstn.py never performed this handshake: it relied entirely on m1n1's
+    C-side pcie_init() and the CLKREQ# pin. RUN 18 proved the pin mux alone
+    doesn't clear LINKSTS BUSY; this is the missing pre-training step.
+
+    Per active port: set REFCLK0REQ, poll REFCLK0ACK; set REFCLK1REQ, poll
+    REFCLK1ACK; set REFCLKEN; optionally set REFCLKCGEN. LINKSTS is
+    snapshotted around the sequence so a change is visible. Every proxy
+    access is guarded + check_alive; bails cleanly on m1n1 wedge via
+    DumpAborted.
+    """
+    if port_indices is None:
+        port_indices = apcie.active_ports
+    buf.write(f"\n=== setup_refclk (apple_pcie_setup_refclk analog, "
+              f"refclk_cgen={refclk_cgen}) ===\n")
+    log(f"  setup_refclk ports={list(port_indices)} "
+        f"refclk_cgen={refclk_cgen}")
+
+    def _poll_ack(phy, ack_bit, ack_name):
+        """Poll phy+0x000 for ack_bit up to timeout_us. Return True on ack."""
+        deadline = time.monotonic() + timeout_us / 1e6
+        while True:
+            try:
+                v = p.read32(phy + 0x000)
+            except Exception as e:
+                buf.write(f"    {ack_name} poll read FAILED: "
+                          f"{e.__class__.__name__}: {e}\n")
+                if not check_alive():
+                    raise DumpAborted() from e
+                return False
+            if v & ack_bit:
+                buf.write(f"    {ack_name} asserted (phy+0x000=0x{v:08x})\n")
+                return True
+            if time.monotonic() >= deadline:
+                buf.write(f"    {ack_name} TIMEOUT after "
+                          f"{timeout_us / 1e3:.0f} ms "
+                          f"(phy+0x000=0x{v:08x})\n")
+                return False
+            time.sleep(poll_us / 1e6)
+
+    def _set(phy, bits, label):
+        buf.write(f"    set32(phy+0x000, 0x{bits:x}) [{label}]\n")
+        try:
+            p.set32(phy + 0x000, bits)
+        except Exception as e:
+            buf.write(f"    {label} set FAILED: "
+                      f"{e.__class__.__name__}: {e}\n")
+            if not check_alive():
+                raise DumpAborted() from e
+
+    for i in port_indices:
+        p_ = apcie.ports[i]
+        pb = p_.port_base
+        phy = p_.phy_base
+        buf.write(f"\n--- port{i} refclk (phy_base=0x{phy:x}) ---\n")
+        log(f"    port{i} phy_base=0x{phy:x}")
+
+        def snap(label):
+            _read32_live(phy + 0x000, f"port{i} PHY_LANE_CFG ({label})", buf)
+            v = _read32_live(pb + 0x208, f"port{i} LINKSTS ({label})", buf)
+            if v is not None:
+                buf.write(f"  port{i} {label:22s} LINKSTS decode: "
+                          f"[{_linksts_decode(v)}]\n")
+
+        snap("pre-refclk")
+
+        _set(phy, PHY_LANE_CFG_REFCLK0REQ, "REFCLK0REQ")
+        _poll_ack(phy, PHY_LANE_CFG_REFCLK0ACK, "REFCLK0ACK")
+
+        _set(phy, PHY_LANE_CFG_REFCLK1REQ, "REFCLK1REQ")
+        _poll_ack(phy, PHY_LANE_CFG_REFCLK1ACK, "REFCLK1ACK")
+
+        _set(phy, PHY_LANE_CFG_REFCLKEN, "REFCLKEN")
+
+        if refclk_cgen:
+            _set(phy, PHY_LANE_CFG_REFCLKCGEN, "REFCLKCGEN")
+
+        time.sleep(0.001)
+        snap("post-refclk")
 
 
 # ---------------------------------------------------------------- T602X init replay
@@ -5477,6 +5586,32 @@ def main():
                          "-- the manual override is a prime suspect "
                          "for LTSSM never converging (ports stuck "
                          "BUSY).")
+    ap.add_argument("--setup-refclk", choices=("pre", "post", "both"),
+                    default=None,
+                    help="RUN 19: run the per-port REFCLK REQ->ACK "
+                         "handshake on phy_base+0x000 (PHY_LANE_CFG), "
+                         "mirroring Linux apple_pcie_setup_refclk -- "
+                         "the missing pre-training step (perstn.py "
+                         "never did it; RUN 18 proved --clkreq-mode="
+                         "periph alone doesn't clear LINKSTS BUSY). "
+                         "'pre': before p.pcie_init() (upstream "
+                         "ordering). 'post': after pcie_init, before "
+                         "the LINKSTS watch (kick a stuck link). "
+                         "'both': both slots.")
+    ap.add_argument("--refclk-cgen", action="store_true",
+                    help="RUN 19: in setup_refclk, additionally set "
+                         "REFCLKCGEN (bits 30|31) after REFCLKEN "
+                         "(apple_pcie_setup_port post-link step). OFF "
+                         "by default -- adds a write not needed to "
+                         "prove the REQ->ACK handshake.")
+    ap.add_argument("--tier3-phyextra", action="store_true",
+                    help="RUN 19: re-enable the Tier-3 per-port "
+                         "phy_extra/ctrl_lo probes. They AXI-stall and "
+                         "WEDGED m1n1 in RUN 18 (port0 phy_extra+0x000 "
+                         "= 0x497048000), costing the LTSSM kick + ECAM "
+                         "walk. Gated OFF by default now, mirroring the "
+                         "Tier-3a phy_ip gate; pass this only when you "
+                         "specifically want those windows.")
     ap.add_argument("--phyip-apply-local", action="store_true",
                     help="RUN 17: apply 6.g's apcie-phy-ip-pll-"
                          "tunables via the C-side applicator "
@@ -5865,6 +6000,19 @@ def main():
             buf.write("\n=== Phase C: skipped (--pmgr-per-port needs "
                       "--pmgr-enable) ===\n\n")
 
+    # RUN 19: per-port REFCLK handshake BEFORE pcie_init (upstream
+    # apple_pcie_setup_refclk ordering -- refclk precedes PERST#
+    # deassert / LTSSM training). phy_base+0x000 is proven reachable
+    # (RUN 18 Tier-2 read 0x2300066f); still guarded in case the pre-
+    # init fabric state stalls it.
+    if args.setup_refclk in ("pre", "both"):
+        log("setup_refclk (pre-pcie_init)...")
+        with guarded(buf, "setup_refclk(pre)", short_timeout=timeout):
+            try_(lambda: setup_refclk(apcie, buf,
+                                      refclk_cgen=args.refclk_cgen),
+                 "setup_refclk(pre)")
+        flush("setup-refclk-pre")
+
     pcie_init_ok = False
     if args.no_pcie_init:
         log("SKIPPING p.pcie_init() (--no-pcie-init)")
@@ -5931,6 +6079,19 @@ def main():
                                         tier=1),
                  "dump_pcie_regs(early)")
         flush("dump-post-init-early")
+
+        # RUN 19: per-port REFCLK handshake AFTER pcie_init, before the
+        # LINKSTS watch -- kick a link that pcie_init left stuck at
+        # BUSY. Placed here so the 5 s watch below immediately shows
+        # whether the handshake cleared BUSY.
+        if args.setup_refclk in ("post", "both") and liveness_gate(
+                "setup_refclk(post)"):
+            log("setup_refclk (post-pcie_init)...")
+            with guarded(buf, "setup_refclk(post)", short_timeout=timeout):
+                try_(lambda: setup_refclk(apcie, buf,
+                                          refclk_cgen=args.refclk_cgen),
+                     "setup_refclk(post)")
+            flush("setup-refclk-post")
 
         # RUN 18: long LINKSTS watch. The C-side idle poll gives BUSY
         # only 250 ms; watch each active port for up to 5 s in case
@@ -6031,7 +6192,8 @@ def main():
         with guarded(buf, "dump_pcie_regs(post-init)",
                      short_timeout=timeout):
             try_(lambda: dump_pcie_regs(apcie, buf, "post-init",
-                                        tier=args.tier),
+                                        tier=args.tier,
+                                        phyextra=args.tier3_phyextra),
                  "dump_pcie_regs")
         flush("dump-post-init")
 
@@ -6056,7 +6218,8 @@ def main():
                 with guarded(buf, "dump_pcie_regs(post-kick)",
                              short_timeout=timeout):
                     try_(lambda: dump_pcie_regs(apcie, buf, "post-kick",
-                                                tier=args.tier),
+                                                tier=args.tier,
+                                                phyextra=args.tier3_phyextra),
                          "dump_pcie_regs")
                 flush("dump-post-kick")
 
@@ -6080,7 +6243,8 @@ def main():
                 with guarded(buf, "dump_pcie_regs(post-t602x)",
                              short_timeout=timeout):
                     try_(lambda: dump_pcie_regs(apcie, buf, "post-t602x",
-                                                tier=args.tier),
+                                                tier=args.tier,
+                                                phyextra=args.tier3_phyextra),
                          "dump_pcie_regs")
                 flush("dump-post-t602x")
 
@@ -6098,7 +6262,8 @@ def main():
                 with guarded(buf, "dump_pcie_regs(post-unblock)",
                              short_timeout=timeout):
                     try_(lambda: dump_pcie_regs(apcie, buf, "post-unblock",
-                                                tier=args.tier),
+                                                tier=args.tier,
+                                                phyextra=args.tier3_phyextra),
                          "dump_pcie_regs")
                 flush("dump-post-unblock")
     else:

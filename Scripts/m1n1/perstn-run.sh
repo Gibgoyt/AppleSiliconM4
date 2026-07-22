@@ -1200,8 +1200,39 @@ case "${RUN^^}" in
                --clkreq-mode=periph
                --require-build=rc1-59-g)
         ;;
+    19)
+        # RUN 19: link training, part 2. RUN 18's --clkreq-mode=periph did
+        # NOT clear LINKSTS BUSY (0x8300020c / 0x83000204 held). Missing
+        # piece: the per-port REFCLK REQ->ACK handshake on phy_base+0x000
+        # (PHY_LANE_CFG) that Linux apple_pcie_setup_refclk does BEFORE
+        # LTSSM trains -- perstn.py never performed it, relying entirely on
+        # m1n1's C-side pcie_init + the CLKREQ# pin. phy_base+0x000 is
+        # proven reachable (RUN 18 Tier-2 read 0x2300066f on both ports).
+        #
+        # setup_refclk runs in BOTH slots: 'pre' (before pcie_init, upstream
+        # ordering) and 'post' (after pcie_init, kicking the link pcie_init
+        # left stuck at BUSY -- the post-init 5 s LINKSTS watch then shows
+        # whether BUSY clears). Keep RUN 18's ADT pin mux. Tier-3
+        # phy_extra/ctrl_lo probes are now gated OFF by default (they wedged
+        # m1n1 in RUN 18 at 0x497048000, before the LTSSM kick + ECAM walk),
+        # so this run should finally reach the ECAM walk. REFCLKCGEN is left
+        # off (--refclk-cgen would add it) to isolate the REQ->ACK handshake.
+        #
+        # Matrix: ACK asserts + BUSY clears -> link trains -> ECAM walk finds
+        # the NIC -> next phase = BAR setup + driver. ACK times out -> refclk
+        # gating is upstream of phy_base+0x000; RUN 20 = PERST re-toggle after
+        # refclk / --no-clkreq+refclk / longer settle. ACK asserts but BUSY
+        # persists -> refclk necessary-not-sufficient; combine with the LTSSM
+        # kick / T602X replay. ECAM readable despite BUSY -> fabric alive,
+        # training-only problem (high signal either way).
+        FLAGS=(--preinit-probe
+               --tier3
+               --clkreq-mode=periph
+               --setup-refclk=both
+               --require-build=rc1-59-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
