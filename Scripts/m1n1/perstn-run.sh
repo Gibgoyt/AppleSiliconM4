@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -72,7 +72,20 @@
 # applies the 29 pll tunable RMWs back-to-back with dsb sy
 # barriers, microseconds apart -- tests the tight-timing-window
 # hypothesis (proxy MMIO runs on the same CPU; only the seconds-
-# long inter-access gaps differ from pcie.c).
+# long inter-access gaps differ from pcie.c) (FALSIFIED -- stub
+# uploaded cleanly, p.call wedged with UartTimeout on the first
+# phy_ip access). Git archaeology then reframed the blocker: on
+# 2026-07-11 (d664bd9 era) p.pcie_init() RAN TO COMPLETION on
+# this machine (per-port bring-up included, ports stuck at
+# LINKSTS_BUSY) and Phase F's C-applicator 6.g then applied all
+# 29 pll entries through phy_ip+0x38 SUCCESSFULLY -- phy_ip
+# decodes after the C init's per-port bring-up, which the replay
+# never runs. 6b277bc later moved the phy-ip tunables into the C
+# path but wedges on the port-1 auspma slice (j773g has no
+# pci-bridge1), hence --no-pcie-init and the whole replay series.
+# RUN 11 = fix the C path: m1n1 patched with a t8132 port-slice
+# filter (m1n1 commit b404263), full p.pcie_init() + tier-3
+# post-init dumps incl. a phy_ip shared-window harvest.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -790,8 +803,51 @@ case "${RUN^^}" in
                --pmgr-pre6g-scan
                --phy-ip-stub-apply=tail)
         ;;
+    11)
+        # RUN 11: full C-side pcie_init on the PATCHED m1n1 (commit
+        # b404263: t8132 port-slice filter for the phy-ip tunables).
+        # REQUIRES the patched m1n1.macho to be enrolled first
+        # (kmutil configure-boot from recovery; /tmp/m4-serve has
+        # m1n1.macho + m1n1.macho.prepatch rollback).
+        #
+        # Rationale: RUNs A..10 proved phy_ip is decode-locked from
+        # every state the Python replay can build (all pcie.c
+        # pre-phy_ip writes applied and STUCK, all APCIE PMGR gates
+        # ON, on-CPU stub with tight timing -- all wedge at
+        # phy_ip+0x38). But on 2026-07-11, p.pcie_init() ran to
+        # completion (per-port bring-up included) and the C-side
+        # applicator then walked all 29 pll entries through
+        # phy_ip+0x38 cleanly. The unlock lives in the parts of
+        # pcie_init the replay never executes (per-port bring-up
+        # prime suspect). Its only known-fatal bug -- writing the
+        # auspma port-1 slice on a machine with no pci-bridge1 --
+        # is now filtered in C.
+        #
+        # NOT using BASE_FLAGS: no --no-pcie-init (p.pcie_init()
+        # must run) and no --t8140-replay (Phase F would wedge at
+        # 6.g before pcie_init). Keep the PERSTN/CLKREQ pokes and
+        # Phase 0/D PMGR work; --tier3 arms the post-init dump
+        # incl. the new Tier 3a phy_ip shared-window harvest;
+        # LTSSM kick runs by default.
+        #
+        # Interpretation: pcie_init returns + filter printout shows
+        # skipped port-1 entries + Tier 3a phy_ip reads live ->
+        # C wedge fixed; check per-port LINKSTS (port 2 = NIC
+        # training would be the jackpot; stuck BUSY -> we still
+        # harvested a live phy_ip dump to diff against the replay
+        # state for the unlock register). pcie_init wedges
+        # elsewhere -> new C-side wedge address, high signal.
+        # pcie_init returns but phy_ip still dead -> per-port-
+        # unlock hypothesis falsified; fallback = cio3pllcore/
+        # pcieclkgen naked-apply to rc_base (flags exist).
+        FLAGS=(--preinit-probe
+               --pmgr-enable
+               --pmgr-per-port
+               --gate-poke
+               --tier3)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

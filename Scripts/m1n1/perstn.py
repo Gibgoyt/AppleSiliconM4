@@ -4325,6 +4325,30 @@ def dump_pcie_regs(apcie, buf, tag="post-init", tier=1):
         # --- Tier 3: LTSSM + phy_extra + ctrl_lo. May AXI-stall. ---
         buf.write(f"\n=== Tier 3 (--tier3, DANGEROUS) ===\n")
         log("  === Tier 3 (ltssm + phy_extra + ctrl_lo) ===")
+
+        # --- Tier 3a: phy_ip shared window harvest (RUN 11). Across
+        # RUNs A..10 phy_ip was decode-locked from every replay state;
+        # after a successful C-side pcie_init (patched m1n1 with the
+        # port-slice filter) it should finally read. Harvest it FIRST
+        # (before the ctrl_lo reads that can AXI-stall on the DART
+        # overlap) so a late wedge doesn't cost us this data: a dense
+        # 0x0..0x100 sweep plus every pll-tunable target with its
+        # expected mask/value for offline verification.
+        buf.write(f"\n=== Tier 3a: phy_ip shared window (harvest) ===\n")
+        log("  === Tier 3a (phy_ip shared window harvest) ===")
+        for off in range(0x0, 0x100, 4):
+            _read32_live(apcie.phy_ip_base + off,
+                         f"phy_ip +0x{off:04x}", buf)
+        try:
+            _pll = apcie.apcie_tunables(u, "apcie-phy-ip-pll-tunables")
+        except Exception as e:
+            buf.write(f"  pll tunables parse failed: "
+                      f"{e.__class__.__name__}: {e}\n")
+            _pll = []
+        for (_off, _size, _mask, _value) in _pll:
+            _read32_live(apcie.phy_ip_base + _off,
+                         f"phy_ip pll-target +0x{_off:04x} "
+                         f"(mask=0x{_mask:x} want=0x{_value:x})", buf)
         for i in apcie.active_ports:
             p_ = apcie.ports[i]
             lt = p_.ltssm_base
