@@ -406,4 +406,17 @@ Interpretation matrix for RUN 10:
 
 **RUN 12 plan (2026-07-22):** `./Scripts/m1n1/perstn-run.sh 12` — flags `--preinit-probe --gate-poke --tier3`, straight to the C-side `p.pcie_init()`. **No reflash needed.** Interpretation matrix unchanged from RUN 11: filter printout + `pcie_init` returns + Tier 3a phy_ip harvest live → check per-port LINKSTS (port 2 = NIC = jackpot; stuck BUSY → live phy_ip dump to diff for the unlock register); new C-side wedge address → high signal; `pcie_init` returns but phy_ip dead → fallback cio3pllcore/pcieclkgen → rc_base.
 
+**State as of 2026-07-22 (post RUN 12) — the ordering bug identified:**
+- **RUN 12:** `pcie: Initializing t8132 PCIe controller` → UartTimeout, nothing else (`logs/12/run.log:195-197`). The missing `pcie: ADT uses…` line looked like an impossible wedge in RAM-only code — resolved by the **console-buffering insight**: during a proxy request only the first printf escapes the FIFO; the CPU ran past the parsing and hung at the first phy_ip MMIO.
+- **Archaeology:** `logs/pcie_up_1.log` (2026-07-10, pre-`6b277bc`, identical pre-init sequence) shows **`p.pcie_init() -> 0`** with ports at LINKSTS BUSY; `logs/pcie_up_2.log` embeds the 6b277bc diff — its first test — and wedged with **exactly the RUN 12 signature**. Conclusion: **`6b277bc` introduced an ordering bug on t8132** — it applies the phy-ip tunables at pcie.c:518, *before* per-port bring-up, where phy_ip never decodes (the 30-wedge lesson). The port-slice filter (`b404263`) fixed the real-but-second-order absent-port-slice bug; the 29 shared pll entries still fired pre-port-init and wedged first. Full analysis in `Scripts/m1n1/logs/12/findings.md`.
+
+**RUN 13 plan (2026-07-22): the ordering fix — every piece proven on this machine.**
+- **m1n1 fork `7728fb0`:** t8132's `pcie_init` SKIPS the phy-ip tunables (prints `pcie: t8132: skipping phy-ip tunables pre-port-init`), restoring pcie_up_1's rc=0 behavior. The filtered applicator stays as the in-C fix candidate once the ungating per-port step is identified. Staged at `/tmp/m4-serve/` (m1n1.bin + m1n1.macho + rollbacks) — **requires one more 1TR kmutil enrollment**.
+- **perstn.py:** `--post-init-phy-ip` — after `pcie_init` returns: pll via `p.tunables_apply_local(reg_idx=3)` (the 2026-07-11 recipe), auspma Python-side with the port-slice filter; runs before the tier-3 dump so the Tier 3a phy_ip harvest verifies application. Plus `p.pcie_init()` now runs with a 60 s UART timeout + 30 s post-timeout liveness recovery (slow ≠ dead; short timeouts also desync the proxy).
+- **Dispatch:** `./Scripts/m1n1/perstn-run.sh 13` (`--preinit-probe --gate-poke --tier3 --post-init-phy-ip`).
+- **Matrix:**
+  - `pcie_init -> 0` + pll lands + Tier 3a live → auspma, LINKSTS dumps, LTSSM kick, ECAM walk. **NIC vendor/device ID in ECAM = goal.** Ports still BUSY after tunables+kick → RUN 14 = re-run per-port init/LTSSM after tunables (candidate: in-C reorder using `tunables_apply_phy_ip_filtered` at the right point).
+  - `pcie_init` still wedges with tunables skipped → ordering story falsified; 60 s/recovery data + the per-port `pcie: Initializing port %d` breadcrumbs locate the real wedge.
+  - Post-init pll apply wedges → phy_ip needs more than per-port init on this boot path; diff against the 2026-07-11 environment.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
