@@ -4646,6 +4646,133 @@ def watch_linksts(apcie, buf, secs=5.0, label="post-init"):
                       f"(LINKSTS=0x{last:08x})\n")
 
 
+# ---------------------------------------------------------------- PERST re-sequence
+
+# LTSSM register offsets in port_ltssm_base (m1n1 src/pcie.c:857-861).
+LTSSM_KICK_10 = 0x10  # write 0x2
+LTSSM_KICK_1C = 0x1c  # write 0x4
+LTSSM_KICK_20 = 0x20  # set 0x2
+LTSSM_START   = 0x14  # write 0x1 -- the START bit that refused to latch in RUN 20
+
+
+def perst_resequence(apcie, buf, perstn_pin, settle_ms=100, hold_ms=100,
+                     port_indices=None):
+    """RUN 21: refclk-first PERST# re-sequence honoring the ADT
+    t-refclk-to-perst / perst-to-config = 100 ordering, then write
+    LTSSM_START (ltssm+0x14) and read it back -- the key instrument.
+
+    RUN 20 landed ltssm+0x10/0x1c/0x20 but LTSSM_START (ltssm+0x14) read
+    back 0 and LINKSTS stayed BUSY. Prime suspect: PERST# was deasserted
+    BEFORE refclk came up (perstn.py deasserts it pre-pcie_init), so the
+    port rejects START. This re-sequence assumes setup_refclk already ran
+    (phy_base+0x000 REFCLKEN set): re-assert PERST#, cycle the internal
+    port reset (+0x82c), deassert PERST#, settle, poll BUSY->0, then write
+    START and read ltssm+0x14 back.
+
+    All addresses are Tier-1 / GPIO (proven reachable in RUN 20, exc_count
+    delta 0). Guarded; bails on wedge via DumpAborted.
+    """
+    if port_indices is None:
+        port_indices = apcie.active_ports
+    buf.write(f"\n=== PERST re-sequence (refclk-first, settle={settle_ms} "
+              f"ms, hold={hold_ms} ms) ===\n")
+    log(f"  perst_resequence ports={list(port_indices)} pin={perstn_pin}")
+
+    def _w(fn, addr, val, label):
+        buf.write(f"    {label}\n")
+        try:
+            fn(addr, val)
+        except Exception as e:
+            buf.write(f"    {label} FAILED: {e.__class__.__name__}: {e}\n")
+            if not check_alive():
+                raise DumpAborted() from e
+
+    for i in port_indices:
+        p_ = apcie.ports[i]
+        pb = p_.port_base
+        phy = p_.phy_base
+        lt = p_.ltssm_base
+        buf.write(f"\n--- port{i} PERST re-sequence "
+                  f"(port_base=0x{pb:x} ltssm=0x{lt:x}) ---\n")
+        log(f"    port{i} port_base=0x{pb:x} phy_base=0x{phy:x} "
+            f"ltssm=0x{lt:x}")
+
+        def snap(label):
+            _read32_live(phy + 0x000, f"port{i} PHY_LANE_CFG ({label})", buf)
+            v = _read32_live(pb + 0x208, f"port{i} LINKSTS ({label})", buf)
+            if v is not None:
+                buf.write(f"  port{i} {label:22s} LINKSTS decode: "
+                          f"[{_linksts_decode(v)}]\n")
+
+        try:
+            snap("pre-resequence")
+
+            # Re-assert PERST# (drive the endpoint reset pin low). Shared
+            # pin across ports on this board; driven once per port is fine.
+            buf.write(f"  re-assert PERST# gpio0[{perstn_pin}] low\n")
+            log(f"    re-assert PERST# gpio0[{perstn_pin}] low")
+            gpio_set_output(perstn_pin, 0, buf)
+            time.sleep(hold_ms / 1e3)
+
+            # Cycle the internal port reset (+0x82c): assert then release.
+            _w(p.clear32, pb + 0x82c, 0x1, "clear32(port+0x82c, 0x1) "
+               "[assert internal reset]")
+            _read32_live(pb + 0x82c, f"port{i} +0x82c (asserted)", buf)
+            time.sleep(0.001)
+            _w(p.set32, pb + 0x82c, 0x1, "set32(port+0x82c, 0x1) "
+               "[release internal reset]")
+            _read32_live(pb + 0x82c, f"port{i} +0x82c (released)", buf)
+
+            # Deassert PERST# (release the endpoint), then settle the
+            # ADT-declared t-refclk-to-perst / perst-to-config window.
+            buf.write(f"  deassert PERST# gpio0[{perstn_pin}] high\n")
+            log(f"    deassert PERST# gpio0[{perstn_pin}] high")
+            gpio_set_output(perstn_pin, 1, buf)
+            time.sleep(settle_ms / 1e3)
+            buf.write(f"  settled {settle_ms} ms after PERST deassert\n")
+
+            # Poll BUSY -> 0 (up to 2 s) before kicking LTSSM.
+            deadline = time.monotonic() + 2.0
+            last = None
+            while time.monotonic() < deadline:
+                try:
+                    v = p.read32(pb + 0x208)
+                except Exception as e:
+                    buf.write(f"  port{i}: LINKSTS poll RAISED "
+                              f"{e.__class__.__name__}; abandoning\n")
+                    if not check_alive():
+                        raise DumpAborted() from e
+                    break
+                if v != last:
+                    buf.write(f"  port{i}: LINKSTS=0x{v:08x} "
+                              f"[{_linksts_decode(v)}] at "
+                              f"+{2.0 - (deadline - time.monotonic()):.2f}s\n")
+                    last = v
+                if not (v & (1 << 2)):
+                    buf.write(f"  port{i}: BUSY cleared before START kick!\n")
+                    break
+                time.sleep(0.05)
+
+            # Kick LTSSM: config regs then the START bit. Read START back --
+            # this is the primary instrument (RUN 20: it read back 0).
+            buf.write(f"  LTSSM kick + START (ltssm=0x{lt:x})\n")
+            _w(p.write32, lt + LTSSM_KICK_10, 0x2, "write32(ltssm+0x10, 0x2)")
+            _w(p.write32, lt + LTSSM_KICK_1C, 0x4, "write32(ltssm+0x1c, 0x4)")
+            _w(p.set32,   lt + LTSSM_KICK_20, 0x2, "set32(ltssm+0x20, 0x2)")
+            _w(p.write32, lt + LTSSM_START,   0x1, "write32(ltssm+0x14, 0x1) "
+               "[LTSSM_START]")
+            _read32_live(lt + LTSSM_START,
+                         f"port{i} ltssm+0x14 (LTSSM_START readback)", buf)
+
+            time.sleep(0.05)
+            snap("post-resequence")
+        except DumpAborted:
+            log(f"    perst_resequence aborted (m1n1 wedged) on port{i}")
+            buf.write(f"[perst_resequence] aborted on port{i} "
+                      f"-- m1n1 not responding\n")
+            return
+
+
 # ---------------------------------------------------------------- refclk handshake
 
 # APCIE_PHY_LANE_CFG bits, from Linux pcie-apple.c (PHY window + 0x000).
@@ -5640,6 +5767,22 @@ def main():
                          "(apple_pcie_setup_port post-link step). OFF "
                          "by default -- adds a write not needed to "
                          "prove the REQ->ACK handshake.")
+    ap.add_argument("--perst-resequence", action="store_true",
+                    help="RUN 21: after setup_refclk(post), re-sequence "
+                         "PERST# refclk-first (re-assert PERST#, cycle "
+                         "port+0x82c, deassert PERST#, settle the ADT "
+                         "t-refclk-to-perst window, poll BUSY->0), then "
+                         "write LTSSM_START (ltssm+0x14=0x1) and read it "
+                         "back. RUN 20 landed ltssm+0x10/0x1c/0x20 but "
+                         "LTSSM_START refused to latch (read back 0) with "
+                         "LINKSTS stuck BUSY -- the suspect is PERST# being "
+                         "deasserted before refclk was up. Requires "
+                         "--setup-refclk (pre/post/both).")
+    ap.add_argument("--perst-settle-ms", type=int, default=100,
+                    help="RUN 21: settle (ms) after PERST# deassert in "
+                         "--perst-resequence, matching the ADT-declared "
+                         "t-refclk-to-perst / perst-to-config = 100 "
+                         "(default: 100).")
     ap.add_argument("--tier3-phyextra", action="store_true",
                     help="RUN 19: re-enable the Tier-3 per-port "
                          "phy_extra/ctrl_lo probes. They AXI-stall and "
@@ -6134,6 +6277,23 @@ def main():
         # training converges late (endpoint slow out of reset).
         watch_linksts(apcie, buf, secs=5.0, label="post-init")
         flush("postinit-linksts-watch")
+
+        # RUN 21: refclk-first PERST# re-sequence + LTSSM_START readback.
+        # Runs after setup_refclk(post) + the post-init watch above, so
+        # refclk is already up when PERST# is re-toggled (the ADT
+        # t-refclk-to-perst ordering RUN 20 violated). The post-perst
+        # watch below reports whether BUSY finally clears.
+        if args.perst_resequence and liveness_gate("perst-resequence"):
+            log("PERST re-sequence (refclk-first)...")
+            with guarded(buf, "perst_resequence", short_timeout=timeout):
+                try_(lambda: perst_resequence(
+                        apcie, buf, perstn_pin,
+                        settle_ms=args.perst_settle_ms),
+                     "perst_resequence")
+            flush("perst-resequence")
+            if liveness_gate("post-perst LINKSTS watch"):
+                watch_linksts(apcie, buf, secs=5.0, label="post-perst")
+                flush("post-perst-linksts-watch")
 
         if args.t8140_replay_post_init and liveness_gate(
                 "Phase F post-init replay"):

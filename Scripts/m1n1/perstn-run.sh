@@ -1262,8 +1262,36 @@ case "${RUN^^}" in
                --t602x-do-again
                --require-build=rc1-59-g)
         ;;
+    21)
+        # RUN 21: link training, part 4. RUN 20 landed the LTSSM config
+        # writes (ltssm+0x10/0x1c/0x20 latched) but LTSSM_START (ltssm+0x14)
+        # refused to latch (written 0x1, read back 0) and LINKSTS stayed
+        # BUSY; ECAM all vacant. Root cause: PERST# is deasserted BEFORE
+        # refclk is up, violating the ADT's t-refclk-to-perst=100 /
+        # perst-to-config=100 ordering, so the port rejects START.
+        #
+        # Re-sequence refclk-first (--perst-resequence): setup_refclk(post),
+        # then re-assert PERST# (gpio165 low), cycle port+0x82c, deassert
+        # PERST#, 100 ms settle, poll BUSY->0, write LTSSM_START and READ
+        # ltssm+0x14 back -- the key instrument. Pin mux kept; phy_extra
+        # probes stay gated. Drops --t602x-init (RUN 20 showed its
+        # rc_base+0x3c/port+0x10 writes drop post-init and add noise); this
+        # isolates the ordering variable.
+        #
+        # Matrix: ltssm+0x14 latches 0x1 / BUSY clears -> LINK TRAINS ->
+        # ECAM finds the NIC. START still 0 after correct ordering -> START
+        # gated deeper than reset timing; RUN 22 = patched m1n1 (in-window
+        # T602X writes) or --no-clkreq A/B. port2 never distinguishes from a
+        # dead port -> endpoint-presence axis (RUN 22 diagnostics).
+        FLAGS=(--preinit-probe
+               --tier3
+               --clkreq-mode=periph
+               --setup-refclk=both
+               --perst-resequence
+               --require-build=rc1-59-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
