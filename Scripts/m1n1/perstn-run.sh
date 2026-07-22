@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -93,7 +93,21 @@
 # untested). RUN 12 = RUN 11 minus --pmgr-enable/--pmgr-per-port
 # (Phase B/C skipped; pcie.c:425 does its own power enable) with
 # Phase B's phy_ip probes removed from perstn.py -- straight to
-# the C-side pcie_init.
+# the C-side pcie_init (WEDGED inside pcie_init: only
+# "Initializing t8132" escaped the console buffer. Archaeology:
+# pcie_up_2.log -- the FIRST test of 6b277bc -- shows the
+# IDENTICAL signature, while pcie_up_1 (pre-6b277bc, no phy-ip
+# tunables in C) returned 0. 6b277bc's phy-ip tunables at
+# pcie.c:518 fire BEFORE per-port bring-up, where phy_ip never
+# decodes on t8132 -- an ordering bug; the port-slice filter was
+# necessary but not sufficient). RUN 13 = m1n1 7728fb0 SKIPS the
+# phy-ip tunables in C on t8132 (restoring the pcie_up_1 rc=0
+# behavior) + perstn.py applies them POST-init
+# (--post-init-phy-ip: pll via C applicator reg_idx=3, the
+# proven 2026-07-11 recipe; auspma Python-side with the
+# port-slice filter), then tier-3 dumps + LTSSM kick + ECAM
+# walk. pcie_init now runs with a 60 s UART timeout + 30 s
+# post-timeout liveness recovery.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -882,8 +896,45 @@ case "${RUN^^}" in
                --gate-poke
                --tier3)
         ;;
+    13)
+        # RUN 13: the ORDERING FIX. REQUIRES the RUN-13 m1n1 (fork
+        # commit 7728fb0) to be enrolled first (kmutil from 1TR;
+        # /tmp/m4-serve has m1n1.bin + m1n1.macho + rollbacks).
+        #
+        # RUN 12 post-mortem (see logs/12/findings.md): the wedge
+        # inside pcie_init is 6b277bc's ORDERING BUG -- it applies
+        # the phy-ip tunables at pcie.c:518, BEFORE per-port
+        # bring-up, where phy_ip never decodes on t8132. pcie_up_2
+        # (the first 6b277bc test, 2026-07-10) wedged identically;
+        # pcie_up_1 (pre-6b277bc) returned 0 with ports at
+        # LINKSTS_BUSY. The missing "ADT uses..." line was stuck in
+        # the console buffer (only the first line escapes during a
+        # proxy request), so the wedge LOOKED earlier than it was.
+        # The port-slice filter (b404263) fixed a real but
+        # second-order bug; the 29 shared pll entries still fired
+        # pre-port-init and wedged first.
+        #
+        # RUN 13 recipe (every piece proven on this machine):
+        #   1. m1n1 7728fb0 skips the phy-ip tunables in C on t8132
+        #      -> pcie_init should return 0 like pcie_up_1.
+        #   2. --post-init-phy-ip: pll via the C applicator
+        #      (p.tunables_apply_local reg_idx=3 -- walked all 29
+        #      entries cleanly on 2026-07-11 post-init) + auspma
+        #      Python-side with the port-slice filter (the C
+        #      applicator writing the port-1 slice was the
+        #      2026-07-11 killer).
+        #   3. Tier-3 dumps (Tier 3a phy_ip harvest verifies the
+        #      tunables landed) + LTSSM kick + ECAM walk (NIC
+        #      vendor/device ID = goal).
+        # pcie_init runs with a 60 s UART timeout + 30 s
+        # post-timeout liveness recovery (slow != dead).
+        FLAGS=(--preinit-probe
+               --gate-poke
+               --tier3
+               --post-init-phy-ip)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

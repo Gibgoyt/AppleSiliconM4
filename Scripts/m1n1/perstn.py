@@ -4270,6 +4270,111 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
               "  m1n1's own C-side init should now run without wedging.\n\n")
 
 
+def post_init_phy_ip_apply(apcie, buf, timeout=0.3, flush_fn=None):
+    """RUN 13: apply the phy-ip tunables AFTER a successful C-side
+    p.pcie_init().
+
+    The patched m1n1 (fork 7728fb0) SKIPS the phy-ip tunables inside
+    pcie_init on t8132 -- phy_ip does not decode until per-port
+    bring-up has run, so the pre-port-init application at pcie.c:518
+    (6b277bc) could never work. Post-init, phy_ip is live (proven
+    2026-07-11: p.tunables_apply_local walked all 29 pll entries
+    cleanly after a completed pre-6b277bc pcie_init).
+
+    1. pll via the C-side applicator, reg idx 3 -- the exact
+       2026-07-11 recipe.
+    2. auspma Python-side with the port-slice filter -- the C
+       applicator writing the port-1 slice (no pci-bridge1 on j773g)
+       was the 2026-07-11 killer.
+    """
+    def _flush(tag):
+        if flush_fn is not None:
+            flush_fn(tag)
+
+    buf.write("=== post-init phy-ip tunables (RUN 13) ===\n")
+    path = "/arm-io/apcie"
+
+    _flush("postinit-phyip.pre-pll")
+    try:
+        exc0 = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"  get_exc_count failed: "
+                  f"{e.__class__.__name__}: {e}\n")
+        return False
+    buf.write("  pll: p.tunables_apply_local("
+              "'apcie-phy-ip-pll-tunables', reg_idx=3)...\n")
+    try:
+        with guarded(buf, "postinit.pll-tunables",
+                     short_timeout=max(timeout, 2.0)):
+            r = p.tunables_apply_local(path,
+                                       "apcie-phy-ip-pll-tunables", 3)
+        buf.write(f"  pll: -> {r!r}\n")
+    except Exception as e:
+        buf.write(f"  pll: RAISED {e.__class__.__name__}: {e}\n")
+        _flush("postinit-phyip.pll-raised")
+        return False
+    alive, delta = check_alive_fast(exc0, timeout=max(timeout, 0.5))
+    buf.write(f"  pll: alive={alive} exc_delta={delta}\n")
+    if not alive:
+        _flush("postinit-phyip.pll-dead")
+        return False
+    _flush("postinit-phyip.post-pll")
+
+    entries = apcie.apcie_tunables(u, "apcie-phy-ip-auspma-tunables")
+    if not entries:
+        buf.write("  auspma: property absent; done\n")
+        _flush("postinit-phyip.done")
+        return True
+    mask_op = {1: p.mask8, 2: p.mask16, 4: p.mask32, 8: p.mask64}
+    applied = 0
+    skipped = 0
+    try:
+        exc_running = p.get_exc_count()
+    except Exception as e:
+        buf.write(f"  auspma: get_exc_count failed: "
+                  f"{e.__class__.__name__}: {e}\n")
+        return False
+    for i, (offset, size, mask, value) in enumerate(entries):
+        info = apcie.classify_phy_ip_offset(offset)
+        do_apply = (info["kind"] == "shared" or
+                    (info["kind"] == "port_slice" and
+                     info["port_active"]))
+        if not do_apply:
+            skipped += 1
+            continue
+        target = apcie.phy_ip_base + offset
+        op = mask_op.get(size)
+        if op is None:
+            buf.write(f"  auspma: #{i} unknown size {size}; abort\n")
+            _flush(f"postinit-phyip.auspma-badsize.{i}")
+            return False
+        with guarded(buf, f"postinit.auspma.#{i:03d}@0x{target:x}",
+                     short_timeout=timeout):
+            try:
+                op(target, mask, value)
+            except Exception as e:
+                buf.write(f"  auspma: RAISED at #{i} 0x{target:x}: "
+                          f"{e.__class__.__name__}: {e}\n")
+                _flush(f"postinit-phyip.auspma-raise.{i}")
+                return False
+        alive, delta = check_alive_fast(exc_running, timeout=timeout)
+        if not alive:
+            buf.write(f"  auspma: m1n1 dead at #{i} 0x{target:x}\n")
+            _flush(f"postinit-phyip.auspma-dead.{i}")
+            return False
+        if delta:
+            buf.write(f"  auspma: SYNC delta={delta} at #{i} "
+                      f"0x{target:x}\n")
+            exc_running += delta
+            _flush(f"postinit-phyip.auspma-sync.{i}")
+            return False
+        applied += 1
+    buf.write(f"  auspma: applied {applied}, skipped {skipped} "
+              f"(inactive-port slices)\n")
+    _flush("postinit-phyip.done")
+    return True
+
+
 def dump_pcie_regs(apcie, buf, tag="post-init", tier=1):
     """Dump PCIe controller state, gated by safety tier.
 
@@ -5277,6 +5382,19 @@ def main():
                          "dedicated flush "
                          "(phaseF.pre.6.g.pmgr-scan). Requires "
                          "--t8140-replay.")
+    ap.add_argument("--post-init-phy-ip", action="store_true",
+                    help="RUN 13: after a successful p.pcie_init() "
+                         "(patched m1n1 7728fb0 SKIPS the phy-ip "
+                         "tunables in C on t8132), apply them from "
+                         "the host: pll via the C-side applicator "
+                         "p.tunables_apply_local(reg_idx=3) -- the "
+                         "exact 2026-07-11 recipe -- then auspma "
+                         "Python-side with the port-slice filter "
+                         "(skips inactive-port slices; the C "
+                         "applicator writing the port-1 slice was "
+                         "the 2026-07-11 killer). Runs before the "
+                         "post-init register dump so the Tier 3a "
+                         "phy_ip harvest verifies application.")
     ap.add_argument("--phy-ip-write-probe", action="store_true",
                     help="RUN P: at --phy-ip-diag-at swap the phy_ip "
                          "read probe for a naked posted write32 to "
@@ -5579,6 +5697,14 @@ def main():
                   "phy_ip tunables report above for the port-1 hypothesis.\n\n")
     else:
         log("p.pcie_init()...")
+        # RUN 13: pcie_init is a LONG proxy request (several 250 ms
+        # polls + per-port LTSSM waits). The default UART timeout can
+        # fire while m1n1 is still legitimately working, and the
+        # timeout itself desyncs the proxy protocol -- a slow init then
+        # looks identical to a hard wedge. Give the request 60 s, and
+        # on timeout poll liveness for 30 s before declaring death.
+        _old_to = iface.dev.timeout
+        iface.dev.timeout = 60.0
         try:
             rc = p.pcie_init()
             buf.write(f"\np.pcie_init() -> {rc!r}\n\n")
@@ -5588,6 +5714,21 @@ def main():
             buf.write(f"\np.pcie_init raised: {e.__class__.__name__}: {e}\n\n")
             log(f"p.pcie_init raised: {e.__class__.__name__}: {e}")
             traceback.print_exc(limit=5)
+            log("post-timeout recovery probe (up to 30 s)...")
+            for _i in range(30):
+                time.sleep(1.0)
+                if check_alive(timeout=1.0):
+                    buf.write(f"  m1n1 ALIVE again {_i + 1}s after the "
+                              f"timeout -- request was slow or the "
+                              f"reply was lost, NOT a hard wedge\n")
+                    log(f"m1n1 alive again after {_i + 1}s")
+                    break
+            else:
+                buf.write("  m1n1 still dead 30 s after the timeout -- "
+                          "hard wedge\n")
+                log("m1n1 still dead after 30 s -- hard wedge")
+        finally:
+            iface.dev.timeout = _old_to
     flush("pcie-init")
 
     def liveness_gate(label):
@@ -5601,6 +5742,15 @@ def main():
 
     if pcie_init_ok:
         log(f"active ports (per ADT): {apcie.active_ports}")
+
+        if args.post_init_phy_ip and liveness_gate("post-init phy-ip"):
+            log("applying phy-ip tunables post-init (RUN 13)...")
+            try_(lambda: post_init_phy_ip_apply(apcie, buf,
+                                                timeout=timeout,
+                                                flush_fn=flush),
+                 "post_init_phy_ip_apply")
+            flush("postinit-phyip")
+
         log(f"dumping PCIe controller registers (post-init, tier={args.tier})...")
         with guarded(buf, "dump_pcie_regs(post-init)",
                      short_timeout=timeout):
