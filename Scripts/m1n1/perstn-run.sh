@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -117,7 +117,19 @@
 # --require-build=rc1-59-g guard (aborts pre-SMC on mismatch);
 # --gate-poke dropped (Phase D was the one state-changing
 # pre-init step the proven pcie_up_1 boot didn't have; pcie.c
-# does its own pmgr enable).
+# does its own pmgr enable) (BREAKTHROUGH -- p.pcie_init()
+# returned 0 for the first time since 2026-07-10: full shared
+# init + rc handshake OK; both ports "failed to become idle"
+# (LINKSTS BUSY, continue'd) = pcie_up_1 parity per its BUSY
+# post-init LINKSTS 0x8300020c/0x83000204, a NON-event; but the
+# straight-to-pll post-init apply wedged -- phy_ip still locked
+# right after pcie_init). RUN 15 = the 2026-07-11 recipe: on
+# that boot phy_ip decoded only after pcie_init was followed by
+# a FULL Phase F re-pass of the shared sequence (second
+# CLK0/CLK1 handshake etc). --t8140-replay-post-init runs
+# Phase F AFTER pcie_init (native order); its 6.g/6.h apply the
+# phy-ip tunables python-filtered. No reflash needed (8a569ad
+# stays enrolled).
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -973,8 +985,52 @@ case "${RUN^^}" in
                --post-init-phy-ip
                --require-build=rc1-59-g)
         ;;
+    15)
+        # RUN 15: the 2026-07-11 recipe -- Phase F AFTER pcie_init.
+        # NO REFLASH NEEDED (m1n1 8a569ad stays enrolled; the
+        # require-build guard enforces it).
+        #
+        # RUN 14 results: p.pcie_init() -> 0 (first completed C init
+        # since 2026-07-10) with every shared-init breadcrumb clean.
+        # Both ports "failed to become idle" (LINKSTS BUSY within
+        # 250 ms -> continue) -- a NON-event: pcie_up_1's post-init
+        # LINKSTS (0x8300020c/0x83000204) had BUSY set too, so the
+        # known-good boot had the same port outcome. But phy_ip was
+        # STILL locked right after pcie_init: the straight-to-pll
+        # post-init apply wedged at 0x497040038.
+        #
+        # The 2026-07-11 boot (the only phy_ip decode ever) did NOT
+        # go straight from pcie_init to phy_ip: it re-ran the WHOLE
+        # Phase F shared sequence first (pmgr enable, axi2af, phy
+        # tunables, a SECOND CLK0REQ/ACK+CLK1REQ/ACK handshake,
+        # RESET clear, T8140 marker) and only then applied the pll
+        # tunables -- successfully. Hypothesis: the post-init
+        # shared-sequence RE-PASS is the phy_ip ungate.
+        #
+        # RUN 15 = --t8140-replay-post-init: run Phase F (native
+        # order, no experimental flags -- exactly d664bd9's Phase F)
+        # after pcie_init returns. Phase F's 6.g applies the 29 pll
+        # entries per-entry python-side; 6.h applies auspma with the
+        # port-1 slice filtered (the 2026-07-11 killer). Then steps
+        # 7-10, tier-3 dumps (Tier 3a phy_ip harvest), LTSSM kick,
+        # ECAM walk (NIC vendor/device ID = goal). Also new: an
+        # early tier-1 dump right after pcie_init captures the port
+        # LINKSTS state RUN 14 never got.
+        #
+        # Matrix: Phase F completes -> tunables in, best state ever;
+        # ports still BUSY after kick -> RUN 16 = LTSSM work from a
+        # fully-tuned controller. 6.g wedges even post-init ->
+        # 2026-07-11 reproduced except m1n1 binary internals; next
+        # lever = diff d664bd9-era port-body pre-idle phy writes
+        # (clear32 0x10 / set32 0x200/0x400) vs 8a569ad. Earlier
+        # Phase F step wedges -> step label names it.
+        FLAGS=(--preinit-probe
+               --tier3
+               --t8140-replay-post-init
+               --require-build=rc1-59-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

@@ -5405,6 +5405,23 @@ def main():
                          "dedicated flush "
                          "(phaseF.pre.6.g.pmgr-scan). Requires "
                          "--t8140-replay.")
+    ap.add_argument("--t8140-replay-post-init", action="store_true",
+                    help="RUN 15: run Phase F (the full T8140 shared-"
+                         "init replay, native order, no experimental "
+                         "flags) AFTER a successful p.pcie_init() -- "
+                         "the exact 2026-07-11 recipe. On that boot, "
+                         "phy_ip decoded only after pcie_init was "
+                         "followed by a RE-PASS of the shared "
+                         "sequence (pmgr enable, axi2af, phy "
+                         "tunables, a second CLK0/CLK1 handshake, "
+                         "RESET clear, marker) -- RUN 14 jumped "
+                         "straight from pcie_init to the pll apply "
+                         "and wedged. Phase F's 6.g/6.h apply the "
+                         "phy-ip tunables python-filtered (the "
+                         "port-1 auspma slice is skipped). Mutually "
+                         "exclusive with --t8140-replay; do not "
+                         "combine with --post-init-phy-ip (Phase F "
+                         "already applies the tunables).")
     ap.add_argument("--require-build", default=None, metavar="SUBSTR",
                     help="RUN 14: abort (exit 2) before any device "
                          "state changes unless the m1n1 USB product "
@@ -5518,6 +5535,9 @@ def main():
     if args.pcieclkgen_naked_apply_to and args.pcieclkgen_set5_only_to:
         ap.error("--pcieclkgen-naked-apply-to and --pcieclkgen-set5-"
                  "only-to are mutually exclusive")
+    if args.t8140_replay_post_init and args.t8140_replay:
+        ap.error("--t8140-replay-post-init and --t8140-replay are "
+                 "mutually exclusive (pre- vs post-pcie_init Phase F)")
 
     # RUN 14: stale-binary guard. RUN 13 burned a boot silently
     # re-running RUN 12 because the new m1n1 build was staged but never
@@ -5799,6 +5819,30 @@ def main():
 
     if pcie_init_ok:
         log(f"active ports (per ADT): {apcie.active_ports}")
+
+        # RUN 15: capture the safe port/rc state FIRST (RUN 14 wedged
+        # before any post-init dump, so we never saw the port LINKSTS
+        # values). Tier 1 touches only proven-safe windows.
+        log("early post-init tier-1 dump (safe windows only)...")
+        with guarded(buf, "dump_pcie_regs(post-init-early)",
+                     short_timeout=timeout):
+            try_(lambda: dump_pcie_regs(apcie, buf, "post-init-early",
+                                        tier=1),
+                 "dump_pcie_regs(early)")
+        flush("dump-post-init-early")
+
+        if args.t8140_replay_post_init and liveness_gate(
+                "Phase F post-init replay"):
+            # RUN 15: the 2026-07-11 recipe. That boot's phy_ip decode
+            # succeeded only after pcie_init was followed by a full
+            # Phase F re-pass of the shared sequence; native order,
+            # no experimental flags. Phase F's 6.g/6.h apply the
+            # phy-ip tunables python-filtered.
+            log("Phase F post-init replay (2026-07-11 recipe)...")
+            try_(lambda: probe_phaseF_t8140_replay(
+                    apcie, buf, timeout=timeout, flush_fn=flush),
+                 "probe_phaseF_t8140_replay(post-init)")
+            flush("phaseF-post-init")
 
         if args.post_init_phy_ip and liveness_gate("post-init phy-ip"):
             log("applying phy-ip tunables post-init (RUN 13)...")
