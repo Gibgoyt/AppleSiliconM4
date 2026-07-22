@@ -1,142 +1,161 @@
-# RUN 20 — PCIe LTSSM link training: replay m1n1's skipped T602X LTSSM kick
+# RUN 21 — PCIe link training: refclk-first PERST# re-sequence + LTSSM_START readback
 
 ## Context
 
 m4-pcie bring-up in `AppleSiliconM4/` (Mac16,10 / J773g / t8132), poking hardware through
-m1n1 to get the NIC on `pci-bridge2` to enumerate. The phy-ip tunables axis was closed by
-RUN 17 (phy_ip never decodes; `pcie_init` completes without it). RUN 18/19 pivoted to the
-real blocker: ports reach **LINKSTS BUSY** (`0x8300020c` / `0x83000204`) and never train.
+m1n1 to enumerate the 1GbE NIC (`lan-1gb`) on `pci-bridge2`. `pcie_init()` returns 0 and both
+ports reach **LINKSTS BUSY** (port0 `0x8300020c`, port2 `0x83000204`) but never reach UP (bit0).
 
-**RUN 19 result (decisive):** the per-port REFCLK REQ→ACK handshake now succeeds on both
-ports (REFCLK0ACK + REFCLK1ACK assert on `phy_base+0x000`, ending `0x2300066f`). But LINKSTS
-never moved — BUSY through pcie_init, the 5 s watch, and the LTSSM kick. RUN 19 also proved
-the infrastructure works: the Tier-3 `phy_extra`/`ctrl_lo` gate held (no wedge), and for the
-first time the run reached the **LTSSM kick, post-kick dump, and ECAM walk** (both slots
-vacant `0xffffffff` — expected, link not trained).
+Runs so far falsified, each no-reflash:
+- **RUN 18** (mux CLKREQ# to ADT alt-func 2): BUSY unchanged.
+- **RUN 19** (per-port REFCLK REQ→ACK handshake on `phy_base+0x000`): handshake **succeeds**
+  (REFCLK0ACK+REFCLK1ACK assert, `→0x3300067f`) — BUSY unchanged.
+- **RUN 20** (replay m1n1's T602X LTSSM kick): mixed, and it produced the decisive clue.
 
-### Root cause (from m1n1 source, authoritative)
+### RUN 20 result — the sharp clue (verified against `logs/20/nic-runtime.txt`)
 
-Reading `/home/ahmed/Projects/C/embedded/m1n1/src/pcie.c` (the actual enrolled build):
+In the post-t602x dump (lines 934-944), three LTSSM config registers **latched**:
+`ltssm+0x10=0x2`, `ltssm+0x1c=0x4`, `ltssm+0x20=0x2`; APPCLK bit8 cleared
+(`0x00100101→0x00100001`); `+0x104` override took (`→0x7ffffff0`). **But**:
 
-- Port comes up: `set32(+0x82c, RESET_DIS=BIT(0))` releases reset (845), STATUS_RUN poll
-  passes (851; our STATUS=`0x5`). "Port failed to come up" is NOT printed. Good.
-- **The LTSSM-start writes are gated `type==APCIE_T602X && controller!=APCIE` (857-864) —
-  SKIPPED on our path** (t8132 uses the `APCIE_T8140` type; the main NIC ports are
-  `controller==APCIE`). So `ltssm_base+0x10/0x1c/0x20/0x14` and the APPCLK bit-8 clear never
-  run → LTSSM engine never told to advance → the RUN 19 dump shows `ltssm_base` all-zero.
-- LINKSTS-idle poll (866) times out → prints **"Port failed to become idle"** → **`continue`
-  (869)** bails out of the rest of per-port bring-up.
-- The "Do it again?" retry that DOES kick LTSSM (873-889: T602X_RESET cycle + the same
-  ltssm_base writes) is gated `type==APCIE_T602X` → **never runs for T8140**, and is
-  unreachable anyway after the `continue`.
+- **`ltssm+0x14` (LTSSM_START, m1n1 `pcie.c:861`) refused to latch** — written `0x1` twice
+  (lines 794, 809), reads back **`0x00000000`** (line 935/942). The *config* regs take; the
+  *start* bit will not set.
+- `rc_base+0x3c` and `port_base+0x10` writes silently dropped (read back 0; lines 818/831).
+- LINKSTS frozen BUSY through every step; the 5 s post-t602x watch says "still BUSY"; ECAM
+  all vacant (`0xffffffff`), no class-0x02 device.
 
-**Conclusion:** on t8132 (T8140 type, APCIE controller) m1n1 has **no LTSSM-start sequence at
-all**. The link sits BUSY because nothing kicks the LTSSM state machine. Note: upstream
-Linux's `PORT_LTSSMCTL (0x080) START` is a *different* mechanism m1n1 doesn't use — m1n1
-kicks via `ltssm_base` writes, so RUN 20 replays the m1n1 sequence, not the Linux one.
+### Why START won't latch — the ordering bug (ADT-grounded)
 
-### Why this is now safe to write
+The NIC bridge ADT (`m4_recon/adt.txt:2550-2566`, `nic-adt.txt`) declares
+`t-refclk-to-perst = 100` and `perst-to-config = 100`: **refclk must be up, THEN PERST#
+deasserts, THEN ~100 later config/LTSSM starts**. The bridge has *no* pwren / power_gate node —
+only clkreq (gpio162) + perst (gpio165) — so there is no separate endpoint power rail we are
+missing; endpoint power is just the SMC fabric keys (`gP0d`/`gP1a`), already set.
 
-Every prior run feared `ltssm_base` writes would AXI-stall (it's Tier 3). RUN 19 **read
-`ltssm_base+0x10/0x14/0x1c/0x20` cleanly (all `0x00000000`, no wedge)** on both ports — the
-window is clocked and reachable. Writing it is now low-risk.
+But perstn.py's current order is **backwards**: `deassert_perstn` (`perstn.py:366`) drives
+PERST# high (released) *before* the refclk handshake and *before* pcie_init. So PERST# was
+released with no refclk, refclk came up late, and the port/LTSSM sits in a substate that
+rejects the START write. This is a canonical cause of LTSSM-never-converges and exactly fits
+"config regs writable, START not."
 
 ## Goal
 
-Replay m1n1's exact T602X `controller==APCIE` port-completion path — the block the T8140 code
-skips — after the proven refclk handshake, then watch LINKSTS for training. All the machinery
-already exists in `perstn.py`; RUN 20 is primarily a **new dispatcher flag combination** plus
-a small ordering fix so the LTSSM kick runs *after* refclk.
+Reproduce the upstream `apple_pcie_setup_link` ordering as a **post-init re-sequence** (no
+reflash): with refclk proven up, re-assert PERST#, cycle the internal port reset, deassert
+PERST#, wait the ADT-declared settle, **then** write LTSSM_START and **read `ltssm+0x14` back**
+as the primary instrument, then watch LINKSTS. The one observable that matters:
+does `ltssm+0x14` flip `0x0 → 0x1`? If yes, START is finally latching and BUSY should follow.
 
 ## Approach
 
-### 1. New RUN 20 dispatcher arm — `Scripts/m1n1/perstn-run.sh`
+### 1. New re-sequence function — `Scripts/m1n1/perstn.py`
 
-Add a `20)` case before `*)` (~line 1231, after the RUN 19 arm) and add `20` to the usage
-string. Reuse existing flags — no perstn.py logic change needed for the core experiment:
+Add near the LTSSM helpers (after `watch_linksts`, ~`perstn.py:4650`):
 
 ```
-    20)
-        # RUN 20: link training, part 3. RUN 19 proved the refclk REQ->ACK
-        # handshake succeeds but LINKSTS stays BUSY. m1n1 src/pcie.c:857-889
-        # shows WHY: the LTSSM kick (ltssm_base+0x10/0x1c/0x20/0x14) and the
-        # "do it again" retry are BOTH gated to APCIE_T602X and skipped on the
-        # T8140/APCIE path we run -- so LTSSM is never started and pcie_init
-        # bails at the "failed to become idle" poll. ltssm_base read cleanly
-        # (all-zero, no wedge) in RUN 19, so writing it is safe now.
+def perst_resequence(apcie, buf, perstn_pin, settle_ms=100,
+                     hold_ms=100, port_indices=None):
+    """RUN 21: refclk-first PERST# re-sequence honoring the ADT
+    t-refclk-to-perst / perst-to-config = 100 ordering, then write
+    LTSSM_START (ltssm+0x14) and read it back -- the key instrument.
+    Assumes setup_refclk already ran (phy_base+0x000 REFCLKEN set)."""
+```
+
+Behavior (per active port; NIC = port2):
+1. Snapshot `phy_base+0x000` (confirm REFCLKEN still set) + LINKSTS (`_read32_live`,
+   `_linksts_decode`).
+2. Re-assert PERST#: `gpio_set_output(perstn_pin, 0, buf)` (reads back the pin reg → free
+   gpio165 output-verify / endpoint-presence guard); hold `hold_ms`.
+3. Cycle internal port reset: `clear32(port_base+0x82c, 0x1)` → 1 ms → `set32(port_base+0x82c,
+   0x1)` (RUN 20 proved `+0x82c` latches), each read back.
+4. Deassert PERST#: `gpio_set_output(perstn_pin, 1, buf)`.
+5. **Settle `settle_ms` (=100) once** after PERST release (vs RUN 20's scattered 0.25 s waits).
+6. Poll `port_base+0x208` BUSY(bit2)→0 for up to ~2 s (bounded loop like `setup_refclk`'s
+   `_poll_ack`); log transitions via `_linksts_decode`.
+7. Write LTSSM_START: `write32(ltssm+0x10,0x2); write32(ltssm+0x1c,0x4); set32(ltssm+0x20,0x2);
+   write32(ltssm+0x14,0x1)`; **then `_read32_live(ltssm+0x14, ...)` — the primary result.**
+8. Final LINKSTS snapshot.
+
+Every proxy access guarded with `check_alive()`→`DumpAborted`, matching
+`t602x_port_init_replay`/`setup_refclk`. All addresses are Tier-1/GPIO — proven reachable in
+RUN 20 (exc_count delta 0); phy_ip / phy_extra / ctrl_lo stay gated OFF.
+
+### 2. Argparse + main() wiring — `Scripts/m1n1/perstn.py`
+
+- Add `--perst-resequence` (store_true) and `--perst-settle-ms` (int, default 100), near
+  `--setup-refclk` (~`perstn.py:5480`).
+- In main(), call it inside `if pcie_init_ok:` **after `setup_refclk(post)`** and **after the
+  post-init LINKSTS watch**, guarded by `liveness_gate("perst-resequence")` + `flush(
+  "perst-resequence")`, passing `perstn_pin` (resolved at `perstn.py:5857`) — thread it down
+  via a local since main()'s pin vars are in scope. Then let the existing post-t602x-style
+  LINKSTS watch / ECAM walk report the result (reuse `watch_linksts(..., label="post-perst")`).
+
+### 3. New RUN 21 dispatcher arm — `Scripts/m1n1/perstn-run.sh`
+
+Add `21)` before `*)` (~line 1265) + `21` in the usage string:
+
+```
+    21)
+        # RUN 21: link training, part 4. RUN 20 landed the LTSSM config
+        # writes (ltssm+0x10/0x1c/0x20) but LTSSM_START (ltssm+0x14) refused
+        # to latch (read back 0) and LINKSTS stayed BUSY. Root cause: PERST#
+        # is deasserted BEFORE refclk is up, violating the ADT's
+        # t-refclk-to-perst=100 / perst-to-config=100 ordering, so the port
+        # rejects START. Re-sequence refclk-first: setup_refclk, then
+        # re-assert PERST#, cycle +0x82c, deassert PERST#, 100 ms settle,
+        # poll BUSY->0, write LTSSM_START and READ ltssm+0x14 back (the key
+        # instrument). Pin mux kept; phy_extra probes stay gated.
         #
-        # Replay m1n1's T602X controller==APCIE completion path via
-        # --t602x-init --t602x-aggressive --t602x-do-again (t602x_port_init_
-        # replay: rc_base+0x3c gate, port writes, T602X_RESET cycle, the
-        # ltssm_base kick writes, rc_base+0x3c clear-to-arm), on top of the
-        # RUN 19 refclk handshake. Keep the ADT pin mux; phy_extra probes
-        # stay gated. The post-t602x dump + ECAM walk report the result.
-        #
-        # Matrix: BUSY clears -> LINK TRAINS -> ECAM walk finds the NIC ->
-        # BAR setup + driver. Still BUSY -> the ltssm_base writes weren't the
-        # trigger (or a further gate remains); RUN 21 = explicit PORT_LTSSMCTL
-        # 0x080 START (Linux mechanism) / PERST re-toggle / endpoint-presence
-        # diagnostics.
+        # Matrix: ltssm+0x14 latches 0x1 / BUSY clears -> LINK TRAINS ->
+        # ECAM finds the NIC. START still 0 after correct ordering -> START
+        # is gated deeper than reset timing; RUN 22 = patched m1n1 (in-window
+        # T602X writes) or --no-clkreq A/B. port2 LINKSTS never distinguishes
+        # from a dead port -> endpoint-presence axis (RUN 22 diagnostics).
         FLAGS=(--preinit-probe
                --tier3
                --clkreq-mode=periph
                --setup-refclk=both
-               --t602x-init
-               --t602x-aggressive
-               --t602x-do-again
+               --perst-resequence
                --require-build=rc1-59-g)
         ;;
 ```
 
-### 2. Ordering fix — run refclk BEFORE the T602X replay — `Scripts/m1n1/perstn.py`
-
-Current main() post-init order (`~perstn.py:6069+`): early tier-1 dump → **setup_refclk(post)**
-→ LINKSTS watch → post-init dump → LTSSM kick → **T602X replay** (`--t602x-init`, ~6198) →
-post-t602x dump. That order is already correct: refclk(post) runs before the T602X replay.
-No change strictly required.
-
-One improvement: the RUN 18 **5 s LINKSTS watch currently sits before the T602X replay**, so
-it reports "still BUSY" *before* the kick that might fix it. Add a **second short LINKSTS
-watch (≤5 s) immediately after the T602X replay's post-dump**, so RUN 20 shows whether BUSY
-clears post-kick without needing a RUN 21 just to observe it. Implement by extracting the
-existing watch loop (`perstn.py:6087-6114`) into a small helper `def watch_linksts(apcie, buf,
-secs=5.0)` and calling it in both places (after `setup_refclk(post)` as today, and after the
-`flush("dump-post-t602x")` at ~6220). Reuse `_read32_live`/`_linksts_decode`/`p.read32`.
-
-### 3. Nothing else changes
-
-`setup_refclk`, `t602x_port_init_replay` (incl. `aggressive`/`do_again`), the Tier-3 gate, and
-the ECAM walk all already exist and are exercised by the flags above.
+(Deliberately drops `--t602x-init` — RUN 20 showed the full replay adds noise and its
+`rc_base+0x3c`/`port+0x10` writes drop anyway. RUN 21 isolates the ordering variable.)
 
 ## Critical files
 
-- `Scripts/m1n1/perstn-run.sh` — new `20)` arm (~1231) + usage string.
-- `Scripts/m1n1/perstn.py` — extract `watch_linksts()` helper from the inline loop
-  (~6087-6114); call it a second time after the post-t602x dump (~6220).
-- Reference only (no edits): `/home/ahmed/Projects/C/embedded/m1n1/src/pcie.c:836-889`
-  (the gated LTSSM logic), `docs/ref-asahi-t8132-pcie.md`, `Scripts/m1n1/logs/*/findings.md`.
+- `Scripts/m1n1/perstn.py` — new `perst_resequence()` (~4650); argparse `--perst-resequence`
+  / `--perst-settle-ms` (~5480); main() call after `setup_refclk(post)` + post-init watch
+  (~6135). Reuse `gpio_set_output` (344), `setup_refclk` (4650-ish), `watch_linksts` (4613),
+  `_read32_live`/`_linksts_decode`, `check_alive`/`DumpAborted`, `liveness_gate`.
+- `Scripts/m1n1/perstn-run.sh` — new `21)` arm (~1265) + usage string.
+- Reference only: `/home/ahmed/Projects/C/embedded/m1n1/src/pcie.c:754-889` (T602X gating,
+  LTSSM_START = `write32(ltssm+0x14,0x1)` @861), `m4_recon/adt.txt:2550-2566` (ADT timing +
+  no-pwren), `docs/ref-asahi-t8132-pcie.md`, `Scripts/m1n1/logs/20/nic-runtime.txt`.
 
-Follow-up (not this change): write `Scripts/m1n1/logs/19/findings.md` (RUN 19 result: refclk
-handshake succeeds, LTSSM never kicked on T8140 path, infra reaching ECAM) + the RUN 20 plan,
-matching the per-run log convention. `logs/18/findings.md` is also still owed.
+Follow-up (not this change): the owed per-run logs `Scripts/m1n1/logs/{18,19,20}/findings.md`.
 
 ## Verification
 
 Real hardware (M4 mini + m1n1 over UART) — the user runs it:
 
 1. **Static**: `python3 -c "import ast; ast.parse(open('Scripts/m1n1/perstn.py').read())"`,
-   `bash -n Scripts/m1n1/perstn-run.sh`, and confirm the `20)` arm routes.
-2. **Live**: `./Scripts/m1n1/perstn-run.sh 20`.
-3. **Read** `/tmp/m4-recon/nic-runtime.txt`, keying on:
-   - the T602X replay's `snap(...)` lines — does LINKSTS change after the `ltssm_base`
-     kick / T602X_RESET cycle?
-   - the new post-t602x LINKSTS watch — `BUSY CLEARED after …s!` vs `still BUSY after 5 s`.
-   - if BUSY clears → the ECAM walk should print the NIC VID:DID (class 0x02 network).
-4. **Outcome matrix** (record in `logs/19/findings.md`):
-   - BUSY clears → link trains → NIC enumerates → next phase = BAR setup / driver.
-   - BUSY persists but `ltssm_base` readback now non-zero → LTSSM advanced but no link
-     partner response; RUN 21 = PERST re-toggle / longer settle / endpoint-power check.
-   - BUSY persists and `ltssm_base` writes read back 0 (dropped) → the block needs the
-     APPCLK bit-8 clear or config-write-enable first; RUN 21 = add explicit PORT_LTSSMCTL
-     (0x080) START and/or reorder.
-   - ltssm_base write wedges m1n1 → revert to non-aggressive; the window regressed vs RUN 19.
+   `bash -n Scripts/m1n1/perstn-run.sh`, confirm `21)` routes and the new flags parse.
+2. **Live**: `./Scripts/m1n1/perstn-run.sh 21`.
+3. **Read** `/tmp/m4-recon/nic-runtime.txt`, keying on — in order of importance:
+   - **`ltssm+0x14` readback after START** in the perst-resequence section: `0x1` (latched!)
+     vs `0x0` (still rejected). This is the experiment.
+   - the `post-perst` LINKSTS watch: `BUSY CLEARED` vs `still BUSY`.
+   - port2-vs-port0 LINKSTS delta (does port2 gain the bit3 port0 has?).
+   - if BUSY clears → ECAM walk should print the NIC VID:DID (class 0x02).
+4. **Outcome matrix** (record in `logs/20/findings.md`):
+   - `ltssm+0x14`→`0x1` and/or BUSY clears → START latched; link trains → NIC enumerates.
+   - `ltssm+0x14` still `0x0` after correct ordering → START gated deeper than reset timing
+     → RUN 22 = patched m1n1 running the T602X `rc_base+0x3c`+`port+0x10`+kick *in-window*
+     during pcie_init (bisected, excluding the SError-triggering phy_ip writes; reflash), or
+     `--no-clkreq` A/B control.
+   - port2 stays indistinguishable from a dead port even with correct ordering → endpoint-
+     presence axis → RUN 22 = SMC key readback + gpio165 verify + wiring/board check.
+   - any write wedges m1n1 → all addresses were RUN-20-safe; investigate the regression.
