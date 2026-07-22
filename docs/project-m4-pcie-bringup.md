@@ -383,4 +383,20 @@ Interpretation matrix for RUN 10:
 - **`0xDEAD0001/2`** → a tail step is NOT idempotent (CLK ACK lost on re-request) — unexpected and high-signal about the handshake semantics.
 - **SError/guard-delta instead of a hang** → first-ever fault syndrome from phy_ip; analyze the ESR/exception record.
 
+**State as of 2026-07-22 (post RUN 10) — THE REFRAME:**
+- **RUN 10 hypothesis FALSIFIED.** The on-CPU stub worked mechanically (340 bytes at `0x1000cce0000`, 29-entry table, dc_cvau+ic_ivau clean) and `p.call` wedged with UartTimeout on the first phy_ip access (`logs/10/nic-runtime.txt:5775`, end of log). Pre-6.g state byte-identical to RUN 9 modulo counters. Tight-timing axis dead. Full findings in `Scripts/m1n1/logs/10/findings.md`.
+- **Git archaeology reframed the blocker.** On 2026-07-11 (`d664bd9` era): (1) `p.pcie_init()` — the full C-side init on the pre-`6b277bc` m1n1 — **ran to completion on this machine** ("After p.pcie_init() has returned (with ports stuck at LINKSTS_BUSY)"), including per-port bring-up (pcie.c:571-852); (2) Phase F's 6.g then applied all 29 pll entries through `phy_ip+0x38` via the C-side `p.tunables_apply_local` **successfully** — phy_ip decoded; (3) the wedge that day was 6.h writing the auspma **port-1 slice** into the unpowered slice (no pci-bridge1 on j773g). `6b277bc` then moved the phy-ip tunables into C, which made `pcie_init` itself hit the port-1 bug — hence `--no-pcie-init` and the entire replay series, which never runs per-port bring-up and **never once decoded phy_ip**.
+- **Conclusion:** the phy_ip unlock lives in the parts of `pcie_init` the replay never executes (per-port PHY power-up ungating the shared PHY-IP block is the prime suspect). The replay's gating ("no per-port init until Phase F succeeds") was structurally self-defeating.
+- Secondary recon retained: wrong-base hypothesis rejected (`phy_ip_idx=3` consistent everywhere); cio3pllcore/pcieclkgen → rc_base (never tried there; atc.c CIO3PLL DCO analogy for the +0x38 stall) kept as the fallback axis.
+
+**RUN 11 plan (2026-07-22, user-approved): fix the C path.**
+
+- **m1n1 fork commit `b404263`** (`src/pcie.c`): `tunables_apply_phy_ip_filtered()` — t8132-only entry-by-entry application of `apcie-phy-ip-{pll,auspma}-tunables` that skips entries in slices of absent ports (shared `< 0x8000` always applies; slice idx = `(off - 0x8000) / 0x8000` applies iff `pci-bridge{idx}` exists; prints applied/skipped counts). Other chips keep the unfiltered path. Built macho staged at `/tmp/m4-serve/m1n1.macho` (+ `.prepatch` rollback).
+- **User step:** enroll the patched macho (`kmutil configure-boot` from recovery, PLAN.md flow), then `./Scripts/m1n1/perstn-run.sh 11`.
+- **RUN 11 dispatcher arm:** full-init mode, NOT BASE_FLAGS — `--preinit-probe --pmgr-enable --pmgr-per-port --gate-poke --tier3`; no `--no-pcie-init` (so `p.pcie_init()` runs), no `--t8140-replay` (Phase F would wedge first). Post-init machinery fires automatically: `dump_pcie_regs(post-init, tier=3)` — now including **Tier 3a: phy_ip shared-window harvest** (dense `0x0..0x100` sweep + every pll-tunable target with expected mask/value) placed before the risky ctrl_lo reads — then LTSSM kick + post-kick dump.
+- **Interpretation matrix:**
+  - `pcie_init` returns; UART shows the filter's applied/skipped printout; Tier 3a phy_ip reads live → **C wedge fixed and phy_ip harvested.** Check per-port LINKSTS: port 2 (NIC) training = jackpot → next phase is NIC bring-up. Ports stuck BUSY → RUN 12 works the LTSSM problem from the C-init state, with a live phy_ip dump to diff against replay state for the unlock register.
+  - `pcie_init` wedges at a NEW address → first new C-side wedge data in 20+ runs; identify via the UART log's last line (add printfs if needed).
+  - `pcie_init` returns but phy_ip still unreadable → per-port-unlock hypothesis falsified → fallback: `--pcieclkgen-naked-apply-to=rc_base --cio3pllcore-naked-apply-to=rc_base` (dispatcher-only).
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
