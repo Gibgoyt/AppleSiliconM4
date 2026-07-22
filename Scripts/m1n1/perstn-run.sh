@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -85,7 +85,15 @@
 # pci-bridge1), hence --no-pcie-init and the whole replay series.
 # RUN 11 = fix the C path: m1n1 patched with a t8132 port-slice
 # filter (m1n1 commit b404263), full p.pcie_init() + tier-3
-# post-init dumps incl. a phy_ip shared-window harvest.
+# post-init dumps incl. a phy_ip shared-window harvest
+# (TOOLING BUG -- patched m1n1 confirmed enrolled (banner
+# -dirty), but legacy Phase B ran alive for the first time in
+# ~20 runs and its shared-MMIO sweep read phy_ip pre-init ->
+# Exception: SYNC before p.pcie_init() ever ran; filter still
+# untested). RUN 12 = RUN 11 minus --pmgr-enable/--pmgr-per-port
+# (Phase B/C skipped; pcie.c:425 does its own power enable) with
+# Phase B's phy_ip probes removed from perstn.py -- straight to
+# the C-side pcie_init.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -846,8 +854,36 @@ case "${RUN^^}" in
                --gate-poke
                --tier3)
         ;;
+    12)
+        # RUN 12: RUN 11 retry with the Phase B landmine defused.
+        # RUN 11 post-mortem: the patched m1n1 WAS enrolled (banner
+        # v1.6.0-rc1-56-g6b277bc-dirty; raw-bin kmutil flow worked)
+        # but with --pmgr-enable set and no --t8140-replay, legacy
+        # Phase B ran alive for the first time in ~20 runs and its
+        # shared-MMIO sweep included FOUR phy_ip reads (+0x0,
+        # +0x8000, +0x10000, +0x18000) -- a pre-wedge-discipline
+        # relic. m1n1 printed "Exception: SYNC" and died before
+        # p.pcie_init() ever ran; the C-side port-slice filter is
+        # STILL UNTESTED. Fix: Phase B's phy_ip probes removed in
+        # perstn.py, and RUN 12 drops --pmgr-enable/--pmgr-per-port
+        # entirely (pcie.c:425 does its own pmgr_adt_power_enable;
+        # fewer live phases before the C init = fewer confounds,
+        # closer to the 2026-07-11 environment). NO REFLASH NEEDED:
+        # the patched m1n1 is already enrolled. Same interpretation
+        # matrix as RUN 11: pcie_init returns + filter printout
+        # ("applied N, skipped M (absent-port phy_ip slices)",
+        # M > 0) + Tier 3a phy_ip harvest reads live -> check
+        # per-port LINKSTS (port 2 = NIC training = jackpot; stuck
+        # BUSY -> live phy_ip dump to diff for the unlock).
+        # pcie_init wedges at a new C-side address -> high signal.
+        # pcie_init returns but phy_ip still dead -> fallback =
+        # cio3pllcore/pcieclkgen naked-apply to rc_base.
+        FLAGS=(--preinit-probe
+               --gate-poke
+               --tier3)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

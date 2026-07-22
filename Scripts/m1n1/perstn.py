@@ -1209,7 +1209,7 @@ def probe_phaseA_preinit_single(apcie, buf, timeout=0.2):
                   "read.\n\n")
 
 
-def probe_phaseB_apcie_pmgr(apcie, buf, timeout=0.3):
+def probe_phaseB_apcie_pmgr(apcie, buf, timeout=0.3, flush_fn=None):
     """Phase B -- enable apcie PMGR from Python + shared MMIO probe.
 
     Calls p.pmgr_adt_power_enable('/arm-io/apcie') which is the same C
@@ -1228,6 +1228,10 @@ def probe_phaseB_apcie_pmgr(apcie, buf, timeout=0.3):
     Caches the post-PMGR gate state on `apcie.phaseB_gate_state` so
     Phase C can gate its per-port MMIO reads on it.
     """
+    def _flush(tag):
+        if flush_fn is not None:
+            flush_fn(tag)
+
     buf.write("=== Phase B: apcie PMGR enable + shared MMIO probe ===\n")
     apcie.phaseB_gate_state = {}
 
@@ -1238,12 +1242,21 @@ def probe_phaseB_apcie_pmgr(apcie, buf, timeout=0.3):
                   f"({e.__class__.__name__}: {e})\n\n")
         return
 
+    # RUN 11 lost ALL Phase B output because nothing flushed before the
+    # wedge; flush the banner first so the log always shows how far we
+    # got. The pmgr call itself is proven safe (Phase F step 1 ran it
+    # after the same Phase D poke in RUNs 1-10) but guard it anyway so
+    # a future C-side surprise degrades to a logged bail.
+    _flush("phaseB.pre-pmgr-enable")
     try:
-        p.pmgr_adt_power_enable("/arm-io/apcie")
+        with guarded(buf, "phaseB.pmgr_adt_power_enable",
+                     short_timeout=timeout):
+            p.pmgr_adt_power_enable("/arm-io/apcie")
         buf.write("  p.pmgr_adt_power_enable('/arm-io/apcie') -> ok\n")
     except Exception as e:
         buf.write(f"  p.pmgr_adt_power_enable raised: "
                   f"{e.__class__.__name__}: {e}\n\n")
+        _flush("phaseB.pmgr-enable-raised")
         return
 
     try:
@@ -1251,10 +1264,12 @@ def probe_phaseB_apcie_pmgr(apcie, buf, timeout=0.3):
     except Exception as e:
         buf.write(f"  ERROR: get_exc_count post-PMGR failed "
                   f"({e.__class__.__name__}: {e})\n\n")
+        _flush("phaseB.pmgr-enable-dead")
         return
     buf.write(f"  exc_count during PMGR enable: "
               f"{exc_before} -> {exc_after_pmgr} "
               f"(delta={exc_after_pmgr - exc_before})\n\n")
+    _flush("phaseB.post-pmgr-enable")
 
     # Verify every gate is now ON. This is the belt-and-braces check
     # that keeps Phase A from repeating here: if pmgr_adt_power_enable
@@ -1287,6 +1302,15 @@ def probe_phaseB_apcie_pmgr(apcie, buf, timeout=0.3):
         return
     buf.write("  all real apcie gates ACTIVE; shared MMIO reads are safe.\n\n")
 
+    # phy_ip probes REMOVED (RUN 11): this legacy sweep predates the
+    # wedge discipline learned across RUNs A..10 and killed the first
+    # boot that ever reached Phase B alive -- m1n1 printed
+    # "Exception: SYNC" and the session died before p.pcie_init() could
+    # run. phy_ip (0x497040000) is only touchable after the C-side
+    # pcie_init has run its per-port bring-up; see logs/11/findings.md.
+    buf.write("  phy_ip probes SKIPPED (RUN 11: killed m1n1 with "
+              "Exception: SYNC pre-pcie_init; phy_ip is only touchable "
+              "after C-side pcie_init -- see logs/11/findings.md)\n")
     probes = [
         (apcie.rc_base + 0x00,          "rc_base +0x00"),
         (apcie.rc_base + 0x04,          "rc_base +0x04"),
@@ -1296,10 +1320,6 @@ def probe_phaseB_apcie_pmgr(apcie, buf, timeout=0.3):
         (apcie.rc_base + 0x54,          "rc_base +0x54"),
         (apcie.rc_base + 0x58,          "rc_base +0x58"),
         (apcie.phy_common_base + 0x00,  "phy_common +0x00 (PHYCMN_CLK)"),
-        (apcie.phy_ip_base + 0x00,      "phy_ip +0x00 (PLL area head)"),
-        (apcie.phy_ip_base + 0x8000,    "phy_ip +0x08000 (port 0 slice head)"),
-        (apcie.phy_ip_base + 0x10000,   "phy_ip +0x10000 (port 1 slice head -- INACTIVE)"),
-        (apcie.phy_ip_base + 0x18000,   "phy_ip +0x18000 (port 2 slice head)"),
         (apcie.axi_base + 0x00,         "axi_base +0x00"),
     ]
 
@@ -1308,7 +1328,9 @@ def probe_phaseB_apcie_pmgr(apcie, buf, timeout=0.3):
     except Exception as e:
         buf.write(f"  ERROR: get_exc_count pre-read failed "
                   f"({e.__class__.__name__}: {e})\n\n")
+        _flush("phaseB.pre-read-dead")
         return
+    _flush("phaseB.pre-shared-mmio")
 
     for addr, label in probes:
         with guarded(buf, f"phaseB.0x{addr:x}", short_timeout=timeout):
@@ -5534,7 +5556,8 @@ def main():
 
         if args.pmgr_enable:
             log("Phase B: p.pmgr_adt_power_enable('/arm-io/apcie') + shared MMIO...")
-            try_(lambda: probe_phaseB_apcie_pmgr(apcie, buf, timeout=timeout),
+            try_(lambda: probe_phaseB_apcie_pmgr(apcie, buf, timeout=timeout,
+                                                 flush_fn=flush),
                  "probe_phaseB_apcie_pmgr")
             flush("phaseB-apcie-pmgr")
 
