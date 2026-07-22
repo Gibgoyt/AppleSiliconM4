@@ -3107,7 +3107,8 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
                               t8122_shared_post=False,
                               t8122_shared_post_val=0x200,
                               pmgr_pre6g_scan=False,
-                              phy_ip_stub_apply=None):
+                              phy_ip_stub_apply=None,
+                              phyip_apply_local=False):
     """Phase F -- replay m1n1 pcie.c T8140 shared-init step by step.
 
     m1n1 6b277bc treats t8132 as APCIE_T8140 (pcie.c:303-315). The
@@ -4258,6 +4259,28 @@ def probe_phaseF_t8140_replay(apcie, buf, timeout=0.3, flush_fn=None,
         if not phy_ip_stub_apply_run("6.h.stub",
                                      "apcie-phy-ip-auspma-tunables",
                                      tail=False):
+            return
+    elif phyip_apply_local:
+        # RUN 17: the corrected 2026-07-11 recipe. Commit c4c0b33's
+        # contemporary record ("flushed step 6.g's post-marker at 29649
+        # bytes") proves a Jul-11 boot completed 6.g via the C-side
+        # applicator p.tunables_apply_local(prop, reg_idx=3) -- the
+        # d664bd9-era method, before the python filter existed. Every
+        # cold-state run since has used python per-entry application
+        # and wedged at entry #0; the C-applicator-from-cold cell of
+        # the matrix has never been retried. All 29 pll entries are in
+        # the shared slice, so this prop carries no port-slice risk.
+        # 6.h stays python-filtered: its port-1 slice is what killed
+        # the Jul-11 boot's C-applicator 6.h.
+        apcie.phaseF_last_step = "6.g.apply_local"
+        if not step("6.g.tunables apcie-phy-ip-pll-tunables reg_idx=3 "
+                    "(C-applicator, d664bd9 recipe)",
+                    lambda: p.tunables_apply_local(
+                        path, "apcie-phy-ip-pll-tunables", 3)):
+            return
+        diag("post-6.g.apply-local")
+        if not phy_ip_tunables_filtered("6.h",
+                                        "apcie-phy-ip-auspma-tunables"):
             return
     else:
         if not phy_ip_tunables_filtered("6.g", "apcie-phy-ip-pll-tunables"):
@@ -5420,6 +5443,19 @@ def main():
                          "dedicated flush "
                          "(phaseF.pre.6.g.pmgr-scan). Requires "
                          "--t8140-replay.")
+    ap.add_argument("--phyip-apply-local", action="store_true",
+                    help="RUN 17: apply 6.g's apcie-phy-ip-pll-"
+                         "tunables via the C-side applicator "
+                         "p.tunables_apply_local(reg_idx=3) -- the "
+                         "d664bd9-era method that commit c4c0b33 "
+                         "records as having COMPLETED on 2026-07-11 "
+                         "('flushed step 6.g's post-marker at 29649 "
+                         "bytes'), the only phy_ip decode ever. Every "
+                         "cold-state run since used python per-entry "
+                         "and wedged at entry #0; this fills the "
+                         "untested cold+C-applicator matrix cell. "
+                         "6.h stays python-filtered (its port-1 "
+                         "slice killed the Jul-11 C-applicator 6.h).")
     ap.add_argument("--t8140-replay-post-init", action="store_true",
                     help="RUN 15: run Phase F (the full T8140 shared-"
                          "init replay, native order, no experimental "
@@ -5728,6 +5764,7 @@ def main():
                     f"0x{args.t8122_shared_post_val:x}, "
                     f"pmgr_pre6g_scan={args.pmgr_pre6g_scan}, "
                     f"phy_ip_stub_apply={args.phy_ip_stub_apply!r}, "
+                    f"phyip_apply_local={args.phyip_apply_local}, "
                     f"phyif_ctrl_run={args.phyif_ctrl_run}]...")
                 try_(lambda: probe_phaseF_t8140_replay(
                         apcie, buf, timeout=timeout, flush_fn=flush,
@@ -5755,7 +5792,8 @@ def main():
                         t8122_shared_post_val=
                             args.t8122_shared_post_val,
                         pmgr_pre6g_scan=args.pmgr_pre6g_scan,
-                        phy_ip_stub_apply=args.phy_ip_stub_apply),
+                        phy_ip_stub_apply=args.phy_ip_stub_apply,
+                        phyip_apply_local=args.phyip_apply_local),
                      "probe_phaseF_t8140_replay")
                 flush("phaseF-t8140-replay")
         elif args.phy_ip_probe or args.t8140_replay:
@@ -5891,7 +5929,8 @@ def main():
             # phy-ip tunables python-filtered.
             log("Phase F post-init replay (2026-07-11 recipe)...")
             try_(lambda: probe_phaseF_t8140_replay(
-                    apcie, buf, timeout=timeout, flush_fn=flush),
+                    apcie, buf, timeout=timeout, flush_fn=flush,
+                    phyip_apply_local=args.phyip_apply_local),
                  "probe_phaseF_t8140_replay(post-init)")
             flush("phaseF-post-init")
 

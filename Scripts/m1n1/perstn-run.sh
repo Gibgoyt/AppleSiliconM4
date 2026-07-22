@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -137,7 +137,20 @@
 # register-identical to pcie_up_1's golden dump on all 7
 # compared registers). RUN 16 = RUN 15 + post-init PMGR gate
 # verification (sets the Phase F precondition from hardware
-# truth via safe PS reads) + Tier 3a gated on phaseF_shared_up.
+# truth via safe PS reads) + Tier 3a gated on phaseF_shared_up
+# (FALSIFIED post-init+re-pass+per-entry: Phase F ran 1->6.f
+# from the post-init state -- largely idempotent -- and 6.g
+# wedged at entry #0 again). Archaeology then CORRECTED the
+# 2026-07-11 record: c4c0b33's contemporary commit message
+# proves 6.g completed via the C-APPLICATOR
+# (p.tunables_apply_local reg_idx=3, the d664bd9 method), and
+# the "pcie_init ran first" part was circular evidence --
+# pcie_up_2 proved 6b277bc's pcie_init wedges, so the Jul-11
+# boot almost certainly ran WITHOUT pcie_init. RUN 17 = the
+# corrected reproduction: cold boot + Phase D + Phase F native
+# order + --phyip-apply-local (6.g via C applicator; 6.h stays
+# python-filtered). The cold+C-applicator matrix cell has never
+# been retried.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -1077,8 +1090,54 @@ case "${RUN^^}" in
                --t8140-replay-post-init
                --require-build=rc1-59-g)
         ;;
+    17)
+        # RUN 17: cold-boot Phase F with C-applicator 6.g -- the
+        # CORRECTED 2026-07-11 reproduction. NO REFLASH (8a569ad;
+        # with --no-pcie-init its tunables-skip patch is inert).
+        #
+        # RUN 16 falsified post-init+re-pass+per-entry (Phase F ran
+        # 1->6.f post-init, largely idempotent, 6.g entry #0 wedge
+        # unchanged). Corrected archaeology: c4c0b33's contemporary
+        # message ("flushed step 6.g's post-marker at 29649 bytes,
+        # then wedged before step 6.h") proves the Jul-11 boot
+        # completed 6.g via p.tunables_apply_local(reg_idx=3) --
+        # the C-side applicator, pre-filter era -- and the
+        # "pcie_init ran first" belief was circular (pcie_up_2
+        # proved 6b277bc's pcie_init wedges; Phase F was BUILT as
+        # its replacement; --no-pcie-init existed at d664bd9).
+        #
+        # Combination matrix:
+        #   cold + PhaseF + per-entry      = 30 wedges (A..10, 17-)
+        #   post-init + PhaseF + per-entry = RUN 16 wedge
+        #   post-init (no re-pass) + C-app = RUN 14 wedge
+        #   cold + PhaseF + C-APPLICATOR   = UNTESTED <- RUN 17
+        #
+        # Flags mirror the Jul-11 environment (pre-init flow with
+        # Phase D poke, Phase F native order, wedge-immune diag) +
+        # --phyip-apply-local: 6.g via the C applicator (all 29 pll
+        # entries are shared-slice, no port risk); 6.h stays
+        # python-filtered (its port-1 slice killed Jul-11's 6.h).
+        #
+        # Matrix: 6.g returns 0 -> method confirmed, Phase F
+        # continues (6.h filtered, 7-10, PHASE F SUCCESS) -> Tier 3a
+        # gated harvest fires -> RUN 18 = ports/LTSSM from a tuned
+        # controller. 6.g wedges -> cold+C-applicator falsified,
+        # Jul-11 has no reproducible recipe left -> pivots: extra
+        # tunables cio3pllcore/pcieclkgen->rc_base pre-6.g; m1n1
+        # bisect Jul-10-era vs 8a569ad; or attack LTSSM directly
+        # without phy-ip tunables.
+        FLAGS=(--no-pcie-init
+               --preinit-probe
+               --gate-poke
+               --t8140-replay
+               --phy-ip-diag
+               --reachable-scan
+               --phy-ip-diag-at=none
+               --phyip-apply-local
+               --require-build=rc1-59-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
