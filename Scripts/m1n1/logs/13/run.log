@@ -194,5 +194,22 @@ Starting endpoint #0x20 (smcep)
 [pcie_up] [flush:phaseD-gate151-poke] wrote partial log (33305 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] p.pcie_init()...
 TTY> pcie: Initializing t8132 PCIe controller
+[pcie_up] p.pcie_init raised: UartTimeout: Expected 1 bytes, got 0 bytes
+Traceback (most recent call last):
+  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/perstn.py", line 5709, in main
+    rc = p.pcie_init()
+  File "/home/ahmed/Projects/C/embedded/m1n1/proxyclient/m1n1/proxy.py", line 1130, in pcie_init
+    return self.request(self.P_PCIE_INIT)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/ahmed/Projects/C/embedded/m1n1/proxyclient/m1n1/proxy.py", line 707, in request
+    return self._request(opcode, *args2, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ahmed/Projects/C/embedded/m1n1/proxyclient/m1n1/proxy.py", line 671, in _request
+    reply = self.iface.proxyreq(req, reboot=reboot, no_reply=no_reply, pre_reply=None)
+  File "/home/ahmed/Projects/C/embedded/m1n1/proxyclient/m1n1/proxy.py", line 387, in proxyreq
+    return self.reply(self.REQ_PROXY)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+m1n1.proxy.UartTimeout: Expected 1 bytes, got 0 bytes
+[pcie_up] post-timeout recovery probe (up to 30 s)...
 
 
