@@ -399,4 +399,11 @@ Interpretation matrix for RUN 10:
   - `pcie_init` wedges at a NEW address → first new C-side wedge data in 20+ runs; identify via the UART log's last line (add printfs if needed).
   - `pcie_init` returns but phy_ip still unreadable → per-port-unlock hypothesis falsified → fallback: `--pcieclkgen-naked-apply-to=rc_base --cio3pllcore-naked-apply-to=rc_base` (dispatcher-only).
 
+**State as of 2026-07-22 (post RUN 11) — tooling bug, experiment not yet run:**
+- **Deployment verified:** the patched m1n1 (fork `b404263`) WAS enrolled — banner `m1n1 v1.6.0-rc1-56-g6b277bc-dirty` (`logs/11/run.log:38`), filter string present in the staged artifacts, raw-bin `kmutil --raw --entry-point 2048` flow works.
+- **But `p.pcie_init()` never ran.** With `--pmgr-enable` and no `--t8140-replay`, legacy **Phase B** executed against a live m1n1 for the first time in ~20 runs, and its shared-MMIO sweep contained four pre-wedge-discipline phy_ip reads (`+0x0/+0x8000/+0x10000/+0x18000`). m1n1 printed `Exception: SYNC` and died at that point (nothing flushed — Phase B had no flush points). NOT a falsification; the C-side port-slice filter is still untested. Full post-mortem in `Scripts/m1n1/logs/11/findings.md`.
+- **Fixes:** Phase B defused in perstn.py (phy_ip probes removed with a logged SKIP, pmgr call guarded, flush points added); RUN 12 drops `--pmgr-enable`/`--pmgr-per-port` entirely (pcie.c:425 does its own power enable).
+
+**RUN 12 plan (2026-07-22):** `./Scripts/m1n1/perstn-run.sh 12` — flags `--preinit-probe --gate-poke --tier3`, straight to the C-side `p.pcie_init()`. **No reflash needed.** Interpretation matrix unchanged from RUN 11: filter printout + `pcie_init` returns + Tier 3a phy_ip harvest live → check per-port LINKSTS (port 2 = NIC = jackpot; stuck BUSY → live phy_ip dump to diff for the unlock register); new C-side wedge address → high signal; `pcie_init` returns but phy_ip dead → fallback cio3pllcore/pcieclkgen → rc_base.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
