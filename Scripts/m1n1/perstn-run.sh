@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -129,7 +129,15 @@
 # CLK0/CLK1 handshake etc). --t8140-replay-post-init runs
 # Phase F AFTER pcie_init (native order); its 6.g/6.h apply the
 # phy-ip tunables python-filtered. No reflash needed (8a569ad
-# stays enrolled).
+# stays enrolled) (TOOLING x2 -- Phase F post-init silently
+# SKIPPED on its phaseD_gate151_active entry check (a python-
+# side flag only --gate-poke sets; RUN 15 dropped it), then the
+# unconditional Tier 3a phy_ip harvest wedged the boot; BONUS:
+# the early tier-1 dump proved RUN 15's post-init state is
+# register-identical to pcie_up_1's golden dump on all 7
+# compared registers). RUN 16 = RUN 15 + post-init PMGR gate
+# verification (sets the Phase F precondition from hardware
+# truth via safe PS reads) + Tier 3a gated on phaseF_shared_up.
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -1029,8 +1037,48 @@ case "${RUN^^}" in
                --t8140-replay-post-init
                --require-build=rc1-59-g)
         ;;
+    16)
+        # RUN 16: RUN 15 with its two tooling interactions fixed.
+        # NO REFLASH (m1n1 8a569ad stays enrolled; require-build
+        # enforces).
+        #
+        # RUN 15 post-mortem: pcie_init -> 0 again, and the new
+        # early tier-1 dump proved the post-init state is
+        # REGISTER-IDENTICAL to pcie_up_1's golden dump (LINKSTS
+        # 0x8300020c/0x83000204, PHY_CTRL 0x2300066f, phy+4 0x30,
+        # PHYCMN 0x80300001 -- all 7 compared registers match).
+        # But the Phase F post-init replay never ran: its entry
+        # check (perstn.py ~3168) requires phaseD_gate151_active, a
+        # python-side flag only Phase D (--gate-poke) sets, and
+        # RUN 15 dropped that flag -- graceful silent skip. Then
+        # the unconditional Tier 3a phy_ip harvest wedged the boot
+        # at read32(0x497040000), costing the LTSSM kick and ECAM
+        # sections. The 2026-07-11-recipe hypothesis is STILL
+        # untested.
+        #
+        # Fixes (both python-side):
+        #   * post-init PMGR gate verification: re-read every
+        #     apcie power-gate PS register (safe reads) after
+        #     pcie_init; if all real gates ACTIVE (they will be --
+        #     "BC pmgr power enable done" proved the C walk), set
+        #     phaseD_gate151_active=True from hardware truth so
+        #     Phase F actually runs.
+        #   * Tier 3a phy_ip harvest now gated on phaseF_shared_up
+        #     (Phase F full success) -- a skipped/failed Phase F
+        #     boot stays alive through the rest of tier 3, the
+        #     LTSSM kick, and the ECAM walk.
+        # Same experiment + matrix as RUN 15: Phase F post-init ->
+        # 6.g 29 pll entries -> 6.h auspma filtered -> 7-10 ->
+        # PHASE F SUCCESS -> Tier 3a harvest -> kick -> ECAM (NIC
+        # vendor/device ID = goal). 6.g wedge -> diff d664bd9-era
+        # port-body pre-idle phy writes vs 8a569ad / bisect.
+        FLAGS=(--preinit-probe
+               --tier3
+               --t8140-replay-post-init
+               --require-build=rc1-59-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

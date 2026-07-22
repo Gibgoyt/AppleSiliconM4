@@ -4484,21 +4484,36 @@ def dump_pcie_regs(apcie, buf, tag="post-init", tier=1):
         # overlap) so a late wedge doesn't cost us this data: a dense
         # 0x0..0x100 sweep plus every pll-tunable target with its
         # expected mask/value for offline verification.
-        buf.write(f"\n=== Tier 3a: phy_ip shared window (harvest) ===\n")
-        log("  === Tier 3a (phy_ip shared window harvest) ===")
-        for off in range(0x0, 0x100, 4):
-            _read32_live(apcie.phy_ip_base + off,
-                         f"phy_ip +0x{off:04x}", buf)
-        try:
-            _pll = apcie.apcie_tunables(u, "apcie-phy-ip-pll-tunables")
-        except Exception as e:
-            buf.write(f"  pll tunables parse failed: "
-                      f"{e.__class__.__name__}: {e}\n")
-            _pll = []
-        for (_off, _size, _mask, _value) in _pll:
-            _read32_live(apcie.phy_ip_base + _off,
-                         f"phy_ip pll-target +0x{_off:04x} "
-                         f"(mask=0x{_mask:x} want=0x{_value:x})", buf)
+        #
+        # RUN 16: gated on Phase F success. RUN 15 ran this
+        # unconditionally after Phase F silently skipped and the very
+        # first phy_ip read wedged the boot, costing the LTSSM kick
+        # and ECAM sections. phy_ip is only touchable once
+        # phaseF_shared_up is True.
+        if not getattr(apcie, "phaseF_shared_up", False):
+            buf.write("\n=== Tier 3a SKIPPED: Phase F shared init not "
+                      "up (phaseF_shared_up=False); phy_ip reads "
+                      "would wedge m1n1 -- RUN 15 lesson ===\n")
+            log("  Tier 3a SKIPPED (phaseF_shared_up=False)")
+        else:
+            buf.write(f"\n=== Tier 3a: phy_ip shared window "
+                      f"(harvest) ===\n")
+            log("  === Tier 3a (phy_ip shared window harvest) ===")
+            for off in range(0x0, 0x100, 4):
+                _read32_live(apcie.phy_ip_base + off,
+                             f"phy_ip +0x{off:04x}", buf)
+            try:
+                _pll = apcie.apcie_tunables(
+                    u, "apcie-phy-ip-pll-tunables")
+            except Exception as e:
+                buf.write(f"  pll tunables parse failed: "
+                          f"{e.__class__.__name__}: {e}\n")
+                _pll = []
+            for (_off, _size, _mask, _value) in _pll:
+                _read32_live(apcie.phy_ip_base + _off,
+                             f"phy_ip pll-target +0x{_off:04x} "
+                             f"(mask=0x{_mask:x} want=0x{_value:x})",
+                             buf)
         for i in apcie.active_ports:
             p_ = apcie.ports[i]
             lt = p_.ltssm_base
@@ -5833,6 +5848,42 @@ def main():
 
         if args.t8140_replay_post_init and liveness_gate(
                 "Phase F post-init replay"):
+            # RUN 16: Phase F's entry check (line ~3168) requires
+            # apcie.phaseD_gate151_active, which only Phase D
+            # (--gate-poke) sets -- RUN 15 dropped that flag and
+            # Phase F silently SKIPPED. The flag is python-side
+            # state, not hardware: post-pcie_init the C side has
+            # already walked pmgr_adt_power_enable successfully
+            # ("BC pmgr power enable done"). Verify the ACTUAL gate
+            # states via safe PMGR PS reads and set the precondition
+            # from hardware truth.
+            buf.write("=== post-init PMGR gate verification ===\n")
+            dev_by_idx = getattr(apcie, "phase0_dev_by_idx", None)
+            if dev_by_idx is None:
+                _pmgr, dev_by_idx = _load_pmgr_devices(buf)
+            all_on = dev_by_idx is not None
+            if dev_by_idx is not None:
+                for gate in apcie.power_gates:
+                    st = _read_pmgr_gate_state(dev_by_idx, gate, buf,
+                                               indent="  ")
+                    if st is None:
+                        all_on = False
+                    elif not st.get("virtual") and not st["on"]:
+                        all_on = False
+            if all_on:
+                buf.write("  all real apcie gates ACTIVE -- enabling "
+                          "Phase F preconditions "
+                          "(phaseD_gate151_active=True)\n")
+                log("post-init PMGR verification: all apcie gates "
+                    "ACTIVE -- enabling Phase F")
+                apcie.phaseD_gate151_active = True
+            else:
+                buf.write("  !!! not all gates ACTIVE post-init; "
+                          "Phase F will skip (see above)\n")
+                log("post-init PMGR verification FAILED -- Phase F "
+                    "will skip")
+            flush("postinit-pmgr-verify")
+
             # RUN 15: the 2026-07-11 recipe. That boot's phy_ip decode
             # succeeded only after pcie_init was followed by a full
             # Phase F re-pass of the shared sequence; native order,
