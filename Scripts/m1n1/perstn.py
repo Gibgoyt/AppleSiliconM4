@@ -391,6 +391,29 @@ def deassert_perstn(buf, pin=PERSTN_PIN, cold_reset_us=10000, settle_ms=100):
     buf.write(f"settled {settle_ms} ms after deassert\n\n")
 
 
+def gpio_set_periph(pin, func, buf=None):
+    """Mux `pin` to peripheral function `func` (0-3), mirroring Linux
+    pinctrl-apple-gpio.c's pinmux_set_mux: modify only the PERIPH field
+    and set INPUT_ENABLE, preserving everything else. RUN 18: the ADT
+    declares CLKREQ as GPIO(162, 2) -- alt-function 2, i.e. the PCIe
+    controller manages CLKREQ# itself -- but every run since the pcie_up
+    era has forced it to a manual GPIO output LOW, overriding the
+    hardware handshake. This restores the ADT-declared function.
+    """
+    addr = _gpio_reg_addr(pin)
+    old = p.read32(addr)
+    new = old & ~REG_GPIOx_PERIPH_MASK
+    new |= (func & 0x3) << 5
+    new |= REG_GPIOx_INPUT_ENABLE
+    p.write32(addr, new)
+    read_back = p.read32(addr)
+    if buf is not None:
+        buf.write(f"gpio0[{pin}] @ 0x{addr:x}: 0x{old:08x} -> "
+                  f"0x{new:08x} (read-back 0x{read_back:08x}) "
+                  f"[periph func {func}]\n")
+    return old, new, read_back
+
+
 def assert_clkreq(buf, pin=CLKREQ_PIN, settle_ms=1):
     """Drive CLKREQ# (gpio0 pin `pin`) low so the endpoint has a valid refclk
     request asserted before we release PERSTN#. Called BEFORE deassert_perstn.
@@ -5443,6 +5466,17 @@ def main():
                          "dedicated flush "
                          "(phaseF.pre.6.g.pmgr-scan). Requires "
                          "--t8140-replay.")
+    ap.add_argument("--clkreq-mode", choices=("gpio", "periph"),
+                    default="gpio",
+                    help="RUN 18: how to handle the NIC CLKREQ# pin "
+                         "(gpio0[162]). 'gpio' (default, all prior "
+                         "runs): force it to a manual GPIO output LOW."
+                         " 'periph': mux it to the ADT-declared "
+                         "alt-function 2 so the apcie controller "
+                         "manages the CLKREQ#/refclk handshake itself "
+                         "-- the manual override is a prime suspect "
+                         "for LTSSM never converging (ports stuck "
+                         "BUSY).")
     ap.add_argument("--phyip-apply-local", action="store_true",
                     help="RUN 17: apply 6.g's apcie-phy-ip-pll-"
                          "tunables via the C-side applicator "
@@ -5670,6 +5704,20 @@ def main():
     if args.no_clkreq:
         log("CLKREQ assert skipped (--no-clkreq)")
         buf.write("=== CLKREQ assert (skipped) ===\n\n")
+    elif args.clkreq_mode == "periph":
+        # RUN 18: restore the ADT-declared pin function (alt-2: the
+        # apcie controller manages CLKREQ# itself) instead of the
+        # manual GPIO-out-low override every prior run used. The
+        # refclk-request handshake being forced by the host is a prime
+        # suspect for LTSSM never converging (ports stuck BUSY).
+        log(f"CLKREQ -> peripheral func 2 (ADT-declared) on gpio0 "
+            f"pin {clkreq_pin}...")
+        buf.write(f"=== CLKREQ periph mux (gpio0 pin {clkreq_pin}, "
+                  f"ADT alt-func 2) ===\n")
+        try_(lambda: gpio_set_periph(clkreq_pin, 2, buf),
+             "gpio_set_periph(clkreq)")
+        buf.write("\n")
+        flush("clkreq-periph")
     else:
         log(f"CLKREQ assert on gpio0 pin {clkreq_pin}...")
         try_(lambda: assert_clkreq(buf, pin=clkreq_pin),
@@ -5883,6 +5931,43 @@ def main():
                                         tier=1),
                  "dump_pcie_regs(early)")
         flush("dump-post-init-early")
+
+        # RUN 18: long LINKSTS watch. The C-side idle poll gives BUSY
+        # only 250 ms; watch each active port for up to 5 s in case
+        # training converges late (endpoint slow out of reset). Pure
+        # reads on proven-safe port_base windows.
+        buf.write("=== post-init LINKSTS watch (5 s per active "
+                  "port) ===\n")
+        log("post-init LINKSTS watch (up to 5 s per port)...")
+        for _pi in apcie.active_ports:
+            _pb = apcie.ports[_pi].port_base
+            _first = None
+            _last = None
+            _t0 = time.monotonic()
+            while time.monotonic() - _t0 < 5.0:
+                try:
+                    _v = p.read32(_pb + 0x208)
+                except Exception as _e:
+                    buf.write(f"  port{_pi}: LINKSTS read RAISED "
+                              f"{_e.__class__.__name__}; abandoning "
+                              f"watch\n")
+                    break
+                if _first is None:
+                    _first = _v
+                if _v != _last:
+                    buf.write(f"  port{_pi}: LINKSTS=0x{_v:08x} "
+                              f"[{_linksts_decode(_v)}] at "
+                              f"+{time.monotonic() - _t0:.2f}s\n")
+                    _last = _v
+                if not (_v & (1 << 2)):
+                    buf.write(f"  port{_pi}: BUSY CLEARED after "
+                              f"{time.monotonic() - _t0:.2f}s!\n")
+                    break
+                time.sleep(0.1)
+            else:
+                buf.write(f"  port{_pi}: still BUSY after 5 s "
+                          f"(LINKSTS=0x{_last:08x})\n")
+        flush("postinit-linksts-watch")
 
         if args.t8140_replay_post_init and liveness_gate(
                 "Phase F post-init replay"):

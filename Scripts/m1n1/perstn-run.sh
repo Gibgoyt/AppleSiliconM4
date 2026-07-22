@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18} [extra perstn.py args...]
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -150,7 +150,21 @@
 # corrected reproduction: cold boot + Phase D + Phase F native
 # order + --phyip-apply-local (6.g via C applicator; 6.h stays
 # python-filtered). The cold+C-applicator matrix cell has never
-# been retried.
+# been retried (WEDGED identically at entry #0 -- AND the +55-
+# byte post.6.g flush signature RUN 17 produced is
+# indistinguishable from the Jul-11 record's, whose era's step()
+# flushed the post marker on the exception path too. VERDICT:
+# the Jul-11 "6.g success" was a misread wedge; phy_ip has NEVER
+# decoded on this machine; the phy-ip tunables axis (37 boots)
+# is CLOSED). RUN 18 pivots to the evidenced blocker: pcie_init
+# returns 0, ports reach LTSSM BUSY (training STARTS) and never
+# converge. Prime suspect: the CLKREQ# pin has been forced to a
+# manual GPIO output LOW since the pcie_up era, overriding its
+# ADT-declared alt-function 2 (the apcie controller manages the
+# CLKREQ#/refclk handshake itself). RUN 18 = full pcie_init with
+# --clkreq-mode=periph (restore the ADT pin function) + a 5 s
+# post-init LINKSTS watch + dumps/kick/ECAM (no phy_ip anywhere;
+# Tier 3a auto-gated off).
 #
 # Each RUN tests one specific hypothesis for what ungates phy_ip on
 # t8132 (the current Phase F blocker). See docs/project-m4-pcie-
@@ -1136,8 +1150,58 @@ case "${RUN^^}" in
                --phyip-apply-local
                --require-build=rc1-59-g)
         ;;
+    18)
+        # RUN 18: THE PIVOT. The phy-ip tunables axis is CLOSED after
+        # 37 boots: RUN 17 (cold + C-applicator 6.g) wedged at entry
+        # #0 with the exact +55-byte post.6.g flush signature that
+        # the Jul-11 record shows -- and the d664bd9-era step()
+        # flushed the post marker on the exception path too, so the
+        # "only phy_ip decode ever" was a MISREAD WEDGE. phy_ip has
+        # never decoded on this machine; 6b277bc's premise was never
+        # validated.
+        #
+        # The evidenced blocker is the ORIGINAL one: pcie_init
+        # (tunables-skip m1n1 8a569ad) returns 0, ports power up and
+        # reach LTSSM BUSY -- training STARTS -- and never converge
+        # within the C-side 250 ms idle poll, so the port body
+        # continues out early. Historical kick data (pcie_up_1):
+        # post-init writes to rc_base+0x3c / port+0x10 are SILENTLY
+        # DROPPED (read back 0) and reset cycles don't move LINKSTS
+        # -- the port config regs look write-locked while BUSY.
+        #
+        # Prime suspect: the CLKREQ# pin. The ADT declares
+        # function_clkreq = GPIO(162, alt-func 2) -- the apcie
+        # controller manages the CLKREQ#/refclk handshake itself --
+        # but EVERY run since the pcie_up era forced the pin to a
+        # manual GPIO output LOW ("emulating" the endpoint). A broken
+        # refclk-request handshake is exactly the kind of thing that
+        # leaves LTSSM spinning forever. RUN 18 restores the
+        # ADT-declared pin function (--clkreq-mode=periph) before
+        # the PERSTN cold reset and pcie_init.
+        #
+        # Also new: a 5 s post-init LINKSTS watch per active port
+        # (the C-side poll only allows 250 ms; a slow endpoint would
+        # look identical to a dead one). Then tier dumps (Tier 3a
+        # phy_ip harvest auto-gated OFF via phaseF_shared_up=False),
+        # LTSSM kick, and -- for the first time in the numeric era --
+        # the ECAM walk on a live boot. NIC vendor/device ID = goal.
+        #
+        # Matrix: BUSY clears (watch or post-kick) -> LINK TRAINING
+        # BREAKTHROUGH -> ECAM walk finds the NIC -> next phase = BAR
+        # setup + driver. Still BUSY with periph CLKREQ -> the pin
+        # override wasn't the (only) blocker; RUN 19 candidates:
+        # PERST re-sequencing (re-toggle after APPCLK), longer
+        # settle, per-port REFCLK setup (Linux apple_pcie_setup_
+        # refclk analog), or --no-clkreq (leave iBoot pin state
+        # entirely). ECAM readable despite BUSY -> port fabric alive,
+        # training-only problem (high signal either way).
+        FLAGS=(--preinit-probe
+               --tier3
+               --clkreq-mode=periph
+               --require-build=rc1-59-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
