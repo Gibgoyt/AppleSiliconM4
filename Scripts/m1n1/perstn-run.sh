@@ -1231,8 +1231,39 @@ case "${RUN^^}" in
                --setup-refclk=both
                --require-build=rc1-59-g)
         ;;
+    20)
+        # RUN 20: link training, part 3. RUN 19 proved the refclk REQ->ACK
+        # handshake succeeds but LINKSTS stays BUSY. m1n1 src/pcie.c:857-889
+        # shows WHY: the LTSSM kick (ltssm_base+0x10/0x1c/0x20/0x14) and the
+        # "do it again" retry are BOTH gated to APCIE_T602X and skipped on the
+        # T8140/APCIE path we run -- so LTSSM is never started and pcie_init
+        # bails at the "failed to become idle" poll. ltssm_base read cleanly
+        # (all-zero, no wedge) in RUN 19, so writing it is safe now.
+        #
+        # Replay m1n1's T602X controller==APCIE completion path via
+        # --t602x-init --t602x-aggressive --t602x-do-again (t602x_port_init_
+        # replay: rc_base+0x3c gate, port writes, T602X_RESET cycle, the
+        # ltssm_base kick writes, rc_base+0x3c clear-to-arm), on top of the
+        # RUN 19 refclk handshake. Keep the ADT pin mux; phy_extra probes
+        # stay gated. A post-t602x LINKSTS watch + the ECAM walk report the
+        # result.
+        #
+        # Matrix: BUSY clears -> LINK TRAINS -> ECAM walk finds the NIC ->
+        # BAR setup + driver. Still BUSY -> the ltssm_base writes weren't the
+        # trigger (or a further gate remains); RUN 21 = explicit PORT_LTSSMCTL
+        # 0x080 START (Linux mechanism) / PERST re-toggle / endpoint-presence
+        # diagnostics.
+        FLAGS=(--preinit-probe
+               --tier3
+               --clkreq-mode=periph
+               --setup-refclk=both
+               --t602x-init
+               --t602x-aggressive
+               --t602x-do-again
+               --require-build=rc1-59-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

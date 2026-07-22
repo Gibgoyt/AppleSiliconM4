@@ -4610,6 +4610,42 @@ def _linksts_decode(v):
     return "|".join(bits) if bits else "none"
 
 
+def watch_linksts(apcie, buf, secs=5.0, label="post-init"):
+    """Watch each active port's LINKSTS (port_base+0x208) for up to `secs`,
+    logging every state change and exiting early per port when BUSY (bit 2)
+    clears. The C-side idle poll only allows 250 ms; a slow endpoint would
+    look identical to a dead one. Pure reads on proven-safe port_base
+    windows -- abandons a port's watch on a read exception rather than
+    wedging."""
+    buf.write(f"=== {label} LINKSTS watch ({secs:.0f} s per active "
+              f"port) ===\n")
+    log(f"{label} LINKSTS watch (up to {secs:.0f} s per port)...")
+    for pi in apcie.active_ports:
+        pb = apcie.ports[pi].port_base
+        last = None
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < secs:
+            try:
+                v = p.read32(pb + 0x208)
+            except Exception as e:
+                buf.write(f"  port{pi}: LINKSTS read RAISED "
+                          f"{e.__class__.__name__}; abandoning watch\n")
+                break
+            if v != last:
+                buf.write(f"  port{pi}: LINKSTS=0x{v:08x} "
+                          f"[{_linksts_decode(v)}] at "
+                          f"+{time.monotonic() - t0:.2f}s\n")
+                last = v
+            if not (v & (1 << 2)):
+                buf.write(f"  port{pi}: BUSY CLEARED after "
+                          f"{time.monotonic() - t0:.2f}s!\n")
+                break
+            time.sleep(0.1)
+        else:
+            buf.write(f"  port{pi}: still BUSY after {secs:.0f} s "
+                      f"(LINKSTS=0x{last:08x})\n")
+
+
 # ---------------------------------------------------------------- refclk handshake
 
 # APCIE_PHY_LANE_CFG bits, from Linux pcie-apple.c (PHY window + 0x000).
@@ -6095,39 +6131,8 @@ def main():
 
         # RUN 18: long LINKSTS watch. The C-side idle poll gives BUSY
         # only 250 ms; watch each active port for up to 5 s in case
-        # training converges late (endpoint slow out of reset). Pure
-        # reads on proven-safe port_base windows.
-        buf.write("=== post-init LINKSTS watch (5 s per active "
-                  "port) ===\n")
-        log("post-init LINKSTS watch (up to 5 s per port)...")
-        for _pi in apcie.active_ports:
-            _pb = apcie.ports[_pi].port_base
-            _first = None
-            _last = None
-            _t0 = time.monotonic()
-            while time.monotonic() - _t0 < 5.0:
-                try:
-                    _v = p.read32(_pb + 0x208)
-                except Exception as _e:
-                    buf.write(f"  port{_pi}: LINKSTS read RAISED "
-                              f"{_e.__class__.__name__}; abandoning "
-                              f"watch\n")
-                    break
-                if _first is None:
-                    _first = _v
-                if _v != _last:
-                    buf.write(f"  port{_pi}: LINKSTS=0x{_v:08x} "
-                              f"[{_linksts_decode(_v)}] at "
-                              f"+{time.monotonic() - _t0:.2f}s\n")
-                    _last = _v
-                if not (_v & (1 << 2)):
-                    buf.write(f"  port{_pi}: BUSY CLEARED after "
-                              f"{time.monotonic() - _t0:.2f}s!\n")
-                    break
-                time.sleep(0.1)
-            else:
-                buf.write(f"  port{_pi}: still BUSY after 5 s "
-                          f"(LINKSTS=0x{_last:08x})\n")
+        # training converges late (endpoint slow out of reset).
+        watch_linksts(apcie, buf, secs=5.0, label="post-init")
         flush("postinit-linksts-watch")
 
         if args.t8140_replay_post_init and liveness_gate(
@@ -6247,6 +6252,14 @@ def main():
                                                 phyextra=args.tier3_phyextra),
                          "dump_pcie_regs")
                 flush("dump-post-t602x")
+
+            # RUN 20: watch LINKSTS again AFTER the T602X replay (the
+            # ltssm_base kick + T602X_RESET cycle the T8140 path skips) so
+            # we see whether the kick trained the link, not just the pre-
+            # kick state the post-init watch above reported.
+            if liveness_gate("post-T602X LINKSTS watch"):
+                watch_linksts(apcie, buf, secs=5.0, label="post-t602x")
+                flush("post-t602x-linksts-watch")
 
         if args.unblock_experiment and liveness_gate("unblock experiment"):
             log(f"running unblock experiment on port {args.unblock_port}...")
