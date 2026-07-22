@@ -419,4 +419,10 @@ Interpretation matrix for RUN 10:
   - `pcie_init` still wedges with tunables skipped → ordering story falsified; 60 s/recovery data + the per-port `pcie: Initializing port %d` breadcrumbs locate the real wedge.
   - Post-init pll apply wedges → phy_ip needs more than per-port init on this boot path; diff against the 2026-07-11 environment.
 
+**State as of 2026-07-22 (post RUN 13) — stale binary, no hypothesis tested:**
+- RUN 13 ran the RUN 11/12 binary (banner `v1.6.0-rc1-56-g6b277bc-dirty`, `logs/13/run.log:38`; no skip-printf anywhere) — the `7728fb0` tunables-skip build was staged but never kmutil-enrolled. Byte-identical re-run of RUN 12: same wedge, same known ordering-bug cause. The ordering fix remains untested. Full post-mortem in `Scripts/m1n1/logs/13/findings.md`.
+- **Hardening added:** (1) `--require-build=SUBSTR` — perstn.py verifies the m1n1 USB product string (sysfs) and aborts before any device state change on mismatch; (2) m1n1 fork `8a569ad` adds `PCIE_BC` flushed breadcrumbs (`printf + iodev_console_flush()`, the exception-handler delivery path) at every `pcie_init_controller` stage so any future in-C wedge names its exact stage despite console-ring buffering; (3) the pcie_init recovery probe logs each iteration and flushes; (4) `--gate-poke` dropped — Phase D was the one state-changing pre-init step the proven pcie_up_1 boot didn't have.
+
+**RUN 14 plan (2026-07-22): RUN 13 done properly.** Enroll m1n1 `8a569ad` (staged at `/tmp/m4-serve/`, banner `v1.6.0-rc1-59-g8a569ad`), then `./Scripts/m1n1/perstn-run.sh 14` (`--preinit-probe --tier3 --post-init-phy-ip --require-build=rc1-59-g`). Experiment and interpretation matrix unchanged from RUN 13's design: `pcie_init -> 0` (pcie_up_1 behavior restored) + post-init pll via C applicator + auspma Python-filtered + Tier 3a phy_ip harvest + LTSSM kick + ECAM walk (**NIC vendor/device ID = goal**); a wedge with tunables skipped now names its exact stage via the breadcrumbs; a post-init pll wedge → diff vs the 2026-07-11 environment.
+
 **Related memories:** [[ref-m4-repos]] (repo paths + tooling), [[ref-asahi-t8132-pcie]] (upstream Linux + Asahi source-of-truth reference)
