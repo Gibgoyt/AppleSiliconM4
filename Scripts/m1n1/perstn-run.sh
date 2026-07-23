@@ -1347,8 +1347,35 @@ case "${RUN^^}" in
                --endpoint-diag
                --require-build=rc1-60-g)
         ;;
+    24)
+        # RUN 24: SoC-first pivot. 6 falsified PCIe runs (18-23); two
+        # "blockers" (rc_base+0x3c, ltssm+0x14) were write-strobe /
+        # wrong-controller misreads. Every attempt ran on ONE core with the
+        # ACIO companion IOP (iop,mxwrap-acio, role ACIO0 -- owner of the
+        # CIO/PCIe PHY, the "CIO3 PLL" block that AXI-stalls) never booted.
+        #
+        # This run: --smp-start (start all M4 cores, never done), --soc-recon
+        # (read-only recon of IOPs + asleep apcie/CIO power domains), and
+        # --endpoint-diag (now sweeps the FULL ltssm_base LTSSM-debug window
+        # for the LIVE state we've never actually read -- prior runs read our
+        # own written config values). pcie_init still runs (returns 0, benign;
+        # its in-window writes are strobes) so the LTSSM window is reachable in
+        # its proven-safe post-init state. No IOP boot, no phy_ip, no reflash.
+        #
+        # Decides RUN 25: ACIO IOP powered-but-halted + RC parked-in-Detect ->
+        # boot the ACIO rtkit IOP (PHY owner) before pcie_init. Cores refuse ->
+        # fix SoC bring-up first. RC cycling -> endpoint-side.
+        FLAGS=(--smp-start
+               --soc-recon
+               --preinit-probe
+               --tier3
+               --clkreq-mode=periph
+               --setup-refclk=both
+               --endpoint-diag
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

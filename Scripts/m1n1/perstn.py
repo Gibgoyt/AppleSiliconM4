@@ -4830,23 +4830,25 @@ def endpoint_diag(apcie, buf):
             buf.write(f"  port{i}: LINKSTS=0x{v:08x} "
                       f"[{_linksts_decode(v)}] bit3={bit3}\n")
 
-    # 2b) RC LTSSM-debug window (ltssm_base, reg 7/11/15 -- pcie.c:37/42/47).
-    # RUN 22 read these cleanly (no wedge). All-zero = RC link engine never
-    # started (RC-stuck-in-Detect); non-zero/changing = RC is cycling LTSSM
-    # states (training but the endpoint isn't answering). This is the
-    # RC-stuck vs endpoint-silent discriminator.
-    buf.write("  --- RC LTSSM-debug (ltssm_base +0x10/0x14/0x1c/0x20) ---\n")
+    # 2b) RC LTSSM-debug window (ltssm_base, reg 7/11/15 -- pcie.c:37/42/47),
+    # size 0x1000, proven Tier-1 safe (RUN 23, exc_count 0). RUN 24: sweep the
+    # WHOLE window, NOT just +0x10/0x14/0x1c/0x20 -- those four are the config
+    # values WE wrote (the RUN 20-23 misread that mistook them for live state).
+    # The genuine live LTSSM-state field lives elsewhere in this window; this
+    # sweep is the never-actually-read instrument for RC-parked-in-Detect vs
+    # RC-cycling.
+    _written = {0x10, 0x14, 0x1c, 0x20}
+    buf.write("  --- RC LTSSM-debug window sweep (ltssm_base +0x000..+0x100) "
+              "[*=written by our kick] ---\n")
     for i in apcie.active_ports:
         lt = apcie.ports[i].ltssm_base
-        vals = []
-        for off in (0x10, 0x14, 0x1c, 0x20):
-            v = _read32_live(lt + off, f"port{i} LTSSM +0x{off:02x}", buf)
-            vals.append(v)
-        allzero = all((v == 0) for v in vals if v is not None)
-        verdict = ("all-zero (RC link engine not started -- RC-stuck)"
-                   if allzero else "non-zero (RC LTSSM active -- check "
-                   "endpoint)")
-        buf.write(f"  port{i}: LTSSM-debug {verdict}\n")
+        buf.write(f"  port{i} ltssm_base=0x{lt:x}:\n")
+        for off in range(0x0, 0x100, 4):
+            v = _read32_live(lt + off, f"port{i} LTSSM +0x{off:03x}", buf,
+                             log_progress=False)
+            if v is not None and v != 0:
+                tag = " *" if off in _written else ""
+                buf.write(f"    +0x{off:03x} = 0x{v:08x}{tag}\n")
 
     # 3) NIC assigned MAC (ADT-only, no MMIO). The MAC is NOT on the bridge
     # node -- it lives on the NIC child (lan-1gb) or the root /chosen. RUN 22
@@ -4884,6 +4886,88 @@ def endpoint_diag(apcie, buf):
             buf.write("  NIC MAC: not found in lan-1gb/bridge/chosen/root\n")
     except Exception as e:
         buf.write(f"  NIC MAC diag failed: {e.__class__.__name__}: {e}\n")
+
+
+# ---------------------------------------------------------------- SoC recon
+
+# Compatible-string fragments that mark a companion processor (IOP/ASC).
+_IOP_COMPAT_MARKERS = ("iop,", "ascwrap", "rtbuddy", "mxwrap-acio",
+                       "iop-nub")
+
+
+def _adt_compat_str(node):
+    """Return a node's 'compatible' as a lowercase string, or '' on failure."""
+    try:
+        c = getattr(node, "compatible", None)
+        if c is None:
+            return ""
+        if isinstance(c, (list, tuple)):
+            return " ".join(str(x) for x in c).lower()
+        return str(c).lower()
+    except Exception:
+        return ""
+
+
+def soc_recon(buf):
+    """RUN 24: read-only recon of the SoC's companion processors (IOPs) and
+    which apcie/CIO power domains are asleep. ADT-parse + safe PMGR PS reads
+    only -- no risky MMIO, no IOP boot. Tests the theory that the CIO3-PLL /
+    phy_ip block (which AXI-stalls) is owned by the never-booted ACIO IOP
+    (iop,mxwrap-acio, role ACIO0), i.e. we must bring the SoC up before PCIe.
+    """
+    buf.write("\n=== SoC recon (companion IOPs + asleep domains, "
+              "read-only) ===\n")
+    log("SoC recon (IOPs + power domains)...")
+
+    _pmgr, dev_by_idx = _load_pmgr_devices(buf)
+
+    def _gate_state_str(gate):
+        if dev_by_idx is None:
+            return "?"
+        st = _read_pmgr_gate_state(dev_by_idx, gate, buf, indent="      ")
+        if st is None:
+            return "?"
+        if st.get("virtual"):
+            return f"VIRTUAL(on={st['on']})"
+        return "ON" if st["on"] else "OFF"
+
+    # 1) Walk /arm-io for companion processors (IOP/ASC nodes).
+    buf.write("  --- companion processors (/arm-io IOP/ASC nodes) ---\n")
+    try:
+        arm_io = u.adt["arm-io"]
+        for child in arm_io:
+            compat = _adt_compat_str(child)
+            if not any(m in compat for m in _IOP_COMPAT_MARKERS):
+                continue
+            name = getattr(child, "name", "?")
+            role = getattr(child, "role", None)
+            try:
+                cg = list(getattr(child, "clock_gates", []) or [])
+            except Exception:
+                cg = []
+            buf.write(f"  IOP node '{name}' role={role} "
+                      f"compat=[{compat}]\n")
+            buf.write(f"    clock-gates={cg}\n")
+            for g in cg:
+                buf.write(f"    gate {g}: {_gate_state_str(g)}\n")
+    except Exception as e:
+        buf.write(f"  IOP walk failed: {e.__class__.__name__}: {e}\n")
+
+    # 2) apcie power-gate posture (are the apcie / CIO domains up?).
+    buf.write("  --- apcie power-gates ---\n")
+    try:
+        apcie_node = u.adt["arm-io/apcie"]
+        gates = list(getattr(apcie_node, "power_gates", []) or [])
+        buf.write(f"  apcie power-gates={gates}\n")
+        for g in gates:
+            buf.write(f"    gate {g}: {_gate_state_str(g)}\n")
+    except Exception as e:
+        buf.write(f"  apcie gate readout failed: "
+                  f"{e.__class__.__name__}: {e}\n")
+
+    buf.write("  (No IOP boot performed. If acio-cpu0 is powered but its "
+              "rtkit is not running, RUN 25 = boot the ACIO IOP before "
+              "pcie_init.)\n")
 
 
 # ---------------------------------------------------------------- refclk handshake
@@ -5904,6 +5988,20 @@ def main():
                          "writes, wedge-immune. Interprets a patched-m1n1 "
                          "boot: if the link still won't train, tells us "
                          "whether the NIC is even present/powered.")
+    ap.add_argument("--smp-start", action="store_true",
+                    help="RUN 24: call p.smp_start_secondaries() before the "
+                         "PCIe work -- start all M4 CPU cores (never done in "
+                         "RUNs 1-23; every attempt ran on ONE core). m1n1 has "
+                         "an explicit T8132 case. Logs 'Starting CPU N ...' "
+                         "per core; any refusal tests the 'M4 cores don't all "
+                         "come up' hypothesis.")
+    ap.add_argument("--soc-recon", action="store_true",
+                    help="RUN 24: read-only recon of the SoC's companion "
+                         "processors (IOP/ASC nodes -- esp acio-cpu0, the "
+                         "iop,mxwrap-acio owner of the CIO/PCIe PHY 'CIO3 "
+                         "PLL' block) and which apcie/CIO power domains are "
+                         "asleep. ADT-parse + safe PMGR reads, no IOP boot, "
+                         "no risky MMIO.")
     ap.add_argument("--tier3-phyextra", action="store_true",
                     help="RUN 19: re-enable the Tier-3 per-port "
                          "phy_extra/ctrl_lo probes. They AXI-stall and "
@@ -6102,6 +6200,20 @@ def main():
     apcie.describe(buf)
     buf.write("\n")
     flush("adt-map")
+
+    # RUN 24: SoC-first pivot -- start all cores + recon the companion IOPs
+    # BEFORE any PCIe work (every prior run ran on a single core with the
+    # ACIO IOP asleep).
+    if args.smp_start:
+        log("starting secondary CPUs (p.smp_start_secondaries())...")
+        buf.write("=== SMP: p.smp_start_secondaries() ===\n")
+        try_(lambda: p.smp_start_secondaries(), "smp_start_secondaries")
+        buf.write("(see TTY console for 'Starting CPU N ...' lines)\n\n")
+        flush("smp-start")
+
+    if args.soc_recon:
+        try_(lambda: soc_recon(buf), "soc_recon")
+        flush("soc-recon")
 
     # ADT-only, wedge-immune. Runs regardless of --no-pcie-init so we
     # always leave a full tunable dump in nic-runtime.txt.
