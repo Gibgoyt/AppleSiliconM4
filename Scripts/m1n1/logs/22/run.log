@@ -1,0 +1,1442 @@
+[ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/perstn-run.sh 22
+[sudo] password for ahmed: 
+TTY> Initialized dockchannel UART at 0x388128000
+TTY> Device info:
+TTY>   Model: Mac16,10
+TTY>   Target: J773g
+TTY>   Board-ID: 0x2a
+TTY>   Chip-ID: 0x8132
+TTY> 
+TTY> CPU init (MIDR: 0x611f0531 smp_id:0x6)...
+TTY>   CPU part: 0x53 rev: 0x11
+TTY>   CPU: M4 Donan (P core)
+TTY> 
+TTY> boot_args at 0x10003fb8000
+TTY>   revision:     3
+TTY>   version:      2
+TTY>   virt_base:    0x90f0000
+TTY>   phys_base:    0x100010f0000
+TTY>   mem_size:     0x3df834000
+TTY>   top_of_kdata: 0x10003fc8000
+TTY>   video:
+TTY>     base:       0x103e5234000
+TTY>     display:    0x1
+TTY>     stride:     0xa00
+TTY>     width:      640
+TTY>     height:     1136
+TTY>     depth:      32bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0xb76c000
+TTY>   devtree_size: 0x68000
+TTY>   cmdline:      
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x400000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 v1.6.0-rc1-60-g4b77755-dirty
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the MIT license
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: 15.1 (iBoot-11881.41.5)
+TTY> System FW version: 15.1 (iBoot-11881.41.5)
+TTY> Heap base: 0x10003fc8000
+TTY> MCC: Unsupported version:mcc,t8132
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x103e0924000
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c50000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c60000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c70000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c80000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1cb0000000 (0x14000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff1c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe6c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe4c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffddc000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffdbc000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffd4c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30000180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 3 @ 0x381000000
+TTY> AIC: AIC3 with 1/2 dies, 2048/4096 IRQs, reg_size:40004, config:10000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> Primary WDT register @ 0x3882b0000
+TTY> Primary WDT disabled
+TTY> Secondary WDT register @ 0x3882b8008
+TTY> Secondary WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: initialized, 392 devices on 1 dies found.
+TTY> display: Display is external
+TTY> display: Dummy framebuffer found, initializing display
+TTY> dart: dart /arm-io/dart-dcp at 0x30a340000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0 at 0x30a300000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0.0.0 L1 0 is real-time at 0x103fff1c000
+TTY> dart: allocating L2 tbl at 0, 1 to 0x103fff24000
+TTY> dcp: Mapping segment #2 1000393c000 -> 1000393c000 [24000]
+TTY> rtkit(dcp): booting with version 12
+TTY> rtkit(dcp): unknown system endpoint 0x0a
+TTY> rtkit(dcp): pre-allocated buffer (ep 0x1, dva 0x100025eb000, phys 0x103e51a3000)
+TTY> rtkit(dcp): unknown oslog message 105ff8010002604
+TTY> rtkit(dcp): unknown oslog message 3010042100000a1
+TTY> rtkit(dcp): unknown oslog message 4000020d51e4021
+TTY> rtkit(dcp): unknown oslog message 4000040d28078a1
+TTY> rtkit(dcp): unknown oslog message 4000060d51e4001
+TTY> AFK: ring buffer size mismatch
+TTY> AFK: ring buffer size mismatch
+TTY> dcp-iboot: failed to initialize disp0 service
+TTY> display: failed to initialize DCP iBoot interface
+TTY> rtkit(dcp): IOP crashed!
+TTY> rtkit(dcp): == CRASH INFO ==
+TTY> rtkit(dcp):   Message 1: ASSERT!Messenger.c:299 0xc0000000000000 0x7 
+TTY> rtkit(dcp):   0x43766572
+TTY> rtkit(dcp):   0x4374696d
+TTY> rtkit(dcp):   0x43637374
+TTY> rtkit(dcp):   0x4372746b
+TTY> rtkit(dcp):   0x43617343
+TTY> rtkit(dcp):   0x436d6278
+TTY> rtkit(dcp):   0x43636470
+TTY> rtkit(dcp):   0x43706374
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp): IOP died during shutdown
+TTY> fb init: 640x1136 (32) [s=640] @0x103e5234000
+TTY> fb console: max rows 35, max cols 40
+TTY> fb: display logo
+TTY> cpufreq: Chip 0x8132 is unsupported
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j773g
+TTY> Unknown payload at 0x1000393c000 (magic: 5b41464b)
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x402f80000 is a t8110
+TTY> USB0: initialized at 0x100043b6030
+TTY> dart: dart /arm-io/dart-usb1 at 0x40af80000 is a t8110
+TTY> USB1: initialized at 0x100043b6360
+TTY> dart: dart /arm-io/dart-usb2 at 0x412f80000 is a t8110
+TTY> USB2: initialized at 0x100043b6690
+TTY> dart: dart /arm-io/dart-usb3 at 0x41af80000 is a t8110
+TTY> USB3: initialized at 0x100043b69c0
+TTY> Running proxy...
+m1n1 base: 0x10003830000
+Fetching ADT (0x00068000 bytes)...
+[pcie_up] require-build OK: 'm1n1 uartproxy v1.6.0-rc1-60-g' contains 'rc1-60-g'
+[pcie_up] === Phase 3.3 pcie_up ===
+[pcie_up] building ApcieMap from ADT...
+[pcie_up] [flush:adt-map] wrote partial log (2430 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] dumping apcie-phy-ip-{pll,auspma}-tunables report...
+[pcie_up] [flush:phy-ip-report] wrote partial log (18440 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] dumping apcie-{cio3pllcore,pcieclkgen}-tunables report...
+[pcie_up] [flush:extra-tunables-report] wrote partial log (26107 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] SMC power on apcie fabric...
+[mgmt] Starting via message
+[mgmt] Supported versions 12 .. 12
+[mgmt] Adding endpoint 0x0
+[mgmt] Adding endpoint 0x1
+[mgmt] Adding endpoint 0x2
+[mgmt] Adding endpoint 0x3
+[mgmt] Adding endpoint 0x4
+[mgmt] Adding endpoint 0x8
+[mgmt] Adding endpoint 0x20
+Starting endpoint #0x1 (crash)
+Starting endpoint #0x2 (syslog)
+Starting endpoint #0x3 (kdebug)
+Starting endpoint #0x4 (iorep)
+Starting endpoint #0x8 (iorep)
+[crash] buf prealloc at dva 0x38de5c000
+[iorep] buf prealloc 0x38de61000 / 0x38de61000
+[iorep] start
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[mgmt] IOP power state is now 0x20
+[syslog] count 32, entrysize 96
+[syslog] buf prealloc at dva 0x38de60000
+[iorep] buf prealloc 0xff800038de66000 / 0xff800038de66000
+unknown message: 0x31f10428986d339 / 0x408c0000000008 (EP=0x8)
+unknown message: 0x40000209630790a / 0x309c0000000008 (EP=0x8)
+unknown message: 0x40000402572ab9b / 0x20ac0000000008 (EP=0x8)
+unknown message: 0x400006003168728 / 0x10bc0000000008 (EP=0x8)
+[mgmt] AP power state is now 0x20
+[mgmt] Startup complete
+Starting endpoint #0x20 (smcep)
+[smcep] Starting up
+[mgmt] Stopping via message
+[mgmt] AP power state is now 0x10
+[mgmt] IOP power state is now 0x10
+[pcie_up] [flush:smc-power] wrote partial log (26253 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] CLKREQ -> peripheral func 2 (ADT-declared) on gpio0 pin 162...
+[pcie_up] [flush:clkreq-periph] wrote partial log (26402 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] PERSTN deassert on gpio0 pin 165...
+[pcie_up] PERSTN cold reset: drive gpio0[165] low
+[pcie_up] PERSTN: drive gpio0[165] high
+[pcie_up] [flush:perstn] wrote partial log (26667 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] Phase 0: PMGR gate readout (no apcie MMIO)...
+[pcie_up] [flush:phase0-pmgr-state] wrote partial log (27306 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] Phase 0.5: PMGR parent-chain readout (no apcie MMIO)...
+[pcie_up] [flush:phase0.5-parents] wrote partial log (31517 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] Phase A: single pre-PMGR probe at phy_ip_base+0...
+[pcie_up] [flush:phaseA-preinit-single] wrote partial log (32557 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] setup_refclk (pre-pcie_init)...
+[pcie_up]   setup_refclk ports=[0, 2] refclk_cgen=False
+[pcie_up]     port0 phy_base=0x497020000
+[pcie_up]     read32(0x497020000) [port0 PHY_LANE_CFG (pre-refclk)]...
+[pcie_up]       -> 0x33000070
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (pre-refclk)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x497020000) [port0 PHY_LANE_CFG (post-refclk)]...
+[pcie_up]       -> 0x3300067f
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (post-refclk)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     port2 phy_base=0x497028000
+[pcie_up]     read32(0x497028000) [port2 PHY_LANE_CFG (pre-refclk)]...
+[pcie_up]       -> 0x33000070
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (pre-refclk)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x497028000) [port2 PHY_LANE_CFG (post-refclk)]...
+[pcie_up]       -> 0x3300067f
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (post-refclk)]...
+[pcie_up]       -> 0x83000204
+[pcie_up] [flush:setup-refclk-pre] wrote partial log (34000 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] p.pcie_init()...
+TTY> pcie: Initializing t8132 PCIe controller
+TTY> pcie: ADT uses 6 reg entries per port
+TTY> pcie: BC pmgr power enable...
+TTY> pcie: BC pmgr power enable done
+TTY> pcie: BC axi2af tunables done
+TTY> pcie: No common tunables
+TTY> pcie: BC common tunables done
+TTY> pcie: BC phy tunables done
+TTY> pcie: BC phy 0 CLK handshake done
+TTY> pcie: t8132: skipping phy-ip tunables pre-port-init (host applies post-init)
+TTY> pcie: BC shared init done (rc handshake ok)
+TTY> pcie: Initializing port 0
+TTY> pcie: BC t8132 arm rc_base+0x3c (pre=0x0)
+TTY> pcie: BC t8132 arm rc_base+0x3c (post=0x0)
+TTY> pcie: BC t8132 port 0 +0x10 (post=0x0)
+TTY> pcie: BC t8132 port 0 LTSSM kick: ltssm+0x14=0x0 LINKSTS=0x8300020c
+TTY> pcie: Port failed to become idle on /arm-io/apcie/pci-bridge0
+TTY> pcie: Port 0 max speed = 2
+TTY> pcie: BC t8132 port 0 disarm rc_base+0x3c (post=0x0)
+TTY> pcie: BC port 0 init done LINKSTS=0x8300020c
+TTY> pcie: Initializing port 2
+TTY> pcie: BC t8132 arm rc_base+0x3c (pre=0x0)
+TTY> pcie: BC t8132 arm rc_base+0x3c (post=0x0)
+TTY> pcie: BC t8132 port 2 +0x10 (post=0x0)
+TTY> pcie: BC t8132 port 2 LTSSM kick: ltssm+0x14=0x0 LINKSTS=0x83000204
+TTY> pcie: Port failed to become idle on /arm-io/apcie/pci-bridge2
+TTY> pcie: Port 2 max speed = 1
+TTY> pcie: BC t8132 port 2 disarm rc_base+0x3c (post=0x0)
+TTY> pcie: BC port 2 init done LINKSTS=0x83000204
+TTY> pcie: Initialized controller 0
+TTY> pcie: Error getting node /arm-io/apcie0
+TTY> pcie: Error getting node /arm-io/apcie-ge0
+TTY> pcie: Error getting node /arm-io/apcie-ge1
+[pcie_up] p.pcie_init returned 0
+[pcie_up] [flush:pcie-init] wrote partial log (34021 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] active ports (per ADT): [0, 2]
+[pcie_up] early post-init tier-1 dump (safe windows only)...
+[pcie_up]   dump_pcie_regs tier=1 tag=post-init-early active_ports=[0, 2]
+[pcie_up]     read32(0x49400003c) [rc_base + 0x03c]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 1 (port_base=0x490028000) ===
+[pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x490028010) [port0 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028088) [port0 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028100) [port0 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028104) [port0 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x490028124) [port0 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x490028140) [port0 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x490028144) [port0 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x490028148) [port0 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028210) [port0 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028808) [port0 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49002b97c) [port0 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port2 Tier 1 (port_base=0x492028000) ===
+[pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x492028010) [port2 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028088) [port2 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028100) [port2 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028104) [port2 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x492028124) [port2 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x492028140) [port2 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x492028144) [port2 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x492028148) [port2 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028210) [port2 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028808) [port2 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49202b97c) [port2 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up] [flush:dump-post-init-early] wrote partial log (36098 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] setup_refclk (post-pcie_init)...
+[pcie_up]   setup_refclk ports=[0, 2] refclk_cgen=False
+[pcie_up]     port0 phy_base=0x497020000
+[pcie_up]     read32(0x497020000) [port0 PHY_LANE_CFG (pre-refclk)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (pre-refclk)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x497020000) [port0 PHY_LANE_CFG (post-refclk)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (post-refclk)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     port2 phy_base=0x497028000
+[pcie_up]     read32(0x497028000) [port2 PHY_LANE_CFG (pre-refclk)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (pre-refclk)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x497028000) [port2 PHY_LANE_CFG (post-refclk)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (post-refclk)]...
+[pcie_up]       -> 0x83000204
+[pcie_up] [flush:setup-refclk-post] wrote partial log (37542 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] post-init LINKSTS watch (up to 5 s per port)...
+[pcie_up] [flush:postinit-linksts-watch] wrote partial log (37839 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] endpoint diagnostics (read-only)...
+[mgmt] Starting via message
+[mgmt] Supported versions 12 .. 12
+[mgmt] Adding endpoint 0x0
+[mgmt] Adding endpoint 0x1
+[mgmt] Adding endpoint 0x2
+[mgmt] Adding endpoint 0x3
+[mgmt] Adding endpoint 0x4
+[mgmt] Adding endpoint 0x8
+[mgmt] Adding endpoint 0x20
+Starting endpoint #0x1 (crash)
+Starting endpoint #0x2 (syslog)
+Starting endpoint #0x3 (kdebug)
+Starting endpoint #0x4 (iorep)
+Starting endpoint #0x8 (iorep)
+[crash] buf prealloc at dva 0x38de5c000
+[iorep] buf prealloc 0x38de61000 / 0x38de61000
+[iorep] start
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[mgmt] IOP power state is now 0x20
+[syslog] count 32, entrysize 96
+[syslog] buf prealloc at dva 0x38de60000
+[iorep] buf prealloc 0xff800038de66000 / 0xff800038de66000
+unknown message: 0x31f10428986d339 / 0x408c0000000008 (EP=0x8)
+unknown message: 0x40000209630790a / 0x309c0000000008 (EP=0x8)
+unknown message: 0x40000402572ab9b / 0x20ac0000000008 (EP=0x8)
+unknown message: 0x400006003168728 / 0x10bc0000000008 (EP=0x8)
+[mgmt] AP power state is now 0x20
+[mgmt] Startup complete
+Starting endpoint #0x20 (smcep)
+[smcep] Starting up
+[mgmt] Stopping via message
+[mgmt] AP power state is now 0x10
+[mgmt] IOP power state is now 0x10
+[pcie_up]     read32(0x490028208) [port0 LINKSTS]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x492028208) [port2 LINKSTS]...
+[pcie_up]       -> 0x83000204
+[pcie_up] [flush:endpoint-diag] wrote partial log (38345 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] dumping PCIe controller registers (post-init, tier=3)...
+[pcie_up]   dump_pcie_regs tier=3 tag=post-init active_ports=[0, 2]
+[pcie_up]     read32(0x49400003c) [rc_base + 0x03c]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 1 (port_base=0x490028000) ===
+[pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x490028010) [port0 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028088) [port0 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028100) [port0 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028104) [port0 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x490028124) [port0 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x490028140) [port0 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x490028144) [port0 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x490028148) [port0 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028210) [port0 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028808) [port0 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49002b97c) [port0 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port2 Tier 1 (port_base=0x492028000) ===
+[pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x492028010) [port2 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028088) [port2 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028100) [port2 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028104) [port2 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x492028124) [port2 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x492028140) [port2 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x492028144) [port2 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x492028148) [port2 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028210) [port2 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028808) [port2 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49202b97c) [port2 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === Tier 2 (phy_common + phy_base) ===
+[pcie_up]     read32(0x497004000) [PHYCMN_CLK (phy_common+0x000)]...
+[pcie_up]       -> 0x80300001
+[pcie_up]     read32(0x494000024) [PHYIF_CTRL (rc_base+0x024)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 2 (phy_base=0x497020000) ===
+[pcie_up]     read32(0x497020000) [port0 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497020004) [port0 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up]   === port2 Tier 2 (phy_base=0x497028000) ===
+[pcie_up]     read32(0x497028000) [port2 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497028004) [port2 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up]   === Tier 3 (ltssm + phy_extra + ctrl_lo) ===
+[pcie_up]   Tier 3a SKIPPED (phaseF_shared_up=False)
+[pcie_up]   === port0 Tier 3 ===
+[pcie_up]     read32(0x49003c010) [port0 LTSSM +0x10]...
+[pcie_up]       -> 0x00000002
+[pcie_up]     read32(0x49003c014) [port0 LTSSM +0x14]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49003c01c) [port0 LTSSM +0x1c]...
+[pcie_up]       -> 0x00000004
+[pcie_up]     read32(0x49003c020) [port0 LTSSM +0x20]...
+[pcie_up]       -> 0x00000002
+[pcie_up]   === port2 Tier 3 ===
+[pcie_up]     read32(0x49203c010) [port2 LTSSM +0x10]...
+[pcie_up]       -> 0x00000002
+[pcie_up]     read32(0x49203c014) [port2 LTSSM +0x14]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49203c01c) [port2 LTSSM +0x1c]...
+[pcie_up]       -> 0x00000004
+[pcie_up]     read32(0x49203c020) [port2 LTSSM +0x20]...
+[pcie_up]       -> 0x00000002
+[pcie_up] [flush:dump-post-init] wrote partial log (41830 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] trying LTSSM kick sequences on ports [0, 2] (aggressive=False)...
+[pcie_up]   try_ltssm_kick ports=[0, 2] aggressive=False
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (baseline)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     seq A on port0
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A post-set)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028010) [port0 +0x10 (seq A pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028010) [port0 +0x10 (seq A post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after seq A)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     seq C on port0
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after seq C)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x490028208) [port0 LINKSTS (after 200ms settle)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (baseline)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     seq A on port2
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A post-set)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028010) [port2 +0x10 (seq A pre)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028010) [port2 +0x10 (seq A post)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after seq A)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     seq C on port2
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after seq C)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x492028208) [port2 LINKSTS (after 200ms settle)]...
+[pcie_up]       -> 0x83000204
+[pcie_up] [flush:ltssm-kick] wrote partial log (44065 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] dumping PCIe controller registers (post-kick, tier=3)...
+[pcie_up]   dump_pcie_regs tier=3 tag=post-kick active_ports=[0, 2]
+[pcie_up]     read32(0x49400003c) [rc_base + 0x03c]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 1 (port_base=0x490028000) ===
+[pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x8300020c
+[pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x490028010) [port0 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028088) [port0 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028100) [port0 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028104) [port0 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x490028124) [port0 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x490028140) [port0 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x490028144) [port0 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x490028148) [port0 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028210) [port0 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x490028808) [port0 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49002b97c) [port0 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port2 Tier 1 (port_base=0x492028000) ===
+[pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
+[pcie_up]       -> 0x00100001
+[pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
+[pcie_up]       -> 0x00000005
+[pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
+[pcie_up]       -> 0x83000204
+[pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
+[pcie_up]       -> 0x00000001
+[pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
+[pcie_up]       -> 0x00200001
+[pcie_up]     read32(0x492028010) [port2 +0x010]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028088) [port2 +0x088]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028100) [port2 +0x100]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028104) [port2 +0x104]...
+[pcie_up]       -> 0xfffffff0
+[pcie_up]     read32(0x492028124) [port2 +0x124]...
+[pcie_up]       -> 0x00000100
+[pcie_up]     read32(0x492028140) [port2 +0x140]...
+[pcie_up]       -> 0x00000011
+[pcie_up]     read32(0x492028144) [port2 +0x144]...
+[pcie_up]       -> 0x00253770
+[pcie_up]     read32(0x492028148) [port2 +0x148]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028210) [port2 +0x210]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x492028808) [port2 +0x808]...
+[pcie_up]       -> 0x001000ff
+[pcie_up]     read32(0x49202b97c) [port2 +0x397c (T602X only)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === Tier 2 (phy_common + phy_base) ===
+[pcie_up]     read32(0x497004000) [PHYCMN_CLK (phy_common+0x000)]...
+[pcie_up]       -> 0x80300001
+[pcie_up]     read32(0x494000024) [PHYIF_CTRL (rc_base+0x024)]...
+[pcie_up]       -> 0x00000000
+[pcie_up]   === port0 Tier 2 (phy_base=0x497020000) ===
+[pcie_up]     read32(0x497020000) [port0 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497020004) [port0 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up]   === port2 Tier 2 (phy_base=0x497028000) ===
+[pcie_up]     read32(0x497028000) [port2 PHY_CTRL (+0x000)]...
+[pcie_up]       -> 0x2300066f
+[pcie_up]     read32(0x497028004) [port2 PHY      (+0x004)]...
+[pcie_up]       -> 0x00000030
+[pcie_up]   === Tier 3 (ltssm + phy_extra + ctrl_lo) ===
+[pcie_up]   Tier 3a SKIPPED (phaseF_shared_up=False)
+[pcie_up]   === port0 Tier 3 ===
+[pcie_up]     read32(0x49003c010) [port0 LTSSM +0x10]...
+[pcie_up]       -> 0x00000002
+[pcie_up]     read32(0x49003c014) [port0 LTSSM +0x14]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49003c01c) [port0 LTSSM +0x1c]...
+[pcie_up]       -> 0x00000004
+[pcie_up]     read32(0x49003c020) [port0 LTSSM +0x20]...
+[pcie_up]       -> 0x00000002
+[pcie_up]   === port2 Tier 3 ===
+[pcie_up]     read32(0x49203c010) [port2 LTSSM +0x10]...
+[pcie_up]       -> 0x00000002
+[pcie_up]     read32(0x49203c014) [port2 LTSSM +0x14]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x49203c01c) [port2 LTSSM +0x1c]...
+[pcie_up]       -> 0x00000004
+[pcie_up]     read32(0x49203c020) [port2 LTSSM +0x20]...
+[pcie_up]       -> 0x00000002
+[pcie_up] [flush:dump-post-kick] wrote partial log (47550 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] ECAM walk @ 0x1cb0000000 ...
+[pcie_up] [flush:ecam-walk] wrote partial log (47813 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] wrote /tmp/m4-recon/nic-runtime.txt
+[pcie_up] done. Copy /tmp/m4-recon/nic-runtime.txt into m4_recon/ if it looks sane.
+
+--- /tmp/m4-recon/nic-runtime.txt ---
+# Phase 3 PCIe runtime dump
+
+**NIC not found** in the ECAM walk. Check the log below.
+
+## Full walk log
+
+```
+=== apcie ADT map ===
+compatible   = apcie,t8132
+power_gates  = [379, 380, 381, 382, 383, 151]
+active ports = [0, 2]
+
+-- shared --
+  ecam_base       = 0x1cb0000000 sz 0x10000000
+  rc_base         = 0x494000000 sz 0x4000
+  phy_packed_base = 0x497000000 sz 0x40000   (phy_common = +0x4000)
+  phy_common_base = 0x497004000
+  phy_ip_base     = 0x497040000 sz 0x20000
+  axi_base        = 0x496000000 sz 0x1000000
+  axi_sub5        = 0x495046200 sz 0x4000   (reg[5]; separate 0x495xxxxxxx window; purpose unknown)
+  axi_sub6        = 0x495044000 sz 0x4000   (reg[6]; separate 0x495xxxxxxx window; purpose unknown)
+
+--- port0 ---
+  exists in ADT: True
+  port_base       = 0x490028000 sz 0x8000
+  ltssm_base      = 0x49003c000 sz 0x4000
+  phy_base        = 0x497020000 sz 0x4000
+  phy_extra_base  = 0x497048000 sz 0x8000   (inside shared PHY IP)
+  intr2axi_base   = 0x490024000 sz 0x4000
+  ctrl_lo_base    = 0x490000000 sz 0xc000   (overlaps dart-apcie0)
+  bridge          = /arm-io/apcie/pci-bridge0
+  PERSTN pin      = gpio0[163] (mode 0)
+  CLKREQ pin      = gpio0[160] (mode 2)
+  max_link_speed  = 2
+  #apcie_config_tunables       = 1
+  #pcie_rc_tunables            = 3
+  #pcie_rc_gen3_shadow_tunables= 3
+  #pcie_rc_gen4_shadow_tunables= 3
+
+--- port1 ---
+  exists in ADT: False (pci-bridge missing)
+  port_base       = 0x491028000 sz 0x8000
+  ltssm_base      = 0x49103c000 sz 0x4000
+  phy_base        = 0x497024000 sz 0x4000
+  phy_extra_base  = 0x497050000 sz 0x8000   (inside shared PHY IP)
+  intr2axi_base   = 0x491024000 sz 0x4000
+  ctrl_lo_base    = 0x491000000 sz 0xc000   (overlaps dart-apcie1)
+
+--- port2 ---
+  exists in ADT: True
+  port_base       = 0x492028000 sz 0x8000
+  ltssm_base      = 0x49203c000 sz 0x4000
+  phy_base        = 0x497028000 sz 0x4000
+  phy_extra_base  = 0x497058000 sz 0x8000   (inside shared PHY IP)
+  intr2axi_base   = 0x492024000 sz 0x4000
+  ctrl_lo_base    = 0x492000000 sz 0xc000   (overlaps dart-apcie2)
+  bridge          = /arm-io/apcie/pci-bridge2
+  PERSTN pin      = gpio0[165] (mode 0)
+  CLKREQ pin      = gpio0[162] (mode 2)
+  max_link_speed  = 1
+  #apcie_config_tunables       = 1
+  #pcie_rc_tunables            = 3
+  #pcie_rc_gen3_shadow_tunables= 3
+  #pcie_rc_gen4_shadow_tunables= 3
+
+-- darts --
+  dart[port 0]: /arm-io/dart-apcie0  base=0x490000000 sz=0x20000  page_size=16384  sid_count=17
+  dart[port 2]: /arm-io/dart-apcie2  base=0x492000000 sz=0x20000  page_size=16384  sid_count=17
+
+
+=== phy_ip tunables report (from ADT, no MMIO) ===
+phy_ip_base       = 0x497040000 sz 0x20000
+active ADT ports  = [0, 2]
+slice geometry    = shared [0x0000..0x8000)  port0 [0x08000..0x10000)  port1 [0x10000..0x18000)  port2 [0x18000..0x20000)
+
+--- apcie-phy-ip-pll-tunables (29 entries) ---
+  #  offset     sz  mask               value              -> target_addr slice   active
+    0 0x00000038  4  0x0000000010000000 0x0000000000000000    0x497040038 shared -
+    1 0x00000090  4  0x0000000000000001 0x0000000000000001    0x497040090 shared -
+    2 0x000000a4  4  0x0000000000000001 0x0000000000000001    0x4970400a4 shared -
+    3 0x00001000  4  0x00000000003f0000 0x0000000000230000    0x497041000 shared -
+    4 0x0000102c  4  0x0000000003fffffc 0x0000000000454444    0x49704102c shared -
+    5 0x00001204  4  0x000000000000007c 0x0000000000000048    0x497041204 shared -
+    6 0x0000501c  4  0x0000000000000004 0x0000000000000000    0x49704501c shared -
+    7 0x00005080  4  0x0000000003c00000 0x0000000001400000    0x497045080 shared -
+    8 0x00005088  4  0x00000000000f0000 0x0000000000060000    0x497045088 shared -
+    9 0x0000508c  4  0x0000000003c00000 0x0000000001400000    0x49704508c shared -
+   10 0x00005094  4  0x00000000000f0000 0x0000000000060000    0x497045094 shared -
+   11 0x000050a0  4  0x00000000000f0000 0x0000000000050000    0x4970450a0 shared -
+   12 0x000050ac  4  0x00000000000f0000 0x0000000000050000    0x4970450ac shared -
+   13 0x000050b8  4  0x00000000000f0000 0x0000000000050000    0x4970450b8 shared -
+   14 0x00005200  4  0x000000000000000a 0x000000000000000a    0x497045200 shared -
+   15 0x00005224  4  0x0000000000000c00 0x0000000000000800    0x497045224 shared -
+   16 0x00005230  4  0x000000000000001f 0x0000000000000008    0x497045230 shared -
+   17 0x00005240  4  0x0000000007d8007f 0x0000000004000039    0x497045240 shared -
+   18 0x000052b0  4  0x0000000008700000 0x0000000000300000    0x4970452b0 shared -
+   19 0x000052e8  4  0x0000000000060000 0x0000000000040000    0x4970452e8 shared -
+   20 0x00005300  4  0x0000000000ffffff 0x0000000000078078    0x497045300 shared -
+   21 0x00005320  4  0x0000000000000006 0x0000000000000002    0x497045320 shared -
+   22 0x0000608c  4  0x0000000003c3c000 0x0000000001818000    0x49704608c shared -
+   23 0x00006224  4  0x0000000000000c00 0x0000000000000800    0x497046224 shared -
+   24 0x00006228  4  0x0000000000000f00 0x0000000000000b00    0x497046228 shared -
+   25 0x00006230  4  0x000000000000001f 0x000000000000000f    0x497046230 shared -
+   26 0x0000624c  4  0x000000000000007f 0x000000000000005b    0x49704624c shared -
+   27 0x000062b0  4  0x0000000000700000 0x0000000000300000    0x4970462b0 shared -
+   28 0x000062e8  4  0x0000000000060000 0x0000000000040000    0x4970462e8 shared -
+  --- tally by slice ---
+    shared                 29
+  --- offset ranges by slice ---
+    shared   0x00000038 .. 0x000062e8
+
+--- apcie-phy-ip-auspma-tunables (146 entries) ---
+  #  offset     sz  mask               value              -> target_addr slice   active
+    0 0x0000a000  4  0x000000000000000f 0x000000000000000a    0x49704a000 port0  yes
+    1 0x0000a008  4  0x000000000000000f 0x000000000000000a    0x49704a008 port0  yes
+    2 0x0000a00c  4  0x000000000000000f 0x000000000000000a    0x49704a00c port0  yes
+    3 0x0000a010  4  0x000000000000000f 0x000000000000000a    0x49704a010 port0  yes
+    4 0x0000a014  4  0x000000000000000f 0x000000000000000a    0x49704a014 port0  yes
+    5 0x0000a038  4  0x000000000000ffff 0x0000000000000271    0x49704a038 port0  yes
+    6 0x0000a040  4  0x0000000000000800 0x0000000000000000    0x49704a040 port0  yes
+    7 0x0000a04c  4  0x0000000000003fff 0x0000000000000bff    0x49704a04c port0  yes
+    8 0x0000a050  4  0x0000000000000001 0x0000000000000001    0x49704a050 port0  yes
+    9 0x0000a068  4  0x0000000000000007 0x0000000000000001    0x49704a068 port0  yes
+   10 0x0000a070  4  0x00000000fff038e0 0x0000000055b00820    0x49704a070 port0  yes
+   11 0x0000a084  4  0x00000000ffffffff 0x000000003e8f4240    0x49704a084 port0  yes
+   12 0x0000a088  4  0x0000000000000fff 0x0000000000000fff    0x49704a088 port0  yes
+   13 0x0000a09c  4  0x000000000fc00000 0x0000000005400000    0x49704a09c port0  yes
+   14 0x0000a0b8  4  0x00000000ff03e000 0x00000000aa03e000    0x49704a0b8 port0  yes
+   15 0x0000a0bc  4  0x0000000000060fff 0x0000000000040faa    0x49704a0bc port0  yes
+   16 0x0000a0c0  4  0x000000003ff80000 0x0000000014500000    0x49704a0c0 port0  yes
+   17 0x0000a0c4  4  0x000000000000ffff 0x0000000000007777    0x49704a0c4 port0  yes
+   18 0x0000a0e0  4  0x0000000018000000 0x0000000008000000    0x49704a0e0 port0  yes
+   19 0x0000a0e8  4  0x00000000001ff000 0x0000000000002000    0x49704a0e8 port0  yes
+   20 0x0000a10c  4  0x000000003fffffff 0x00000000000f4240    0x49704a10c port0  yes
+   21 0x0000a11c  4  0x0000000000040000 0x0000000000040000    0x49704a11c port0  yes
+   22 0x0000a178  4  0x0000000003f00000 0x0000000000300000    0x49704a178 port0  yes
+   23 0x0000a1b0  4  0x00000000ffffffff 0x0000000000098924    0x49704a1b0 port0  yes
+   24 0x0000a1b4  4  0x000000000003ff00 0x0000000000001500    0x49704a1b4 port0  yes
+   25 0x0000a1b8  4  0x00000000ffffffff 0x0000000000098924    0x49704a1b8 port0  yes
+   26 0x0000a1bc  4  0x000000000003ff00 0x0000000000001500    0x49704a1bc port0  yes
+   27 0x0000a1c4  4  0x0000000000000001 0x0000000000000001    0x49704a1c4 port0  yes
+   28 0x0000a1cc  4  0x0000000000000001 0x0000000000000001    0x49704a1cc port0  yes
+   29 0x0000a1e8  4  0x000000000000000f 0x0000000000000000    0x49704a1e8 port0  yes
+   30 0x00012000  4  0x000000000000000f 0x000000000000000a    0x497052000 port1  NO
+   31 0x00012008  4  0x000000000000000f 0x000000000000000a    0x497052008 port1  NO
+   32 0x0001200c  4  0x000000000000000f 0x000000000000000a    0x49705200c port1  NO
+   33 0x00012010  4  0x000000000000000f 0x000000000000000a    0x497052010 port1  NO
+   34 0x00012014  4  0x000000000000000f 0x000000000000000a    0x497052014 port1  NO
+   35 0x00012038  4  0x000000000000ffff 0x0000000000000271    0x497052038 port1  NO
+   36 0x00012040  4  0x0000000000000800 0x0000000000000000    0x497052040 port1  NO
+   37 0x0001204c  4  0x0000000000003fff 0x0000000000000bff    0x49705204c port1  NO
+   38 0x00012050  4  0x0000000000000001 0x0000000000000001    0x497052050 port1  NO
+   39 0x00012068  4  0x0000000000000007 0x0000000000000001    0x497052068 port1  NO
+   40 0x00012070  4  0x00000000fff038e0 0x0000000055b00820    0x497052070 port1  NO
+   41 0x00012084  4  0x00000000ffffffff 0x000000003e8f4240    0x497052084 port1  NO
+   42 0x00012088  4  0x0000000000000fff 0x0000000000000fff    0x497052088 port1  NO
+   43 0x0001209c  4  0x000000000fc00000 0x0000000005400000    0x49705209c port1  NO
+   44 0x000120b8  4  0x00000000ff03e000 0x00000000aa03e000    0x4970520b8 port1  NO
+   45 0x000120bc  4  0x0000000000060fff 0x0000000000040faa    0x4970520bc port1  NO
+   46 0x000120c0  4  0x000000003ff80000 0x0000000014500000    0x4970520c0 port1  NO
+   47 0x000120c4  4  0x000000000000ffff 0x0000000000007777    0x4970520c4 port1  NO
+   48 0x000120e0  4  0x0000000018000000 0x0000000008000000    0x4970520e0 port1  NO
+   49 0x000120e8  4  0x00000000001ff000 0x0000000000002000    0x4970520e8 port1  NO
+   50 0x0001210c  4  0x000000003fffffff 0x00000000000f4240    0x49705210c port1  NO
+   51 0x0001211c  4  0x0000000000040000 0x0000000000040000    0x49705211c port1  NO
+   52 0x00012178  4  0x0000000003f00000 0x0000000000300000    0x497052178 port1  NO
+   53 0x000121b0  4  0x00000000ffffffff 0x0000000000098924    0x4970521b0 port1  NO
+   54 0x000121b4  4  0x000000000003ff00 0x0000000000001500    0x4970521b4 port1  NO
+   55 0x000121b8  4  0x00000000ffffffff 0x0000000000098924    0x4970521b8 port1  NO
+   56 0x000121bc  4  0x000000000003ff00 0x0000000000001500    0x4970521bc port1  NO
+   57 0x000121c4  4  0x0000000000000001 0x0000000000000001    0x4970521c4 port1  NO
+   58 0x000121cc  4  0x0000000000000001 0x0000000000000001    0x4970521cc port1  NO
+   59 0x000121e8  4  0x000000000000000f 0x0000000000000000    0x4970521e8 port1  NO
+   60 0x0001a000  4  0x000000000000000f 0x000000000000000a    0x49705a000 port2  yes
+   61 0x0001a008  4  0x000000000000000f 0x000000000000000a    0x49705a008 port2  yes
+   62 0x0001a00c  4  0x000000000000000f 0x000000000000000a    0x49705a00c port2  yes
+   63 0x0001a010  4  0x000000000000000f 0x000000000000000a    0x49705a010 port2  yes
+   64 0x0001a014  4  0x000000000000000f 0x000000000000000a    0x49705a014 port2  yes
+   65 0x0001a038  4  0x000000000000ffff 0x0000000000000271    0x49705a038 port2  yes
+   66 0x0001a040  4  0x0000000000000800 0x0000000000000000    0x49705a040 port2  yes
+   67 0x0001a04c  4  0x0000000000003fff 0x0000000000000bff    0x49705a04c port2  yes
+   68 0x0001a050  4  0x0000000000000001 0x0000000000000001    0x49705a050 port2  yes
+   69 0x0001a068  4  0x0000000000000007 0x0000000000000001    0x49705a068 port2  yes
+   70 0x0001a070  4  0x00000000fff038e0 0x0000000055b00820    0x49705a070 port2  yes
+   71 0x0001a084  4  0x00000000ffffffff 0x000000003e8f4240    0x49705a084 port2  yes
+   72 0x0001a088  4  0x0000000000000fff 0x0000000000000fff    0x49705a088 port2  yes
+   73 0x0001a09c  4  0x000000000fc00000 0x0000000005400000    0x49705a09c port2  yes
+   74 0x0001a0b8  4  0x00000000ff03e000 0x00000000aa03e000    0x49705a0b8 port2  yes
+   75 0x0001a0bc  4  0x0000000000060fff 0x0000000000040faa    0x49705a0bc port2  yes
+   76 0x0001a0c0  4  0x000000003ff80000 0x0000000014500000    0x49705a0c0 port2  yes
+   77 0x0001a0c4  4  0x000000000000ffff 0x0000000000007777    0x49705a0c4 port2  yes
+   78 0x0001a0e0  4  0x0000000018000000 0x0000000008000000    0x49705a0e0 port2  yes
+   79 0x0001a0e8  4  0x00000000001ff000 0x0000000000002000    0x49705a0e8 port2  yes
+   80 0x0001a10c  4  0x000000003fffffff 0x00000000000f4240    0x49705a10c port2  yes
+   81 0x0001a11c  4  0x0000000000040000 0x0000000000040000    0x49705a11c port2  yes
+   82 0x0001a178  4  0x0000000003f00000 0x0000000000300000    0x49705a178 port2  yes
+   83 0x0001a1b4  4  0x000000000003ff00 0x0000000000001500    0x49705a1b4 port2  yes
+   84 0x0001a1bc  4  0x000000000003ff00 0x0000000000001500    0x49705a1bc port2  yes
+   85 0x0001a1c4  4  0x0000000000000001 0x0000000000000001    0x49705a1c4 port2  yes
+   86 0x0001a1cc  4  0x0000000000000001 0x0000000000000001    0x49705a1cc port2  yes
+   87 0x0001a1e8  4  0x000000000000000f 0x0000000000000000    0x49705a1e8 port2  yes
+   88 0x0001a1b0  4  0x00000000ffffffff 0x0000000000098924    0x49705a1b0 port2  yes
+   89 0x0001a1b8  4  0x00000000ffffffff 0x0000000000098924    0x49705a1b8 port2  yes
+   90 0x0001a1a4  4  0x0000000000000001 0x0000000000000001    0x49705a1a4 port2  yes
+   91 0x0001a1b0  4  0x00000000ffffffff 0x0000000000000000    0x49705a1b0 port2  yes
+   92 0x0001a1b8  4  0x00000000ffffffff 0x0000000000000000    0x49705a1b8 port2  yes
+   93 0x0000b02c  4  0x0000000000100000 0x0000000000100000    0x49704b02c port0  yes
+   94 0x0000b070  4  0x0000000000000030 0x0000000000000020    0x49704b070 port0  yes
+   95 0x0001302c  4  0x0000000000100000 0x0000000000100000    0x49705302c port1  NO
+   96 0x00013070  4  0x0000000000000030 0x0000000000000020    0x497053070 port1  NO
+   97 0x0001b02c  4  0x0000000000100000 0x0000000000100000    0x49705b02c port2  yes
+   98 0x0001b070  4  0x0000000000000030 0x0000000000000020    0x49705b070 port2  yes
+   99 0x00009000  4  0x0000000040000000 0x0000000000000000    0x497049000 port0  yes
+  100 0x00009008  4  0x0000000000000010 0x0000000000000000    0x497049008 port0  yes
+  101 0x0000903c  4  0x0000000001800000 0x0000000001800000    0x49704903c port0  yes
+  102 0x000090d8  4  0x0000000000003fff 0x000000000000068d    0x4970490d8 port0  yes
+  103 0x000090dc  4  0x0000000000003fff 0x0000000000000408    0x4970490dc port0  yes
+  104 0x000091e0  4  0x0000000000000008 0x0000000000000008    0x4970491e0 port0  yes
+  105 0x00009280  4  0x0000000000f00000 0x0000000000c00000    0x497049280 port0  yes
+  106 0x0000928c  4  0x0000000000000003 0x0000000000000003    0x49704928c port0  yes
+  107 0x00011000  4  0x0000000040000000 0x0000000000000000    0x497051000 port1  NO
+  108 0x00011008  4  0x0000000000000010 0x0000000000000000    0x497051008 port1  NO
+  109 0x0001103c  4  0x0000000001800000 0x0000000001800000    0x49705103c port1  NO
+  110 0x000110d8  4  0x0000000000003fff 0x000000000000068d    0x4970510d8 port1  NO
+  111 0x000110dc  4  0x0000000000003fff 0x0000000000000408    0x4970510dc port1  NO
+  112 0x000111e0  4  0x0000000000000008 0x0000000000000008    0x4970511e0 port1  NO
+  113 0x00011280  4  0x0000000000f00000 0x0000000000c00000    0x497051280 port1  NO
+  114 0x00019000  4  0x0000000040000000 0x0000000000000000    0x497059000 port2  yes
+  115 0x00019008  4  0x0000000000000010 0x0000000000000000    0x497059008 port2  yes
+  116 0x0001903c  4  0x0000000001800000 0x0000000001800000    0x49705903c port2  yes
+  117 0x000190d8  4  0x0000000000003fff 0x000000000000068d    0x4970590d8 port2  yes
+  118 0x000190dc  4  0x0000000000003fff 0x0000000000000408    0x4970590dc port2  yes
+  119 0x000191e0  4  0x0000000000000008 0x0000000000000008    0x4970591e0 port2  yes
+  120 0x00019280  4  0x0000000000f00000 0x0000000000c00000    0x497059280 port2  yes
+  121 0x0001928c  4  0x0000000000000003 0x0000000000000003    0x49705928c port2  yes
+  122 0x0000d008  4  0x000000000000000c 0x000000000000000c    0x49704d008 port0  yes
+  123 0x0000d014  4  0x0000000000007efc 0x0000000000000408    0x49704d014 port0  yes
+  124 0x00015008  4  0x000000000000000c 0x000000000000000c    0x497055008 port1  NO
+  125 0x00015014  4  0x0000000000007efc 0x0000000000000408    0x497055014 port1  NO
+  126 0x0001d008  4  0x000000000000000c 0x000000000000000c    0x49705d008 port2  yes
+  127 0x0001d014  4  0x0000000000007efc 0x0000000000000408    0x49705d014 port2  yes
+  128 0x0000c01c  4  0x00000000000000e0 0x00000000000000a0    0x49704c01c port0  yes
+  129 0x0000c080  4  0x0000000060000000 0x0000000040000000    0x49704c080 port0  yes
+  130 0x0000c08c  4  0x00000000003f0000 0x00000000003e0000    0x49704c08c port0  yes
+  131 0x0000c0a0  4  0x0000000001f80000 0x0000000000380000    0x49704c0a0 port0  yes
+  132 0x0000c0ec  4  0x0000000000000001 0x0000000000000000    0x49704c0ec port0  yes
+  133 0x0001401c  4  0x00000000000000e0 0x00000000000000a0    0x49705401c port1  NO
+  134 0x00014080  4  0x0000000060000000 0x0000000040000000    0x497054080 port1  NO
+  135 0x0001408c  4  0x00000000003f0000 0x00000000003e0000    0x49705408c port1  NO
+  136 0x000140a0  4  0x0000000001f80000 0x0000000000380000    0x4970540a0 port1  NO
+  137 0x000140ec  4  0x0000000000000001 0x0000000000000000    0x4970540ec port1  NO
+  138 0x0001c01c  4  0x00000000000000e0 0x00000000000000a0    0x49705c01c port2  yes
+  139 0x0001c080  4  0x0000000060000000 0x0000000040000000    0x49705c080 port2  yes
+  140 0x0001c08c  4  0x00000000003f0000 0x00000000003e0000    0x49705c08c port2  yes
+  141 0x0001c0a0  4  0x0000000001f80000 0x0000000000380000    0x49705c0a0 port2  yes
+  142 0x0001c0ec  4  0x0000000000000001 0x0000000000000000    0x49705c0ec port2  yes
+  143 0x0000e404  4  0x0000000040000000 0x0000000040000000    0x49704e404 port0  yes
+  144 0x00016404  4  0x0000000040000000 0x0000000040000000    0x497056404 port1  NO
+  145 0x0001e404  4  0x0000000040000000 0x0000000040000000    0x49705e404 port2  yes
+  --- tally by slice ---
+    port0_active           48
+    port1_inactive         47
+    port2_active           51
+  --- offset ranges by slice ---
+    port0    0x00009000 .. 0x0000e404
+    port1    0x00011000 .. 0x00016404
+    port2    0x00019000 .. 0x0001e404
+
+=== port-1 wedge hypothesis ===
+first tunable entry targeting an INACTIVE port slice:
+  apcie-phy-ip-auspma-tunables entry #30: offset=0x12000 -> target_addr=0x497052000
+If m1n1's tunable applicator hits this address, the AXI
+write to an unpowered slave hangs the fabric silently.
+This matches the observed wedge in pcie_up_2.log.
+
+=== extra apcie tunables report (t8132-specific, from ADT, no MMIO) ===
+These are the two apcie-node tunable properties that
+m1n1's pcie.c does NOT apply on the T8140 codepath.
+They may be the missing PCIe clock/PLL setup that the
+phy_ip window needs before its MMIO becomes reachable.
+
+--- apcie-cio3pllcore-tunables (7 entries) ---
+  target inference: max_off=0x100 min_off=0x0 fits in rc_base (reg[1], size 0x4000)
+  --> reg_idx=1, base=0x494000000, size=0x4000
+
+  #  offset     sz  mask               value              -> target_addr    warning
+    0 0x00000000  4  0x0000000000000a0b 0x0000000000000a01    0x494000000  
+    1 0x00000024  4  0x0000000000000c00 0x0000000000000800    0x494000024  
+    2 0x00000028  4  0x0000000000000f00 0x0000000000000b00    0x494000028  
+    3 0x00000038  4  0x0000000000000020 0x0000000000000000    0x494000038  
+    4 0x0000004c  4  0x00000000000000ff 0x0000000000000094    0x49400004c  
+    5 0x000000e8  4  0x00000000000e0000 0x0000000000020000    0x4940000e8  
+    6 0x00000100  4  0x0000000000ffffff 0x00000000000b40b4    0x494000100  
+
+--- apcie-pcieclkgen-tunables (1 entries) ---
+  target inference: max_off=0x0 min_off=0x0 fits in rc_base (reg[1], size 0x4000)
+  --> reg_idx=1, base=0x494000000, size=0x4000
+
+  #  offset     sz  mask               value              -> target_addr    warning
+    0 0x00000000  4  0x00000000000003e0 0x0000000000000220    0x494000000  
+
+=== applied apcie tunables report (from ADT, no MMIO) ===
+These are the tunable properties m1n1 pcie.c DOES apply
+on the T8140 codepath. Listed so we can eyeball for
+any hidden clock-enable / PLL-config write in the
+phy_shared window that could be gating phy_ip.
+
+--- apcie-axi2af-tunables (58 entries) ---
+  target inference: max_off=0x20058 min_off=0x0 fits in phy_packed_base (reg[2], size 0x40000)
+  --> reg_idx=2, base=0x497000000, size=0x40000
+
+  #  offset     sz  mask               value              -> target_addr    note
+    0 0x00000000  4  0x00000000800000ff 0x000000008000001c    0x497000000  
+    1 0x00000004  4  0x0000000080ff00ff 0x00000000800c000d    0x497000004  
+    2 0x00000008  4  0x0000000080ff00ff 0x0000000080160003    0x497000008  
+    3 0x0000000c  4  0x0000000080ff00ff 0x00000000800c000d    0x49700000c  
+    4 0x00000010  4  0x0000000080ff00ff 0x00000000800c000d    0x497000010  
+    5 0x00000014  4  0x0000000080ff00ff 0x0000000080010003    0x497000014  
+    6 0x00000018  4  0x0000000080ff00ff 0x0000000080010003    0x497000018  
+    7 0x0000001c  4  0x00000000800000ff 0x000000008000000e    0x49700001c  
+    8 0x00000020  4  0x00000000800000ff 0x0000000080000024    0x497000020  
+    9 0x00000024  4  0x0000000080ff00ff 0x0000000080200008    0x497000024  
+   10 0x00000028  4  0x0000000080ff00ff 0x0000000080180010    0x497000028  
+   11 0x0000002c  4  0x0000000080ff00ff 0x0000000080200008    0x49700002c  
+   12 0x00000030  4  0x0000000080ff00ff 0x00000000800c0004    0x497000030  
+   13 0x00000034  4  0x0000000080ff00ff 0x0000000080080008    0x497000034  
+   14 0x00000038  4  0x00000000800000ff 0x0000000080000016    0x497000038  
+   15 0x0000003c  4  0x00000000800000ff 0x000000008000000c    0x49700003c  
+   16 0x00000040  4  0x00000000800000ff 0x000000008000000c    0x497000040  
+   17 0x00000100  4  0x00000000000000ff 0x00000000000000ff    0x497000100  
+   18 0x00000104  4  0x0000000000ff0000 0x0000000000010000    0x497000104  
+   19 0x00000108  4  0x00000000ffff0006 0x0000000000040000    0x497000108  
+   20 0x00000304  4  0x000000003f3f0000 0x0000000008080000    0x497000304  
+   21 0x00000314  4  0x0000000080000000 0x0000000080000000    0x497000314  
+   22 0x0000031c  4  0x0000000080000000 0x0000000080000000    0x49700031c  
+   23 0x00000324  4  0x0000000080000000 0x0000000080000000    0x497000324  
+   24 0x00000348  4  0x00000000ffffffff 0x000000000000ffff    0x497000348  
+   25 0x0000034c  4  0x00000000ffffffff 0x000000000000ffff    0x49700034c  
+   26 0x00000408  4  0x00000000ffff0020 0x00000000000d0020    0x497000408  
+   27 0x00000948  4  0x0000000007ff07ff 0x0000000000200000    0x497000948  
+   28 0x00000a48  4  0x0000000007ff07ff 0x0000000000080100    0x497000a48  
+   29 0x00000b48  4  0x0000000007ff07ff 0x0000000000600060    0x497000b48  
+   30 0x00000e00  4  0x00000000ffffffff 0x000000007fffffff    0x497000e00  
+   31 0x00000e04  4  0x0000000000000100 0x0000000000000100    0x497000e04  
+   32 0x00004008  4  0x0000000000000001 0x0000000000000001    0x497004008  phy_common region
+   33 0x0000400c  4  0x0000000000000001 0x0000000000000000    0x49700400c  phy_common region
+   34 0x00004014  4  0x0000000000000001 0x0000000000000000    0x497004014  phy_common region
+   35 0x00004018  4  0x0000000000000001 0x0000000000000000    0x497004018  phy_common region
+   36 0x0000401c  4  0x0000000000000001 0x0000000000000001    0x49700401c  phy_common region
+   37 0x00004020  4  0x00000000ffff0000 0x0000000000000000    0x497004020  phy_common region
+   38 0x00004024  4  0x00000000ffff0000 0x0000000000000000    0x497004024  phy_common region
+   39 0x00004028  4  0x00000000ffff0000 0x0000000000000000    0x497004028  phy_common region
+   40 0x0000402c  4  0x00000000ffff0000 0x0000000000000000    0x49700402c  phy_common region
+   41 0x00004030  4  0x00000000ffff0000 0x0000000000000000    0x497004030  phy_common region
+   42 0x00004034  4  0x00000000ffff0000 0x0000000000000000    0x497004034  phy_common region
+   43 0x000010f8  4  0x0000000000000001 0x0000000000000001    0x4970010f8  
+   44 0x000011f8  4  0x0000000000000001 0x0000000000000001    0x4970011f8  
+   45 0x000012f8  4  0x0000000000000001 0x0000000000000001    0x4970012f8  
+   46 0x000013f8  4  0x0000000000000001 0x0000000000000001    0x4970013f8  
+   47 0x000014f8  4  0x0000000000000001 0x0000000000000001    0x4970014f8  
+   48 0x000010fc  4  0x0000000000000001 0x0000000000000001    0x4970010fc  
+   49 0x000011fc  4  0x0000000000000001 0x0000000000000001    0x4970011fc  
+   50 0x000012fc  4  0x0000000000000001 0x0000000000000001    0x4970012fc  
+   51 0x000013fc  4  0x0000000000000001 0x0000000000000001    0x4970013fc  
+   52 0x000014fc  4  0x0000000000000001 0x0000000000000001    0x4970014fc  
+   53 0x00020028  4  0x000000000000fe2f 0x0000000000000000    0x497020028  
+   54 0x0002002c  4  0x0000000000000007 0x0000000000000000    0x49702002c  
+   55 0x00020030  4  0x000000000000007f 0x0000000000000000    0x497020030  
+   56 0x00020034  4  0x00000000000000ff 0x0000000000000000    0x497020034  
+   57 0x00020058  4  0x000000000000010b 0x0000000000000000    0x497020058  
+
+--- apcie-common-tunables (0 entries) ---
+  (property missing from ADT)
+
+--- apcie-phy-tunables (10 entries) ---
+  target inference: max_off=0x28014 min_off=0x8000 fits in phy_packed_base (reg[2], size 0x40000)
+  --> reg_idx=2, base=0x497000000, size=0x40000
+
+  #  offset     sz  mask               value              -> target_addr    note
+    0 0x00008000  4  0x0000000004000000 0x0000000000000000    0x497008000  phy_shared region
+    1 0x00020000  4  0x0000000010000000 0x0000000000000000    0x497020000  
+    2 0x00020010  4  0x00000000000ffc00 0x0000000000010000    0x497020010  
+    3 0x00020014  4  0x000000003ff00000 0x0000000004000000    0x497020014  
+    4 0x00024000  4  0x0000000010000000 0x0000000000000000    0x497024000  
+    5 0x00024010  4  0x00000000000ffc00 0x0000000000010000    0x497024010  
+    6 0x00024014  4  0x000000003ff00000 0x0000000004000000    0x497024014  
+    7 0x00028000  4  0x0000000010000000 0x0000000000000000    0x497028000  
+    8 0x00028010  4  0x00000000000ffc00 0x0000000000010000    0x497028010  
+    9 0x00028014  4  0x000000003ff00000 0x0000000004000000    0x497028014  
+
+NIC GPIO pins: PERSTN=gpio0[165] CLKREQ=gpio0[162]
+
+SMC smc_addr = 0x38c600000
+gP0d <- 0x800001  (apcie power)
+gP1a <- 1         (apcie-ge power)
+=== CLKREQ periph mux (gpio0 pin 162, ADT alt-func 2) ===
+gpio0[162] @ 0x39a000288: 0x00074a10 -> 0x00074a50 (read-back 0x00074a50) [periph func 2]
+
+=== PERSTN deassert (gpio0 pin 165) ===
+gpio0 probe: read32(0x39a000000) = 0x008742c0
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a02 (read-back 0x00074a02)
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a03 (read-back 0x00074a03)
+settled 100 ms after deassert
+
+=== Phase 0: PMGR gate state (no apcie MMIO) ===
+apcie.power_gates from ADT: [379, 380, 381, 382, 383, 151]
+
+  gate  379 name='ANS-V'                  VIRTUAL (no PS reg, flags.on=False)
+  gate  380 name='APCIE-GP-V'             VIRTUAL (no PS reg, flags.on=False)
+  gate  381 name='APCIE-SYS-GP-V'         VIRTUAL (no PS reg, flags.on=False)
+  gate  382 name='APCIE-ST-V'             VIRTUAL (no PS reg, flags.on=False)
+  gate  383 name='APCIE-SYS-ST-V'         VIRTUAL (no PS reg, flags.on=False)
+  gate  151 name='APCIE_PHY_SW'           ps@0x380700550 = 0x1400024f (target=0xf, actual=0x4, OFF; auto_enable ps_auto=0x4, was_clkgated)
+
+=== Phase 0.5: PMGR parent-chain readout ===
+  --- gate 379 ('ANS-V') parent chain ---
+    gate  148 name='ANS'                    ps@0x380700538 = 0x0f0020ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+      gate  134 name='AFISOCNI4'              VIRTUAL (no PS reg, flags.on=False)
+        gate   32 name='PIOGW'                  VIRTUAL (no PS reg, flags.on=False)
+        gate   34 name='AFINS3'                 VIRTUAL (no PS reg, flags.on=False)
+          gate   33 name='AFINS1'                 VIRTUAL (no PS reg, flags.on=False)
+  --- gate 380 ('APCIE-GP-V') parent chain ---
+    gate  135 name='APCIE_GP'               ps@0x3807004d0 = 0x000000ff (target=0xf, actual=0xf, ON; -)
+      gate  134 name='AFISOCNI4'              VIRTUAL (no PS reg, flags.on=False)
+        gate   32 name='PIOGW'                  VIRTUAL (no PS reg, flags.on=False)
+        gate   34 name='AFINS3'                 VIRTUAL (no PS reg, flags.on=False)
+          gate   33 name='AFINS1'                 VIRTUAL (no PS reg, flags.on=False)
+  --- gate 381 ('APCIE-SYS-GP-V') parent chain ---
+    gate  136 name='APCIE_SYS_GP'           ps@0x3807004d8 = 0x1f0020ff (target=0xf, actual=0xf, ON; auto_enable ps_auto=0xf)
+      gate  135 name='APCIE_GP'               ps@0x3807004d0 = 0x000000ff (target=0xf, actual=0xf, ON; -)
+        gate  134 name='AFISOCNI4'              VIRTUAL (no PS reg, flags.on=False)
+          gate   32 name='PIOGW'                  VIRTUAL (no PS reg, flags.on=False)
+          gate   34 name='AFINS3'                 VIRTUAL (no PS reg, flags.on=False)
+            gate   33 name='AFINS1'                 VIRTUAL (no PS reg, flags.on=False)
+  --- gate 382 ('APCIE-ST-V') parent chain ---
+    gate  149 name='APCIE_ST'               ps@0x380700540 = 0x000002ff (target=0xf, actual=0xf, ON; was_clkgated)
+      gate  148 name='ANS'                    ps@0x380700538 = 0x0f0020ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+        gate  134 name='AFISOCNI4'              VIRTUAL (no PS reg, flags.on=False)
+          gate   32 name='PIOGW'                  VIRTUAL (no PS reg, flags.on=False)
+          gate   34 name='AFINS3'                 VIRTUAL (no PS reg, flags.on=False)
+            gate   33 name='AFINS1'                 VIRTUAL (no PS reg, flags.on=False)
+  --- gate 383 ('APCIE-SYS-ST-V') parent chain ---
+    gate  150 name='APCIE_SYS_ST'           ps@0x380700548 = 0x1000030f (target=0xf, actual=0x0, OFF; auto_enable ps_auto=0x0, was_pwrgated, was_clkgated)
+      gate  148 name='ANS'                    ps@0x380700538 = 0x0f0020ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+        gate  134 name='AFISOCNI4'              VIRTUAL (no PS reg, flags.on=False)
+          gate   32 name='PIOGW'                  VIRTUAL (no PS reg, flags.on=False)
+          gate   34 name='AFINS3'                 VIRTUAL (no PS reg, flags.on=False)
+            gate   33 name='AFINS1'                 VIRTUAL (no PS reg, flags.on=False)
+      gate  149 name='APCIE_ST'               ps@0x380700540 = 0x000002ff (target=0xf, actual=0xf, ON; was_clkgated)
+        parent 148: <cycle -- already visited>
+  --- gate 151 ('APCIE_PHY_SW') parent chain ---
+    gate  150 name='APCIE_SYS_ST'           ps@0x380700548 = 0x1000030f (target=0xf, actual=0x0, OFF; auto_enable ps_auto=0x0, was_pwrgated, was_clkgated)
+      gate  148 name='ANS'                    ps@0x380700538 = 0x0f0020ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+        gate  134 name='AFISOCNI4'              VIRTUAL (no PS reg, flags.on=False)
+          gate   32 name='PIOGW'                  VIRTUAL (no PS reg, flags.on=False)
+          gate   34 name='AFINS3'                 VIRTUAL (no PS reg, flags.on=False)
+            gate   33 name='AFINS1'                 VIRTUAL (no PS reg, flags.on=False)
+      gate  149 name='APCIE_ST'               ps@0x380700540 = 0x000002ff (target=0xf, actual=0xf, ON; was_clkgated)
+        parent 148: <cycle -- already visited>
+    gate  136 name='APCIE_SYS_GP'           ps@0x3807004d8 = 0x1f0020ff (target=0xf, actual=0xf, ON; auto_enable ps_auto=0xf)
+      gate  135 name='APCIE_GP'               ps@0x3807004d0 = 0x000000ff (target=0xf, actual=0xf, ON; -)
+        parent 134: <cycle -- already visited>
+
+=== Phase A: pre-PMGR reachability inference (no MMIO) ===
+  shared apcie MMIO blocks (all behind the apcie power_gates as a set):
+    rc_base          0x494000000  size 0x4000
+    phy_common_base  0x497004000  size 0x40000
+    phy_ip_base      0x497040000  size 0x20000
+    axi_base         0x496000000  size 0x1000000
+
+  gate summary from Phase 0:
+    gate  379 name='ANS-V'                  VIRTUAL (flags.on=False)
+    gate  380 name='APCIE-GP-V'             VIRTUAL (flags.on=False)
+    gate  381 name='APCIE-SYS-GP-V'         VIRTUAL (flags.on=False)
+    gate  382 name='APCIE-ST-V'             VIRTUAL (flags.on=False)
+    gate  383 name='APCIE-SYS-ST-V'         VIRTUAL (flags.on=False)
+    gate  151 name='APCIE_PHY_SW'           OFF (target=0xf, actual=0x4)
+
+  --> the following real apcie gates are not ACTIVE; ANY read into their MMIO would SYNC-abort and wedge m1n1:
+      gate 151 (APCIE_PHY_SW) target=0xf actual=0x4
+      Skipping pre-PMGR MMIO. Phase B will call p.pmgr_adt_power_enable('/arm-io/apcie') first, then read.
+
+
+=== setup_refclk (apple_pcie_setup_refclk analog, refclk_cgen=False) ===
+
+--- port0 refclk (phy_base=0x497020000) ---
+  port0 PHY_LANE_CFG (pre-refclk) @ 0x497020000 = 0x33000070
+  port0 LINKSTS (pre-refclk) @ 0x490028208 = 0x8300020c
+  port0 pre-refclk             LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+    set32(phy+0x000, 0x1) [REFCLK0REQ]
+    REFCLK0ACK asserted (phy+0x000=0x33000075)
+    set32(phy+0x000, 0x2) [REFCLK1REQ]
+    REFCLK1ACK asserted (phy+0x000=0x3300007f)
+    set32(phy+0x000, 0x600) [REFCLKEN]
+  port0 PHY_LANE_CFG (post-refclk) @ 0x497020000 = 0x3300067f
+  port0 LINKSTS (post-refclk) @ 0x490028208 = 0x8300020c
+  port0 post-refclk            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+--- port2 refclk (phy_base=0x497028000) ---
+  port2 PHY_LANE_CFG (pre-refclk) @ 0x497028000 = 0x33000070
+  port2 LINKSTS (pre-refclk) @ 0x492028208 = 0x83000204
+  port2 pre-refclk             LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+    set32(phy+0x000, 0x1) [REFCLK0REQ]
+    REFCLK0ACK asserted (phy+0x000=0x33000075)
+    set32(phy+0x000, 0x2) [REFCLK1REQ]
+    REFCLK1ACK asserted (phy+0x000=0x3300007f)
+    set32(phy+0x000, 0x600) [REFCLKEN]
+  port2 PHY_LANE_CFG (post-refclk) @ 0x497028000 = 0x3300067f
+  port2 LINKSTS (post-refclk) @ 0x492028208 = 0x83000204
+  port2 post-refclk            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+[guard] setup_refclk(pre): exc_count delta = 0 (before=0, after=0)
+
+p.pcie_init() -> 0
+
+=== PCIe controller register dump (post-init-early, tier=1) ===
+  rc_base + 0x03c            @ 0x49400003c = 0x00000000
+
+--- port0 (T1) port_base=0x490028000 ---
+  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100001
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
+  port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
+  port0 +0x010               @ 0x490028010 = 0x00000000
+  port0 +0x088               @ 0x490028088 = 0x00000000
+  port0 +0x100               @ 0x490028100 = 0x00000000
+  port0 +0x104               @ 0x490028104 = 0xfffffff0
+  port0 +0x124               @ 0x490028124 = 0x00000100
+  port0 +0x140               @ 0x490028140 = 0x00000011
+  port0 +0x144               @ 0x490028144 = 0x00253770
+  port0 +0x148               @ 0x490028148 = 0x00000000
+  port0 +0x210               @ 0x490028210 = 0x00000000
+  port0 +0x808               @ 0x490028808 = 0x001000ff
+  port0 +0x397c (T602X only) @ 0x49002b97c = 0x00000000
+
+--- port2 (T1) port_base=0x492028000 ---
+  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100001
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
+  port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
+  port2 +0x010               @ 0x492028010 = 0x00000000
+  port2 +0x088               @ 0x492028088 = 0x00000000
+  port2 +0x100               @ 0x492028100 = 0x00000000
+  port2 +0x104               @ 0x492028104 = 0xfffffff0
+  port2 +0x124               @ 0x492028124 = 0x00000100
+  port2 +0x140               @ 0x492028140 = 0x00000011
+  port2 +0x144               @ 0x492028144 = 0x00253770
+  port2 +0x148               @ 0x492028148 = 0x00000000
+  port2 +0x210               @ 0x492028210 = 0x00000000
+  port2 +0x808               @ 0x492028808 = 0x001000ff
+  port2 +0x397c (T602X only) @ 0x49202b97c = 0x00000000
+[guard] dump_pcie_regs(post-init-early): exc_count delta = 0 (before=0, after=0)
+
+=== setup_refclk (apple_pcie_setup_refclk analog, refclk_cgen=False) ===
+
+--- port0 refclk (phy_base=0x497020000) ---
+  port0 PHY_LANE_CFG (pre-refclk) @ 0x497020000 = 0x2300066f
+  port0 LINKSTS (pre-refclk) @ 0x490028208 = 0x8300020c
+  port0 pre-refclk             LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+    set32(phy+0x000, 0x1) [REFCLK0REQ]
+    REFCLK0ACK asserted (phy+0x000=0x2300066f)
+    set32(phy+0x000, 0x2) [REFCLK1REQ]
+    REFCLK1ACK asserted (phy+0x000=0x2300066f)
+    set32(phy+0x000, 0x600) [REFCLKEN]
+  port0 PHY_LANE_CFG (post-refclk) @ 0x497020000 = 0x2300066f
+  port0 LINKSTS (post-refclk) @ 0x490028208 = 0x8300020c
+  port0 post-refclk            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+--- port2 refclk (phy_base=0x497028000) ---
+  port2 PHY_LANE_CFG (pre-refclk) @ 0x497028000 = 0x2300066f
+  port2 LINKSTS (pre-refclk) @ 0x492028208 = 0x83000204
+  port2 pre-refclk             LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+    set32(phy+0x000, 0x1) [REFCLK0REQ]
+    REFCLK0ACK asserted (phy+0x000=0x2300066f)
+    set32(phy+0x000, 0x2) [REFCLK1REQ]
+    REFCLK1ACK asserted (phy+0x000=0x2300066f)
+    set32(phy+0x000, 0x600) [REFCLKEN]
+  port2 PHY_LANE_CFG (post-refclk) @ 0x497028000 = 0x2300066f
+  port2 LINKSTS (post-refclk) @ 0x492028208 = 0x83000204
+  port2 post-refclk            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+[guard] setup_refclk(post): exc_count delta = 0 (before=0, after=0)
+=== post-init LINKSTS watch (5 s per active port) ===
+  port0: LINKSTS=0x8300020c [BUSY|bit3|bit9|bit24|bit25|bit31] at +0.00s
+  port0: still BUSY after 5 s (LINKSTS=0x8300020c)
+  port2: LINKSTS=0x83000204 [BUSY|bit9|bit24|bit25|bit31] at +0.00s
+  port2: still BUSY after 5 s (LINKSTS=0x83000204)
+
+=== endpoint diagnostics (read-only) ===
+  SMC gP0d = 0x0 (want 0x800001) [MISMATCH]
+  SMC gP1a = 0x0 (want 0x1) [MISMATCH]
+  --- LINKSTS bit3 delta ---
+  port0 LINKSTS              @ 0x490028208 = 0x8300020c
+  port0: LINKSTS=0x8300020c [BUSY|bit3|bit9|bit24|bit25|bit31] bit3=set
+  port2 LINKSTS              @ 0x492028208 = 0x83000204
+  port2: LINKSTS=0x83000204 [BUSY|bit9|bit24|bit25|bit31] bit3=clear
+  NIC bridge: no MAC property found
+[guard] endpoint_diag: exc_count delta = 0 (before=0, after=0)
+=== PCIe controller register dump (post-init, tier=3) ===
+  rc_base + 0x03c            @ 0x49400003c = 0x00000000
+
+--- port0 (T1) port_base=0x490028000 ---
+  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100001
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
+  port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
+  port0 +0x010               @ 0x490028010 = 0x00000000
+  port0 +0x088               @ 0x490028088 = 0x00000000
+  port0 +0x100               @ 0x490028100 = 0x00000000
+  port0 +0x104               @ 0x490028104 = 0xfffffff0
+  port0 +0x124               @ 0x490028124 = 0x00000100
+  port0 +0x140               @ 0x490028140 = 0x00000011
+  port0 +0x144               @ 0x490028144 = 0x00253770
+  port0 +0x148               @ 0x490028148 = 0x00000000
+  port0 +0x210               @ 0x490028210 = 0x00000000
+  port0 +0x808               @ 0x490028808 = 0x001000ff
+  port0 +0x397c (T602X only) @ 0x49002b97c = 0x00000000
+
+--- port2 (T1) port_base=0x492028000 ---
+  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100001
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
+  port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
+  port2 +0x010               @ 0x492028010 = 0x00000000
+  port2 +0x088               @ 0x492028088 = 0x00000000
+  port2 +0x100               @ 0x492028100 = 0x00000000
+  port2 +0x104               @ 0x492028104 = 0xfffffff0
+  port2 +0x124               @ 0x492028124 = 0x00000100
+  port2 +0x140               @ 0x492028140 = 0x00000011
+  port2 +0x144               @ 0x492028144 = 0x00253770
+  port2 +0x148               @ 0x492028148 = 0x00000000
+  port2 +0x210               @ 0x492028210 = 0x00000000
+  port2 +0x808               @ 0x492028808 = 0x001000ff
+  port2 +0x397c (T602X only) @ 0x49202b97c = 0x00000000
+
+=== Tier 2 (--tier2) ===
+  PHYCMN_CLK (phy_common+0x000) @ 0x497004000 = 0x80300001
+  PHYIF_CTRL (rc_base+0x024) @ 0x494000024 = 0x00000000
+
+--- port0 (T2) phy_base=0x497020000 ---
+  port0 PHY_CTRL (+0x000)    @ 0x497020000 = 0x2300066f
+  port0 PHY      (+0x004)    @ 0x497020004 = 0x00000030
+
+--- port2 (T2) phy_base=0x497028000 ---
+  port2 PHY_CTRL (+0x000)    @ 0x497028000 = 0x2300066f
+  port2 PHY      (+0x004)    @ 0x497028004 = 0x00000030
+
+=== Tier 3 (--tier3, DANGEROUS) ===
+
+=== Tier 3a SKIPPED: Phase F shared init not up (phaseF_shared_up=False); phy_ip reads would wedge m1n1 -- RUN 15 lesson ===
+
+--- port0 (T3) ltssm=0x49003c000 phy_extra=0x497048000 ctrl_lo=0x490000000 ---
+  port0 LTSSM +0x10          @ 0x49003c010 = 0x00000002
+  port0 LTSSM +0x14          @ 0x49003c014 = 0x00000000
+  port0 LTSSM +0x1c          @ 0x49003c01c = 0x00000004
+  port0 LTSSM +0x20          @ 0x49003c020 = 0x00000002
+  port0 phy_extra/ctrl_lo SKIPPED (would AXI-stall -- RUN 18 lesson; pass --tier3-phyextra to force)
+
+--- port2 (T3) ltssm=0x49203c000 phy_extra=0x497058000 ctrl_lo=0x492000000 ---
+  port2 LTSSM +0x10          @ 0x49203c010 = 0x00000002
+  port2 LTSSM +0x14          @ 0x49203c014 = 0x00000000
+  port2 LTSSM +0x1c          @ 0x49203c01c = 0x00000004
+  port2 LTSSM +0x20          @ 0x49203c020 = 0x00000002
+  port2 phy_extra/ctrl_lo SKIPPED (would AXI-stall -- RUN 18 lesson; pass --tier3-phyextra to force)
+[guard] dump_pcie_regs(post-init): exc_count delta = 0 (before=0, after=0)
+
+=== LTSSM kick experiment (post-init) ===
+
+--- port0 @ port_base=0x490028000 ltssm=0x49003c000 ---
+  port0 LINKSTS (baseline)   @ 0x490028208 = 0x8300020c
+  port0 baseline               LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  rc_base+0x3c (seq A pre)   @ 0x49400003c = 0x00000000
+  seq A: set32(rc_base+0x3c, 0x1)  # 0x49400003c
+  rc_base+0x3c (seq A post-set) @ 0x49400003c = 0x00000000
+  port0 +0x10 (seq A pre)    @ 0x490028010 = 0x00000000
+  seq A: write32(port_base+0x10, 0x2)
+  port0 +0x10 (seq A post)   @ 0x490028010 = 0x00000000
+  port0 LINKSTS (after seq A) @ 0x490028208 = 0x8300020c
+  port0 after seq A            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  seq B: skipped (--ltssm-kick-aggressive to enable; writes ltssm_base which may AXI-stall)
+  seq C: clear+set T602X_RESET (port_base+0x82c)
+  port0 LINKSTS (after seq C) @ 0x490028208 = 0x8300020c
+  port0 after seq C            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (after 200ms settle) @ 0x490028208 = 0x8300020c
+  port0 after 200ms settle     LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+
+--- port2 @ port_base=0x492028000 ltssm=0x49203c000 ---
+  port2 LINKSTS (baseline)   @ 0x492028208 = 0x83000204
+  port2 baseline               LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  rc_base+0x3c (seq A pre)   @ 0x49400003c = 0x00000000
+  seq A: set32(rc_base+0x3c, 0x1)  # 0x49400003c
+  rc_base+0x3c (seq A post-set) @ 0x49400003c = 0x00000000
+  port2 +0x10 (seq A pre)    @ 0x492028010 = 0x00000000
+  seq A: write32(port_base+0x10, 0x2)
+  port2 +0x10 (seq A post)   @ 0x492028010 = 0x00000000
+  port2 LINKSTS (after seq A) @ 0x492028208 = 0x83000204
+  port2 after seq A            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  seq B: skipped (--ltssm-kick-aggressive to enable; writes ltssm_base which may AXI-stall)
+  seq C: clear+set T602X_RESET (port_base+0x82c)
+  port2 LINKSTS (after seq C) @ 0x492028208 = 0x83000204
+  port2 after seq C            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (after 200ms settle) @ 0x492028208 = 0x83000204
+  port2 after 200ms settle     LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+[guard] try_ltssm_kick: exc_count delta = 0 (before=0, after=0)
+=== PCIe controller register dump (post-kick, tier=3) ===
+  rc_base + 0x03c            @ 0x49400003c = 0x00000000
+
+--- port0 (T1) port_base=0x490028000 ---
+  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100001
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
+  port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
+  port0 +0x010               @ 0x490028010 = 0x00000000
+  port0 +0x088               @ 0x490028088 = 0x00000000
+  port0 +0x100               @ 0x490028100 = 0x00000000
+  port0 +0x104               @ 0x490028104 = 0xfffffff0
+  port0 +0x124               @ 0x490028124 = 0x00000100
+  port0 +0x140               @ 0x490028140 = 0x00000011
+  port0 +0x144               @ 0x490028144 = 0x00253770
+  port0 +0x148               @ 0x490028148 = 0x00000000
+  port0 +0x210               @ 0x490028210 = 0x00000000
+  port0 +0x808               @ 0x490028808 = 0x001000ff
+  port0 +0x397c (T602X only) @ 0x49002b97c = 0x00000000
+
+--- port2 (T1) port_base=0x492028000 ---
+  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100001
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
+  port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
+  port2 +0x010               @ 0x492028010 = 0x00000000
+  port2 +0x088               @ 0x492028088 = 0x00000000
+  port2 +0x100               @ 0x492028100 = 0x00000000
+  port2 +0x104               @ 0x492028104 = 0xfffffff0
+  port2 +0x124               @ 0x492028124 = 0x00000100
+  port2 +0x140               @ 0x492028140 = 0x00000011
+  port2 +0x144               @ 0x492028144 = 0x00253770
+  port2 +0x148               @ 0x492028148 = 0x00000000
+  port2 +0x210               @ 0x492028210 = 0x00000000
+  port2 +0x808               @ 0x492028808 = 0x001000ff
+  port2 +0x397c (T602X only) @ 0x49202b97c = 0x00000000
+
+=== Tier 2 (--tier2) ===
+  PHYCMN_CLK (phy_common+0x000) @ 0x497004000 = 0x80300001
+  PHYIF_CTRL (rc_base+0x024) @ 0x494000024 = 0x00000000
+
+--- port0 (T2) phy_base=0x497020000 ---
+  port0 PHY_CTRL (+0x000)    @ 0x497020000 = 0x2300066f
+  port0 PHY      (+0x004)    @ 0x497020004 = 0x00000030
+
+--- port2 (T2) phy_base=0x497028000 ---
+  port2 PHY_CTRL (+0x000)    @ 0x497028000 = 0x2300066f
+  port2 PHY      (+0x004)    @ 0x497028004 = 0x00000030
+
+=== Tier 3 (--tier3, DANGEROUS) ===
+
+=== Tier 3a SKIPPED: Phase F shared init not up (phaseF_shared_up=False); phy_ip reads would wedge m1n1 -- RUN 15 lesson ===
+
+--- port0 (T3) ltssm=0x49003c000 phy_extra=0x497048000 ctrl_lo=0x490000000 ---
+  port0 LTSSM +0x10          @ 0x49003c010 = 0x00000002
+  port0 LTSSM +0x14          @ 0x49003c014 = 0x00000000
+  port0 LTSSM +0x1c          @ 0x49003c01c = 0x00000004
+  port0 LTSSM +0x20          @ 0x49003c020 = 0x00000002
+  port0 phy_extra/ctrl_lo SKIPPED (would AXI-stall -- RUN 18 lesson; pass --tier3-phyextra to force)
+
+--- port2 (T3) ltssm=0x49203c000 phy_extra=0x497058000 ctrl_lo=0x492000000 ---
+  port2 LTSSM +0x10          @ 0x49203c010 = 0x00000002
+  port2 LTSSM +0x14          @ 0x49203c014 = 0x00000000
+  port2 LTSSM +0x1c          @ 0x49203c01c = 0x00000004
+  port2 LTSSM +0x20          @ 0x49203c020 = 0x00000002
+  port2 phy_extra/ctrl_lo SKIPPED (would AXI-stall -- RUN 18 lesson; pass --tier3-phyextra to force)
+[guard] dump_pcie_regs(post-kick): exc_count delta = 0 (before=0, after=0)
+=== ECAM walk ===
+ecam_base = 0x1cb0000000
+
+active ports: [0, 2]
+
+--- root bus 0 ---
+  00:00.0: vacant (VID:DID = 0xffffffff)
+  00:01.0: skipped (port 1 inactive)
+  00:02.0: vacant (VID:DID = 0xffffffff)
+[guard] ecam_walk: exc_count delta = 0 (before=0, after=0)
+
+=== enable NIC ===
+No class-0x02 device found.
+```
+[ahmed@admin AppleSiliconM4]$ 
+
