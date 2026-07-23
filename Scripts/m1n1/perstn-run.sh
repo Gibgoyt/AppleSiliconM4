@@ -1290,8 +1290,39 @@ case "${RUN^^}" in
                --perst-resequence
                --require-build=rc1-59-g)
         ;;
+    22)
+        # RUN 22: patched-m1n1 in-window T602X LTSSM enable. RUNs 18-21
+        # exhausted the no-reflash axis: the T602X-gated writes (rc_base+0x3c
+        # arm, port+0x10, ltssm+0x14 START) all refuse POST-init Python
+        # writes -- RUN 20/21 seq-A even tried set32(rc_base+0x3c,0x1) and it
+        # read back 0 (logs/21:720-721,738-739). They must run IN-WINDOW
+        # during pcie_init. This build (src/pcie.c patch) runs arm + port+0x10
+        # + the LTSSM kick (incl ltssm+0x14=START) + disarm on the t8132 path,
+        # with the kick placed BEFORE the idle poll so its continue can't skip
+        # it, and t8132 does not bail on the idle-poll timeout -- EXCLUDING the
+        # phy_ip/PHY_CTRL writes that SError on j773g. PCIE_BC breadcrumbs name
+        # any wedge line; watch the TTY console for the arm/ltssm+0x14 readback.
+        #
+        # REQUIRES the patched build enrolled: tag v1.6.0-rc1-60-g4b77755
+        # (guard --require-build=rc1-60-g -- the survivable 30-char USB window
+        # substring; the enrolled RUN18-21 build was rc1-59-g). --endpoint-diag
+        # (read-only) reports SMC power + MAC + LINKSTS bit3 delta.
+        #
+        # Matrix: arm reads back 0x1 in-window + ltssm+0x14=0x1 + BUSY clears
+        # -> LINK TRAINS -> ECAM finds the NIC. arm latches but BUSY persists
+        # -> kicked, no partner -> RUN 23 signal-integrity/longer wait. arm
+        # still 0 even in-window -> deeper analog/clock gate -> RUN 23
+        # cio3pllcore/pcieclkgen in-C. A PCIE_BC'd write wedges -> that line
+        # named -> exclude + re-bisect.
+        FLAGS=(--preinit-probe
+               --tier3
+               --clkreq-mode=periph
+               --setup-refclk=both
+               --endpoint-diag
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

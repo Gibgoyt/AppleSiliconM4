@@ -4773,6 +4773,70 @@ def perst_resequence(apcie, buf, perstn_pin, settle_ms=100, hold_ms=100,
             return
 
 
+# ---------------------------------------------------------------- endpoint diag
+
+def endpoint_diag(apcie, buf):
+    """RUN 22: read-only endpoint-presence / power diagnostics. Zero writes,
+    wedge-immune. Interprets a patched-m1n1 boot -- if the link still won't
+    train, this tells us whether the NIC is even present/powered.
+
+      1) SMC gP0d / gP1a readback (endpoint fabric power; expect 0x800001 / 1).
+      2) port0-vs-port2 LINKSTS bit3 delta (the one unexplained thread that
+         could indicate receiver-detect / endpoint presence).
+      3) the ADT-assigned MAC on the NIC bridge (weak endpoint-present hint).
+    """
+    buf.write("\n=== endpoint diagnostics (read-only) ===\n")
+    log("endpoint diagnostics (read-only)...")
+
+    # 1) SMC power keys. Reuse the SMCClient path from smc_power().
+    try:
+        smc_addr = u.adt["arm-io/smc"].get_reg(0)[0]
+        smc = SMCClient(u, smc_addr, None)
+        smc.start()
+        smc.start_ep(0x20)
+        for key, want in (("gP0d", 0x800001), ("gP1a", 1)):
+            try:
+                val = smc.smcep.read32(key)
+                ok = "OK" if val == want else "MISMATCH"
+                buf.write(f"  SMC {key} = 0x{val:x} (want 0x{want:x}) "
+                          f"[{ok}]\n")
+            except Exception as e:
+                buf.write(f"  SMC {key} read RAISED: "
+                          f"{e.__class__.__name__}: {e}\n")
+        smc.stop()
+    except Exception as e:
+        buf.write(f"  SMC diag failed: {e.__class__.__name__}: {e}\n")
+
+    # 2) LINKSTS bit3 delta across active ports (pure port_base reads).
+    buf.write("  --- LINKSTS bit3 delta ---\n")
+    for i in apcie.active_ports:
+        pb = apcie.ports[i].port_base
+        v = _read32_live(pb + 0x208, f"port{i} LINKSTS", buf)
+        if v is not None:
+            bit3 = "set" if (v & (1 << 3)) else "clear"
+            buf.write(f"  port{i}: LINKSTS=0x{v:08x} "
+                      f"[{_linksts_decode(v)}] bit3={bit3}\n")
+
+    # 3) NIC bridge assigned MAC (ADT-only, no MMIO).
+    try:
+        nic_port = apcie.nic_port()
+        bridge = getattr(nic_port, "bridge_path", None) if nic_port else None
+        if bridge:
+            node = u.adt[bridge.replace("/device-tree/", "")]
+            mac = None
+            for prop in ("mac-address-ethernet0", "local-mac-address",
+                         "mac-address"):
+                mac = getattr(node, prop, None)
+                if mac is not None:
+                    buf.write(f"  NIC {prop} = {mac!r} (endpoint assigned "
+                              f"a MAC -- present)\n")
+                    break
+            if mac is None:
+                buf.write("  NIC bridge: no MAC property found\n")
+    except Exception as e:
+        buf.write(f"  NIC MAC diag failed: {e.__class__.__name__}: {e}\n")
+
+
 # ---------------------------------------------------------------- refclk handshake
 
 # APCIE_PHY_LANE_CFG bits, from Linux pcie-apple.c (PHY window + 0x000).
@@ -5783,6 +5847,14 @@ def main():
                          "--perst-resequence, matching the ADT-declared "
                          "t-refclk-to-perst / perst-to-config = 100 "
                          "(default: 100).")
+    ap.add_argument("--endpoint-diag", action="store_true",
+                    help="RUN 22: read-only endpoint-presence / power "
+                         "diagnostics after pcie_init -- SMC gP0d/gP1a "
+                         "readback, the port0-vs-port2 LINKSTS bit3 delta, "
+                         "and the NIC bridge's ADT-assigned MAC. Zero "
+                         "writes, wedge-immune. Interprets a patched-m1n1 "
+                         "boot: if the link still won't train, tells us "
+                         "whether the NIC is even present/powered.")
     ap.add_argument("--tier3-phyextra", action="store_true",
                     help="RUN 19: re-enable the Tier-3 per-port "
                          "phy_extra/ctrl_lo probes. They AXI-stall and "
@@ -6277,6 +6349,14 @@ def main():
         # training converges late (endpoint slow out of reset).
         watch_linksts(apcie, buf, secs=5.0, label="post-init")
         flush("postinit-linksts-watch")
+
+        # RUN 22: read-only endpoint-presence / power diagnostics. Zero
+        # writes; interprets a patched-m1n1 boot (link trains vs still BUSY
+        # vs endpoint absent).
+        if args.endpoint_diag and liveness_gate("endpoint-diag"):
+            with guarded(buf, "endpoint_diag", short_timeout=timeout):
+                try_(lambda: endpoint_diag(apcie, buf), "endpoint_diag")
+            flush("endpoint-diag")
 
         # RUN 21: refclk-first PERST# re-sequence + LTSSM_START readback.
         # Runs after setup_refclk(post) + the post-init watch above, so
