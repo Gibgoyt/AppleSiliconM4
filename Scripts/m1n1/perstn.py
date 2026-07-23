@@ -282,6 +282,19 @@ def smc_power(buf):
     buf.write("gP0d <- 0x800001  (apcie power)\n")
     smc.smcep.write32("gP1a", 1)
     buf.write("gP1a <- 1         (apcie-ge power)\n")
+    # RUN 23: read the keys back IN THE SAME SESSION (before stop()). RUN 22's
+    # endpoint_diag read them in a fresh session post-stop() and got 0 --
+    # confounded. This tells us whether the writes stick vs whether gP0d/gP1a
+    # are write-triggered keys that read 0 by design.
+    for key, want in (("gP0d", 0x800001), ("gP1a", 1)):
+        try:
+            val = smc.smcep.read32(key)
+            ok = "OK" if val == want else "MISMATCH"
+            buf.write(f"gP{key[2:]} same-session readback = 0x{val:x} "
+                      f"(want 0x{want:x}) [{ok}]\n")
+        except Exception as e:
+            buf.write(f"{key} same-session read RAISED: "
+                      f"{e.__class__.__name__}: {e}\n")
     smc.stop()
 
 
@@ -4817,22 +4830,58 @@ def endpoint_diag(apcie, buf):
             buf.write(f"  port{i}: LINKSTS=0x{v:08x} "
                       f"[{_linksts_decode(v)}] bit3={bit3}\n")
 
-    # 3) NIC bridge assigned MAC (ADT-only, no MMIO).
+    # 2b) RC LTSSM-debug window (ltssm_base, reg 7/11/15 -- pcie.c:37/42/47).
+    # RUN 22 read these cleanly (no wedge). All-zero = RC link engine never
+    # started (RC-stuck-in-Detect); non-zero/changing = RC is cycling LTSSM
+    # states (training but the endpoint isn't answering). This is the
+    # RC-stuck vs endpoint-silent discriminator.
+    buf.write("  --- RC LTSSM-debug (ltssm_base +0x10/0x14/0x1c/0x20) ---\n")
+    for i in apcie.active_ports:
+        lt = apcie.ports[i].ltssm_base
+        vals = []
+        for off in (0x10, 0x14, 0x1c, 0x20):
+            v = _read32_live(lt + off, f"port{i} LTSSM +0x{off:02x}", buf)
+            vals.append(v)
+        allzero = all((v == 0) for v in vals if v is not None)
+        verdict = ("all-zero (RC link engine not started -- RC-stuck)"
+                   if allzero else "non-zero (RC LTSSM active -- check "
+                   "endpoint)")
+        buf.write(f"  port{i}: LTSSM-debug {verdict}\n")
+
+    # 3) NIC assigned MAC (ADT-only, no MMIO). The MAC is NOT on the bridge
+    # node -- it lives on the NIC child (lan-1gb) or the root /chosen. RUN 22
+    # searched only the bridge and found nothing; search the NIC node and its
+    # ancestors + /chosen.
     try:
         nic_port = apcie.nic_port()
         bridge = getattr(nic_port, "bridge_path", None) if nic_port else None
+        # nic_port is a PortMap (has bridge_path, not nic_path). The NIC child
+        # is lan-1gb under the bridge; the assigned MAC is also carried near
+        # the ADT root (m4_recon: mac-address-ethernet0 at the top node).
+        candidates = []
         if bridge:
-            node = u.adt[bridge.replace("/device-tree/", "")]
-            mac = None
+            b = bridge.replace("/device-tree/", "")
+            candidates += [f"{b}/lan-1gb", b]
+        candidates += ["chosen", ""]  # "" = ADT root
+        found = False
+        for pth in candidates:
+            try:
+                node = u.adt[pth] if pth else u.adt
+            except Exception:
+                continue
             for prop in ("mac-address-ethernet0", "local-mac-address",
                          "mac-address"):
                 mac = getattr(node, prop, None)
                 if mac is not None:
-                    buf.write(f"  NIC {prop} = {mac!r} (endpoint assigned "
-                              f"a MAC -- present)\n")
+                    loc = pth or "<adt-root>"
+                    buf.write(f"  NIC MAC {loc}:{prop} = {mac!r} "
+                              f"(endpoint provisioned -- present)\n")
+                    found = True
                     break
-            if mac is None:
-                buf.write("  NIC bridge: no MAC property found\n")
+            if found:
+                break
+        if not found:
+            buf.write("  NIC MAC: not found in lan-1gb/bridge/chosen/root\n")
     except Exception as e:
         buf.write(f"  NIC MAC diag failed: {e.__class__.__name__}: {e}\n")
 

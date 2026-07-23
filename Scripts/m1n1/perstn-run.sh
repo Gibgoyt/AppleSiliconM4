@@ -1321,8 +1321,34 @@ case "${RUN^^}" in
                --endpoint-diag
                --require-build=rc1-60-g)
         ;;
+    23)
+        # RUN 23: force APCIE_PHY_SW (gate 151) ACTIVE before pcie_init.
+        # RUN 22 ran the T602X arm/LTSSM writes in-window but they read back
+        # 0 -- and Phase 0 showed gate 151 (the t8132 PHY power switch, NOT
+        # always-on) + parent APCIE_SYS_ST OFF. RUNs 18-22 all dropped
+        # --gate-poke (Phase D), so the in-window arm may have run with the
+        # PHY switch powered off. Re-add it: Phase D forces gate 151 + parents
+        # ACTIVE (PMGR-only, wedge-safe) BEFORE pcie_init, so the patched
+        # build's in-window arm/kick run with the PHY domain up. No reflash --
+        # reuses the rc1-60-g build. --endpoint-diag now does a same-session
+        # SMC readback + LTSSM-debug decode. Phase E stays OFF (no phy_ip:
+        # --phy-ip-probe deliberately omitted).
+        #
+        # Matrix: with gate 151 ON, arm rc_base+0x3c reads back 0x1 /
+        # ltssm+0x14=0x1 / BUSY clears -> the PHY-switch power was the missing
+        # precondition -> link trains -> ECAM finds the NIC. Still 0 / BUSY ->
+        # gate 151 ruled out; RUN 24 = T602X pmgr posture (pmgr_adt_power_
+        # disable_index path,1 in-C, reflash) or the analog-PLL axis.
+        FLAGS=(--preinit-probe
+               --gate-poke
+               --tier3
+               --clkreq-mode=periph
+               --setup-refclk=both
+               --endpoint-diag
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23} [extra perstn.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
