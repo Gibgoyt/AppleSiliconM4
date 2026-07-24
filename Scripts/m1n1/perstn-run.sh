@@ -3,7 +3,10 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18} [extra perstn.py args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..25} [extra args...]
+#
+# RUNs 1-24 drive perstn.sh (PCIe bring-up). RUN 25+ drive soc_bringup.sh
+# (SoC-first: SMP + companion-IOP recon). The RUNNER var selects which.
 #
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
@@ -387,6 +390,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Which wrapper actually drives m1n1. Defaults to the PCIe-focused perstn.sh;
+# the SoC-first RUNs (25+) override this to soc_bringup.sh.
+RUNNER=perstn.sh
 
 RUN="${1:-}"
 if [ $# -ge 1 ]; then
@@ -1365,6 +1372,13 @@ case "${RUN^^}" in
         # Decides RUN 25: ACIO IOP powered-but-halted + RC parked-in-Detect ->
         # boot the ACIO rtkit IOP (PHY owner) before pcie_init. Cores refuse ->
         # fix SoC bring-up first. RC cycling -> endpoint-side.
+        #
+        # HISTORICAL / FROZEN: this arm still points at perstn.sh, but the
+        # SoC-first flags below (--smp-start, --soc-recon) were moved OUT of
+        # perstn.py into soc_bringup.py after this run completed (see logs/24/).
+        # Re-running `perstn-run.sh 24` now would fail argparse on those two
+        # flags. Use RUN 25 (soc_bringup.sh) for the SoC-first path going
+        # forward; RUN 24 is retained only as the record of the pivot.
         FLAGS=(--smp-start
                --soc-recon
                --preinit-probe
@@ -1374,12 +1388,35 @@ case "${RUN^^}" in
                --endpoint-diag
                --require-build=rc1-60-g)
         ;;
+    25)
+        # RUN 25: SoC-first bring-up moves to its own script, soc_bringup.py
+        # (perstn.py was 6.7k lines and PCIe-focused; the SMP + companion-IOP
+        # recon path now has its own home, sharing primitives via m4_common).
+        #
+        # RUN 24 found 9/9 secondary cores REFUSED and the ACIO IOPs
+        # (ACIO0/1/3, iop,mxwrap-acio -- owners of the CIO3-PLL / phy_ip PHY
+        # that AXI-stalls) gate-OFF. This run is READ-ONLY (except --smp-start),
+        # no reflash: retry --smp-start, diagnose WHY the cores refuse
+        # (--smp-diag: per-core PMGR CPU-gate state), and read the ACIO rtkit
+        # CPU_STATUS/CPU_CONTROL (--acio-status) that RUN 24 skipped -- is the
+        # PHY-owning IOP running, stopped, or in reset? No IOP boot.
+        #
+        # Decides RUN 26: ACIO stopped-but-powered -> boot the ACIO rtkit IOP
+        # before pcie_init. Cores power-gated -> fix cluster power first. Cores
+        # ON but refused -> spin-table / reset-vector path.
+        RUNNER=soc_bringup.sh
+        FLAGS=(--smp-start
+               --soc-recon
+               --smp-diag
+               --acio-status
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24} [extra perstn.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25} [extra perstn.py/soc_bringup.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
         ;;
 esac
 
-exec "$SCRIPT_DIR/perstn.sh" "${FLAGS[@]}" "$@"
+exec "$SCRIPT_DIR/$RUNNER" "${FLAGS[@]}" "$@"
