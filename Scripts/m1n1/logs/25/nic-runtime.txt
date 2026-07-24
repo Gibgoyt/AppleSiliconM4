@@ -106,3 +106,11 @@
       gate  151 name='APCIE_PHY_SW'           ps@0x380700550 = 0x1400024f (target=0xf, actual=0x4, OFF; auto_enable ps_auto=0x4, was_clkgated)
     gate 151: OFF
   (No IOP boot performed. If acio-cpu0 is powered but its rtkit is not running, RUN 26 = boot the ACIO IOP before pcie_init.)
+
+=== ACIO rtkit status (running/stopped/reset, read-only) ===
+  --- acio-cpu0 (role=ACIO0) ---
+    reg[self] base=0x401108000
+  acio-cpu0.self.CPU_CONTROL @ 0x401108044 = <UartTimeout: Expected 1 bytes, got 0 bytes>
+  [ABORT] m1n1 is not responding; stopping dump
+[guard] acio-acio-cpu0-self: set_exc_guard(OFF) failed: SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
+[guard] acio-acio-cpu0-self: get_exc_count(post) failed: SerialException: write failed: [Errno 5] Input/output error
