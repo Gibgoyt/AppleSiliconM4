@@ -1,0 +1,281 @@
+[ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/perstn-run.sh 27
+using m1n1 device: /dev/ttyACM1
+[sudo] password for ahmed: 
+TTY> Initialized dockchannel UART at 0x388128000
+TTY> Device info:
+TTY>   Model: Mac16,10
+TTY>   Target: J773g
+TTY>   Board-ID: 0x2a
+TTY>   Chip-ID: 0x8132
+TTY> 
+TTY> CPU init (MIDR: 0x611f0531 smp_id:0x6)...
+TTY>   CPU part: 0x53 rev: 0x11
+TTY>   CPU: M4 Donan (P core)
+TTY> 
+TTY> boot_args at 0x10004584000
+TTY>   revision:     3
+TTY>   version:      2
+TTY>   virt_base:    0x90f0000
+TTY>   phys_base:    0x100010f0000
+TTY>   mem_size:     0x3df834000
+TTY>   top_of_kdata: 0x10004594000
+TTY>   video:
+TTY>     base:       0x103e5234000
+TTY>     display:    0x1
+TTY>     stride:     0xa00
+TTY>     width:      640
+TTY>     height:     1136
+TTY>     depth:      32bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0xbd38000
+TTY>   devtree_size: 0x68000
+TTY>   cmdline:      
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x400000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 v1.6.0-rc1-60-g4b77755-dirty
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the MIT license
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: 15.1 (iBoot-11881.41.5)
+TTY> System FW version: 15.1 (iBoot-11881.41.5)
+TTY> Heap base: 0x10004594000
+TTY> MCC: Unsupported version:mcc,t8132
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x103e0924000
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c50000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c60000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c70000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c80000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1cb0000000 (0x14000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff1c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe6c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe4c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffddc000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffdbc000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffd4c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30000180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 3 @ 0x381000000
+TTY> AIC: AIC3 with 1/2 dies, 2048/4096 IRQs, reg_size:40004, config:10000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> Primary WDT register @ 0x3882b0000
+TTY> Primary WDT disabled
+TTY> Secondary WDT register @ 0x3882b8008
+TTY> Secondary WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: initialized, 392 devices on 1 dies found.
+TTY> display: Display is external
+TTY> display: Dummy framebuffer found, initializing display
+TTY> dart: dart /arm-io/dart-dcp at 0x30a340000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0 at 0x30a300000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0.0.0 L1 0 is real-time at 0x103fff1c000
+TTY> dart: allocating L2 tbl at 0, 1 to 0x103fff24000
+TTY> dcp: Mapping segment #2 10003f08000 -> 10003f08000 [24000]
+TTY> rtkit(dcp): booting with version 12
+TTY> rtkit(dcp): unknown system endpoint 0x0a
+TTY> rtkit(dcp): pre-allocated buffer (ep 0x1, dva 0x100025eb000, phys 0x103e51a3000)
+TTY> rtkit(dcp): unknown oslog message 105ff8010002604
+TTY> rtkit(dcp): unknown oslog message 3010042100000a1
+TTY> rtkit(dcp): unknown oslog message 4000020d51e4021
+TTY> rtkit(dcp): unknown oslog message 4000040d28078a1
+TTY> rtkit(dcp): unknown oslog message 4000060d51e4001
+TTY> AFK: ring buffer size mismatch
+TTY> AFK: ring buffer size mismatch
+TTY> dcp-iboot: failed to initialize disp0 service
+TTY> display: failed to initialize DCP iBoot interface
+TTY> rtkit(dcp): IOP crashed!
+TTY> rtkit(dcp): == CRASH INFO ==
+TTY> rtkit(dcp):   Message 1: ASSERT!Messenger.c:299 0xc0000000000000 0x7 
+TTY> rtkit(dcp):   0x43766572
+TTY> rtkit(dcp):   0x4374696d
+TTY> rtkit(dcp):   0x43637374
+TTY> rtkit(dcp):   0x4372746b
+TTY> rtkit(dcp):   0x43617343
+TTY> rtkit(dcp):   0x436d6278
+TTY> rtkit(dcp):   0x43636470
+TTY> rtkit(dcp):   0x43706374
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp): IOP died during shutdown
+TTY> fb init: 640x1136 (32) [s=640] @0x103e5234000
+TTY> fb console: max rows 35, max cols 40
+TTY> fb: display logo
+TTY> cpufreq: Chip 0x8132 is unsupported
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j773g
+TTY> Unknown payload at 0x10003f08000 (magic: 5b41464b)
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x402f80000 is a t8110
+TTY> USB0: initialized at 0x10004982030
+TTY> dart: dart /arm-io/dart-usb1 at 0x40af80000 is a t8110
+TTY> USB1: initialized at 0x10004982360
+TTY> dart: dart /arm-io/dart-usb2 at 0x412f80000 is a t8110
+TTY> USB2: initialized at 0x10004982690
+TTY> dart: dart /arm-io/dart-usb3 at 0x41af80000 is a t8110
+TTY> USB3: initialized at 0x100049829c0
+TTY> Running proxy...
+m1n1 base: 0x10003dfc000
+Fetching ADT (0x00068000 bytes)...
+[pcie_up] require-build OK: 'm1n1 uartproxy v1.6.0-rc1-60-g' contains 'rc1-60-g'
+[pcie_up] === soc_bringup (SoC-first recon) ===
+[pcie_up] [flush:start] wrote partial log (47 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] starting secondary CPUs (p.smp_start_secondaries())...
+TTY> Starting secondary CPUs...
+TTY> Starting CPU 0 (0:0:0)... Failed!
+TTY> Starting CPU 1 (0:0:1)... Failed!
+TTY> Starting CPU 2 (0:0:2)... Failed!
+TTY> Starting CPU 3 (0:0:3)... Failed!
+TTY> Starting CPU 4 (0:0:4)... Failed!
+TTY> Starting CPU 5 (0:0:5)... Failed!
+TTY> Starting CPU 7 (0:1:1)... Failed!
+TTY> Starting CPU 8 (0:1:2)... Failed!
+TTY> Starting CPU 9 (0:1:3)... Failed!
+[pcie_up] [flush:smp-start] wrote partial log (136 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] SMP probe (RVBAR + CPU-start block)...
+[pcie_up]     read64(0x210050000) [cpu0.RVBAR]...
+[pcie_up]       -> 0x0010010003dfc001
+[pcie_up]     read64(0x210050100) [cpu0.impl+0x100]...
+[pcie_up]       -> 0x0080802a0f20d102
+[pcie_up]     read64(0x210150000) [cpu1.RVBAR]...
+[pcie_up]       -> 0x0010010003dfc001
+[pcie_up]     read64(0x210150100) [cpu1.impl+0x100]...
+[pcie_up]       -> 0x1180802a0f20d102
+[pcie_up]     read64(0x210250000) [cpu2.RVBAR]...
+[pcie_up]       -> 0x0010010003dfc001
+[pcie_up]     read64(0x210250100) [cpu2.impl+0x100]...
+[pcie_up]       -> 0x2280802a0f20d102
+[pcie_up]     read64(0x210350000) [cpu3.RVBAR]...
+[pcie_up]       -> 0x0010010003dfc001
+[pcie_up]     read64(0x210350100) [cpu3.impl+0x100]...
+[pcie_up]       -> 0x3380802a0f20d102
+[pcie_up]     read64(0x210450000) [cpu4.RVBAR]...
+[pcie_up]       -> 0x0010010003dfc001
+[pcie_up]     read64(0x210450100) [cpu4.impl+0x100]...
+[pcie_up]       -> 0x4480802a0f20d102
+[pcie_up]     read64(0x210550000) [cpu5.RVBAR]...
+[pcie_up]       -> 0x0010010003dfc001
+[pcie_up]     read64(0x210550100) [cpu5.impl+0x100]...
+[pcie_up]       -> 0x5580802a0f20d102
+[pcie_up]     read64(0x211050000) [cpu6.RVBAR]...
+[pcie_up]       -> 0x0110010003dfc001
+[pcie_up]     read64(0x211050100) [cpu6.impl+0x100]...
+[pcie_up]       -> 0x0080800aee201102
+[pcie_up]     read64(0x211150000) [cpu7.RVBAR]...
+[pcie_up]       -> 0x0110010003dfc001
+[pcie_up]     read64(0x211150100) [cpu7.impl+0x100]...
+[pcie_up]       -> 0x1180808aef20d102
+[pcie_up]     read64(0x211250000) [cpu8.RVBAR]...
+[pcie_up]       -> 0x0110010003dfc001
+[pcie_up]     read64(0x211250100) [cpu8.impl+0x100]...
+[pcie_up]       -> 0x2280808aef20d102
+[pcie_up]     read64(0x211350000) [cpu9.RVBAR]...
+[pcie_up]       -> 0x0110010003dfc001
+[pcie_up]     read64(0x211350100) [cpu9.impl+0x100]...
+[pcie_up]       -> 0x3380808aef20d102
+[pcie_up]     read32(0x380734000) [die0.cpustart+0x0]...
+[pcie_up]       -> 0x00000300
+[pcie_up]     read32(0x380734004) [die0.cpustart+0x4]...
+[pcie_up]       -> 0x00000300
+[pcie_up]     read32(0x380734008) [die0.cpustart+0x8+4*0]...
+[pcie_up]       -> 0x00000000
+[pcie_up]     read32(0x38073400c) [die0.cpustart+0x8+4*1]...
+[pcie_up]       -> 0x00000000
+[pcie_up] [flush:smp-probe] wrote partial log (4186 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] SMP release probe (manual core release, writes RVBAR + CPU-start)...
+[pcie_up]     write64(0x210150000, 0x10003dfc000) [cpu1.RVBAR unlock]...
+[pcie_up] [flush:smp-release-probe] wrote partial log (4782 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:done] wrote partial log (4782 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] done; log at /tmp/m4-recon/nic-runtime.txt
+
+--- /tmp/m4-recon/nic-runtime.txt ---
+=== soc_bringup: SoC-first bring-up recon ===
+
+=== SMP: p.smp_start_secondaries() ===
+(see TTY console for 'Starting CPU N ...' lines)
+
+
+=== SMP probe (RVBAR / CPU-start evidence, read-only) ===
+  pmgr reg[0] = 0x380700000; CPU-start base (die0) = 0x380734000 (+0x34000)
+  --- per-CPU RVBAR (cpu-impl-reg[0]) + status ---
+  cpu 'cpu0' reg=0x0 die=0 cluster=0 core=0 state='waiting'
+  cpu0.RVBAR                   @ 0x210050000 = 0x0010010003dfc001
+  cpu0.impl+0x100              @ 0x210050100 = 0x0080802a0f20d102
+[guard] rvbar-cpu0: exc_count delta = 0 (before=0, after=0)
+      -> cpu0: RVBAR addr=0x10003dfc000 LOCK=True
+  cpu 'cpu1' reg=0x1 die=0 cluster=0 core=1 state='waiting'
+  cpu1.RVBAR                   @ 0x210150000 = 0x0010010003dfc001
+  cpu1.impl+0x100              @ 0x210150100 = 0x1180802a0f20d102
+[guard] rvbar-cpu1: exc_count delta = 0 (before=0, after=0)
+      -> cpu1: RVBAR addr=0x10003dfc000 LOCK=True
+  cpu 'cpu2' reg=0x2 die=0 cluster=0 core=2 state='waiting'
+  cpu2.RVBAR                   @ 0x210250000 = 0x0010010003dfc001
+  cpu2.impl+0x100              @ 0x210250100 = 0x2280802a0f20d102
+[guard] rvbar-cpu2: exc_count delta = 0 (before=0, after=0)
+      -> cpu2: RVBAR addr=0x10003dfc000 LOCK=True
+  cpu 'cpu3' reg=0x3 die=0 cluster=0 core=3 state='waiting'
+  cpu3.RVBAR                   @ 0x210350000 = 0x0010010003dfc001
+  cpu3.impl+0x100              @ 0x210350100 = 0x3380802a0f20d102
+[guard] rvbar-cpu3: exc_count delta = 0 (before=0, after=0)
+      -> cpu3: RVBAR addr=0x10003dfc000 LOCK=True
+  cpu 'cpu4' reg=0x4 die=0 cluster=0 core=4 state='waiting'
+  cpu4.RVBAR                   @ 0x210450000 = 0x0010010003dfc001
+  cpu4.impl+0x100              @ 0x210450100 = 0x4480802a0f20d102
+[guard] rvbar-cpu4: exc_count delta = 0 (before=0, after=0)
+      -> cpu4: RVBAR addr=0x10003dfc000 LOCK=True
+  cpu 'cpu5' reg=0x5 die=0 cluster=0 core=5 state='waiting'
+  cpu5.RVBAR                   @ 0x210550000 = 0x0010010003dfc001
+  cpu5.impl+0x100              @ 0x210550100 = 0x5580802a0f20d102
+[guard] rvbar-cpu5: exc_count delta = 0 (before=0, after=0)
+      -> cpu5: RVBAR addr=0x10003dfc000 LOCK=True
+  cpu 'cpu6' reg=0x100 die=0 cluster=1 core=0 state='running'
+  cpu6.RVBAR                   @ 0x211050000 = 0x0110010003dfc001
+  cpu6.impl+0x100              @ 0x211050100 = 0x0080800aee201102
+[guard] rvbar-cpu6: exc_count delta = 0 (before=0, after=0)
+      -> cpu6: RVBAR addr=0x10003dfc000 LOCK=True
+  cpu 'cpu7' reg=0x101 die=0 cluster=1 core=1 state='waiting'
+  cpu7.RVBAR                   @ 0x211150000 = 0x0110010003dfc001
+  cpu7.impl+0x100              @ 0x211150100 = 0x1180808aef20d102
+[guard] rvbar-cpu7: exc_count delta = 0 (before=0, after=0)
+      -> cpu7: RVBAR addr=0x10003dfc000 LOCK=True
+  cpu 'cpu8' reg=0x102 die=0 cluster=1 core=2 state='waiting'
+  cpu8.RVBAR                   @ 0x211250000 = 0x0110010003dfc001
+  cpu8.impl+0x100              @ 0x211250100 = 0x2280808aef20d102
+[guard] rvbar-cpu8: exc_count delta = 0 (before=0, after=0)
+      -> cpu8: RVBAR addr=0x10003dfc000 LOCK=True
+  cpu 'cpu9' reg=0x103 die=0 cluster=1 core=3 state='waiting'
+  cpu9.RVBAR                   @ 0x211350000 = 0x0110010003dfc001
+  cpu9.impl+0x100              @ 0x211350100 = 0x3380808aef20d102
+[guard] rvbar-cpu9: exc_count delta = 0 (before=0, after=0)
+      -> cpu9: RVBAR addr=0x10003dfc000 LOCK=True
+  --- RVBAR cross-check ---
+  dies seen in /cpus: [0]
+  distinct RVBAR target addresses: ['0x10003dfc000']
+  -> all cores point at the SAME RVBAR entry (expected: m1n1's _vectors_start). RVBAR delivery looks correct.
+  --- CPU-start block words (read-only) ---
+  die 0: CPU-start base 0x380734000
+  die0.cpustart+0x0          @ 0x380734000 = 0x00000300
+  die0.cpustart+0x4          @ 0x380734004 = 0x00000300
+  die0.cpustart+0x8+4*0      @ 0x380734008 = 0x00000000
+  die0.cpustart+0x8+4*1      @ 0x38073400c = 0x00000000
+[guard] cpustart-die0: exc_count delta = 0 (before=0, after=0)
+  (RVBARs sane+unlocked & enables latched but flag never set -> core faults after release, before _vectors_start -> M4 per-part init/chicken gap in m1n1 src (chickens.c features_m4). Wrong/missing die-1 RVBAR or unlatched enables -> address-math bug.)
+
+=== SMP release probe (manual smp_start_cpu, WRITES MMIO) ===
+  target cpu 'cpu1' reg=0x1 die=0 cluster=0 core=1 state='waiting'
+  impl(RVBAR)=0x210150000  CPU-start base=0x380734000
+  [pre] RVBAR=0x0010010003dfc001 (addr=0x10003dfc000, LOCK=True)
+  [pre] cpustart+0x4=0x00000300  cpustart+0x8+4*0=0x00000000
+  [write] RVBAR <- 0x10003dfc000 (clears LOCK, re-arms vector)
+  [post] RVBAR=0x0010010003dfc001 (LOCK=True)
+  -> LOCK STAYED SET after write -> RVBAR lock is sticky-until-reset; m1n1's in-line write64 can't clear it either. H1's fix must avoid needing to clear it. NOT strobing start.
+[ahmed@admin AppleSiliconM4]$ 
+
