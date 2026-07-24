@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..25} [extra args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..26} [extra args...]
 #
 # RUNs 1-24 drive perstn.sh (PCIe bring-up). RUN 25+ drive soc_bringup.sh
 # (SoC-first: SMP + companion-IOP recon). The RUNNER var selects which.
@@ -1411,8 +1411,34 @@ case "${RUN^^}" in
                --acio-status
                --require-build=rc1-60-g)
         ;;
+    26)
+        # RUN 26: RUN 25 established the refusing cores are POWERED (ECPU/PCPU
+        # PMGR actual=0xf) but never take the spin-table -- a reset-vector /
+        # handoff issue, NOT power (refutes RUN 24's "fix cluster power"). RUN
+        # 25 also WEDGED m1n1 on --acio-status by reading acio-cpu0's un-clocked
+        # ASC block (guarded() can't catch an AXI stall); acio_status now
+        # gate-checks PMGR state before any MMIO, so it's safe and just reports
+        # "ACIO un-clocked".
+        #
+        # This run (read-only, no reflash): --smp-probe harvests per-CPU RVBAR
+        # (cpu-impl-reg[0]) + LOCK bit + the CPU-start block words, mirroring
+        # m1n1 smp.c's address math, to see whether RVBAR delivery/enable
+        # latching is correct. --acio-status is dropped from the default (now
+        # only re-confirms un-clocked; still available manually).
+        #
+        # Decides the SMP fix (a separate m1n1-source + reflash task): RVBARs
+        # sane+unlocked yet flag never set -> M4 per-part init/chicken gap
+        # (chickens.c features_m4). Wrong die-1 RVBAR / unlatched enables ->
+        # address-math bug in smp.c.
+        RUNNER=soc_bringup.sh
+        FLAGS=(--smp-start
+               --smp-diag
+               --smp-probe
+               --soc-recon
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25} [extra perstn.py/soc_bringup.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26} [extra perstn.py/soc_bringup.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

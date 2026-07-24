@@ -41,7 +41,11 @@ from m4_common import (
 # ASC (rtkit IOP) register offsets, from m1n1 proxyclient m1n1/hw/asc.py:
 #   CPU_CONTROL @ +0x44  -- bit 4 = RUN
 #   CPU_STATUS  @ +0x48  -- bit 0 = RUNNING, bit 1 = STOPPED, bit 5 = IDLE
-# We only ever READ these; a bare read is wedge-guarded and cannot boot the IOP.
+# We only ever READ these. NOTE: a bare read does NOT bail on an un-clocked
+# block -- guarded() cannot catch an AXI stall (see m4_common.guarded's
+# docstring). The ONLY safe protection is to check the block's PMGR gate is
+# ACTIVE first and refuse the MMIO otherwise (RUN 25 wedged m1n1 by skipping
+# that check). See acio_status().
 ASC_CPU_CONTROL = 0x44
 ASC_CPU_STATUS  = 0x48
 ASC_CPU_CONTROL_RUN = 1 << 4
@@ -193,6 +197,148 @@ def smp_diag(buf):
               "path, not power.)\n")
 
 
+# ---------------------------------------------------------------- SMP probe
+
+# Constants from m1n1/src/smp.c + pmgr.h -- keep in lockstep so the Python read
+# matches the C address derivation exactly.
+CPU_START_OFF_T8112 = 0x34000        # smp.c:21; used for T8132 (smp.c:289-291)
+PMGR_DIE_OFFSET     = 0x2000000000   # pmgr.h:8
+RVBAR_LOCK          = 1 << 0         # smp.c:29
+RVBAR_ADDR_MASK     = 0x0000FFFFFFFFF000  # GENMASK(47,12), smp.c:30
+CPU_REG_CORE_MASK    = 0x00FF        # GENMASK(7,0),  smp.c:25
+CPU_REG_CLUSTER_MASK = 0x0700        # GENMASK(10,8), smp.c:26
+CPU_REG_DIE_MASK     = 0x7800        # GENMASK(14,11),smp.c:27
+
+
+def _read64_guarded(addr, label, buf):
+    """Read a 64-bit register through the exception guard, logging like
+    _read32_live. p.read64 is exposed by the proxy (proxy.py:808). Returns the
+    value or None. Only call on blocks known to be live (pmgr / CPU IMPL)."""
+    log(f"    read64(0x{addr:x}) [{label}]...")
+    try:
+        v = p.read64(addr)
+    except Exception as e:
+        msg = f"{e.__class__.__name__}: {e}"
+        buf.write(f"  {label:28s} @ 0x{addr:x} = <{msg}>\n")
+        log(f"      -> FAILED: {msg}")
+        return None
+    buf.write(f"  {label:28s} @ 0x{addr:x} = 0x{v:016x}\n")
+    log(f"      -> 0x{v:016x}")
+    return v
+
+
+def smp_probe(buf):
+    """RUN 26 (read-only): harvest the RVBAR / spin-table / CPU-start evidence
+    the RUN-25 'cores powered but Failed!' finding points to. Mirrors m1n1's
+    own address derivation in src/smp.c so the reads line up with what the C
+    does when it gives up at smp.c:181.
+
+    For each /cpus node: decode die/cluster/core from 'reg' (smp.c:25-27),
+    read its RVBAR (cpu-impl-reg[0]) -- value, RVBAR_LOCK bit, masked address
+    (smp.c:149/381 check these) -- and the impl+0x100 status word (smp.c:223).
+    Then dump the CPU-start block words (pmgr reg[0] + 0x34000, + die offset).
+
+    All targets (pmgr, per-CPU IMPL windows) are live blocks m1n1 itself reads,
+    so this is wedge-safe; reads are still guarded + liveness-checked.
+    """
+    buf.write("\n=== SMP probe (RVBAR / CPU-start evidence, read-only) ===\n")
+    log("SMP probe (RVBAR + CPU-start block)...")
+
+    # CPU-start base = pmgr reg[0] + CPU_START_OFF_T8112 (T8132 case).
+    try:
+        pmgr_reg = u.adt["arm-io/pmgr"].get_reg(0)[0]
+        cpu_start_base0 = pmgr_reg + CPU_START_OFF_T8112
+        buf.write(f"  pmgr reg[0] = 0x{pmgr_reg:x}; CPU-start base (die0) = "
+                  f"0x{cpu_start_base0:x} (+0x{CPU_START_OFF_T8112:x})\n")
+    except Exception as e:
+        buf.write(f"  cannot resolve pmgr reg / CPU-start base: "
+                  f"{e.__class__.__name__}: {e}\n")
+        cpu_start_base0 = None
+
+    # Per-CPU RVBAR posture.
+    buf.write("  --- per-CPU RVBAR (cpu-impl-reg[0]) + status ---\n")
+    rvbars = {}          # cpu-id -> masked RVBAR addr (for die0/die1 compare)
+    dies_seen = set()
+    try:
+        cpus = u.adt["cpus"]
+    except Exception as e:
+        buf.write(f"  cannot open /cpus: {e.__class__.__name__}: {e}\n")
+        cpus = []
+
+    for cpu in cpus:
+        name = getattr(cpu, "name", "?")
+        # Use .getprop() with the literal ADT names -- unambiguous vs the
+        # underscore/hyphen normalization ADTNode.__getattr__ does.
+        reg = cpu.getprop("reg", None)
+        if reg is None:
+            buf.write(f"  cpu '{name}': no 'reg' property, skipping\n")
+            continue
+        reg = int(reg)
+        core = reg & CPU_REG_CORE_MASK
+        cluster = (reg & CPU_REG_CLUSTER_MASK) >> 8
+        die = (reg & CPU_REG_DIE_MASK) >> 11
+        dies_seen.add(die)
+        state = cpu.getprop("state", None)
+        try:
+            impl = list(cpu.getprop("cpu-impl-reg", []) or [])
+        except Exception:
+            impl = []
+        buf.write(f"  cpu '{name}' reg=0x{reg:x} die={die} cluster={cluster} "
+                  f"core={core} state={state!r}\n")
+        if not impl:
+            buf.write("      (no cpu-impl-reg; cannot read RVBAR)\n")
+            continue
+        impl_base = int(impl[0])
+        with guarded(buf, label=f"rvbar-{name}"):
+            rv = _read64_guarded(impl_base, f"{name}.RVBAR", buf)
+            if not check_alive():
+                buf.write("      [ABORT] m1n1 wedged reading RVBAR; stopping\n")
+                return
+            _read64_guarded(impl_base + 0x100, f"{name}.impl+0x100", buf)
+        if rv is not None:
+            locked = bool(rv & RVBAR_LOCK)
+            addr = rv & RVBAR_ADDR_MASK
+            rvbars[core if die == 0 else (die, cluster, core)] = addr
+            buf.write(f"      -> {name}: RVBAR addr=0x{addr:x} "
+                      f"LOCK={locked}\n")
+
+    # die0-vs-die1 comparison + lock summary.
+    buf.write("  --- RVBAR cross-check ---\n")
+    buf.write(f"  dies seen in /cpus: {sorted(dies_seen)}\n")
+    uniq = sorted(set(rvbars.values()))
+    buf.write(f"  distinct RVBAR target addresses: "
+              f"{[hex(a) for a in uniq]}\n")
+    if len(uniq) <= 1:
+        buf.write("  -> all cores point at the SAME RVBAR entry (expected: "
+                  "m1n1's _vectors_start). RVBAR delivery looks correct.\n")
+    else:
+        buf.write("  -> cores point at DIFFERENT RVBAR entries -- a die/cluster "
+                  "cpu-impl-reg derivation problem is possible.\n")
+
+    # CPU-start block words (read-only): are prior --smp-start enables latched?
+    if cpu_start_base0 is not None:
+        buf.write("  --- CPU-start block words (read-only) ---\n")
+        for die in sorted(dies_seen):
+            base = cpu_start_base0 + die * PMGR_DIE_OFFSET
+            buf.write(f"  die {die}: CPU-start base 0x{base:x}\n")
+            with guarded(buf, label=f"cpustart-die{die}"):
+                _read32_live(base + 0x0, f"die{die}.cpustart+0x0", buf)
+                if not check_alive():
+                    buf.write("      [ABORT] m1n1 wedged reading CPU-start "
+                              "block; stopping\n")
+                    return
+                _read32_live(base + 0x4, f"die{die}.cpustart+0x4", buf)
+                # +0x8 + 4*cluster is the per-cluster start word; dump a couple.
+                for cl in range(2):
+                    _read32_live(base + 0x8 + 4 * cl,
+                                 f"die{die}.cpustart+0x8+4*{cl}", buf)
+
+    buf.write("  (RVBARs sane+unlocked & enables latched but flag never set -> "
+              "core faults after release, before _vectors_start -> M4 per-part "
+              "init/chicken gap in m1n1 src (chickens.c features_m4). Wrong/"
+              "missing die-1 RVBAR or unlatched enables -> address-math bug.)\n")
+
+
 # ---------------------------------------------------------------- ACIO status
 
 def _acio_asc_bases(node):
@@ -219,6 +365,37 @@ def _acio_asc_bases(node):
     return bases
 
 
+def _node_gate_posture(node, dev_by_idx, buf):
+    """Return (has_active_gate, summary_str) for an ACIO node by reading each
+    of its clock_gates' PMGR PS state. has_active_gate is True only if at least
+    one real (non-virtual) gate reads ACTIVE (actual==0xf). A node with no
+    gates, or only virtual/OFF gates, is un-clocked -- its MMIO would AXI-stall
+    and wedge m1n1, so callers MUST NOT read it."""
+    try:
+        gates = list(getattr(node, "clock_gates", []) or [])
+    except Exception:
+        gates = []
+    if not gates:
+        return False, "no clock-gates"
+    if dev_by_idx is None:
+        return False, "PMGR devices unavailable"
+    parts = []
+    active = False
+    for g in gates:
+        st = _read_pmgr_gate_state(dev_by_idx, g, buf, indent="      ")
+        if st is None:
+            parts.append(f"gate {g}: ?")
+            continue
+        if st.get("virtual"):
+            parts.append(f"gate {g}: VIRTUAL(on={st['on']})")
+        elif st.get("on"):
+            parts.append(f"gate {g}: ON")
+            active = True
+        else:
+            parts.append(f"gate {g}: OFF(actual=0x{st.get('actual'):x})")
+    return active, "; ".join(parts)
+
+
 def acio_status(buf):
     """RUN 25 (read-only): read each acio-cpuN rtkit IOP's CPU_STATUS /
     CPU_CONTROL -- is it RUNNING, STOPPED, or held in reset? This is the read
@@ -227,13 +404,22 @@ def acio_status(buf):
     CIO3-PLL/phy_ip PHY is powered but STOPPED, that's strong evidence the PHY
     stalls because its owner was never started.
 
-    We only ever READ CPU_STATUS/CPU_CONTROL -- a bare, wedge-guarded read
-    cannot boot the IOP. We do NOT instantiate ASC() or send a mailbox message
-    (which would spin on INBOX_CTRL.FULL against a stopped IOP).
+    We only ever READ CPU_STATUS/CPU_CONTROL -- we do NOT instantiate ASC() or
+    send a mailbox message (which would spin on INBOX_CTRL.FULL against a
+    stopped IOP).
+
+    CRITICAL SAFETY (RUN 25 lesson): before touching ANY ACIO MMIO we check the
+    node's PMGR gate. guarded() does NOT protect against an AXI stall on an
+    un-clocked block -- RUN 25 read acio-cpu0's CPU_CONTROL while its gate was
+    VIRTUAL/OFF and hard-wedged m1n1 (Exception: SYNC -> UART timeout -> dead).
+    So if a node has no ACTIVE gate we report it and SKIP the MMIO entirely.
+    This mirrors perstn.py Phase-A's "not ACTIVE -> skip pre-PMGR MMIO" rule.
     """
     buf.write("\n=== ACIO rtkit status (running/stopped/reset, read-only) "
               "===\n")
-    log("ACIO status (CPU_STATUS/CPU_CONTROL, read-only)...")
+    log("ACIO status (gate-checked CPU_STATUS/CPU_CONTROL, read-only)...")
+
+    _pmgr, dev_by_idx = _load_pmgr_devices(buf)
 
     acio_nodes = []
     try:
@@ -254,14 +440,22 @@ def acio_status(buf):
         name = getattr(node, "name", "?")
         role = getattr(node, "role", None)
         buf.write(f"  --- {name} (role={role}) ---\n")
+
+        # GATE CHECK FIRST -- never read MMIO of an un-clocked block.
+        active, posture = _node_gate_posture(node, dev_by_idx, buf)
+        buf.write(f"    gate posture: {posture}\n")
+        if not active:
+            buf.write(f"    -> {name}: NO ACTIVE gate -> ASC block un-clocked; "
+                      f"NOT reading MMIO (would AXI-stall/wedge m1n1). "
+                      f"IOP not booted.\n")
+            continue
+
         bases = _acio_asc_bases(node)
         if not bases:
             buf.write("    (no reg base resolvable from ADT)\n")
             continue
         for tag, base in bases:
-            buf.write(f"    reg[{tag}] base=0x{base:x}\n")
-            # Wedge-guarded: if the ASC block is un-clocked the read AXI-stalls;
-            # short_timeout + check_alive() bail before we burn the session.
+            buf.write(f"    reg[{tag}] base=0x{base:x} (gate ACTIVE, read OK)\n")
             with guarded(buf, label=f"acio-{name}-{tag}"):
                 ctrl = _read32_live(base + ASC_CPU_CONTROL,
                                     f"{name}.{tag}.CPU_CONTROL", buf,
@@ -286,10 +480,11 @@ def acio_status(buf):
                           f"(RUNNING={running} STOPPED={stopped} IDLE={idle} "
                           f"CPU_CONTROL.RUN={run_bit})\n")
 
-    buf.write("  (Any ACIO STOPPED/RUN=0 while its PMGR gate is powered -> "
-              "RUN 26 = boot the ACIO IOP (ASC(u, base).boot()) before "
-              "pcie_init. All ACIO already RUNNING -> ownership theory "
-              "weakens.)\n")
+    buf.write("  (All ACIO gates VIRTUAL/OFF -> the IOP that owns the "
+              "CIO3-PLL/phy_ip PHY is un-clocked and un-booted -> booting it "
+              "requires powering its gate first, which the AP may not own. "
+              "If a gate ever reads ACTIVE and the IOP is STOPPED/RUN=0 -> "
+              "boot it via ASC(u, base).boot() before pcie_init.)\n")
 
 
 # ---------------------------------------------------------------- main
@@ -316,6 +511,11 @@ def build_argparser():
     ap.add_argument("--smp-diag", action="store_true",
                     help="read-only: per-core PMGR CPU-gate state, to explain "
                          "why the secondary cores refuse to start.")
+    ap.add_argument("--smp-probe", action="store_true",
+                    help="read-only: per-CPU RVBAR (cpu-impl-reg[0]) + LOCK "
+                         "bit + CPU-start block words, mirroring m1n1 smp.c's "
+                         "address derivation. Evidence for the 'cores powered "
+                         "but Failed!' spin-table lead.")
     ap.add_argument("--acio-status", action="store_true",
                     help="read-only: each acio-cpuN rtkit's CPU_STATUS/"
                          "CPU_CONTROL -- running / stopped / in reset. Does "
@@ -353,6 +553,10 @@ def main():
         try_(lambda: smp_diag(buf), "smp_diag")
         flush("smp-diag")
 
+    if args.smp_probe:
+        try_(lambda: smp_probe(buf), "smp_probe")
+        flush("smp-probe")
+
     if args.soc_recon:
         try_(lambda: soc_recon(buf), "soc_recon")
         flush("soc-recon")
@@ -361,10 +565,10 @@ def main():
         try_(lambda: acio_status(buf), "acio_status")
         flush("acio-status")
 
-    if not (args.smp_start or args.smp_diag or args.soc_recon
-            or args.acio_status):
-        log("no probe selected; pass --smp-start/--smp-diag/--soc-recon/"
-            "--acio-status")
+    if not (args.smp_start or args.smp_diag or args.smp_probe
+            or args.soc_recon or args.acio_status):
+        log("no probe selected; pass --smp-start/--smp-diag/--smp-probe/"
+            "--soc-recon/--acio-status")
 
     flush("done")
     log(f"done; log at {runtime_path}")
