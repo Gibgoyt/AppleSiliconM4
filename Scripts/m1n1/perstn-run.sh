@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..26} [extra args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..27} [extra args...]
 #
 # RUNs 1-24 drive perstn.sh (PCIe bring-up). RUN 25+ drive soc_bringup.sh
 # (SoC-first: SMP + companion-IOP recon). The RUNNER var selects which.
@@ -1437,8 +1437,29 @@ case "${RUN^^}" in
                --soc-recon
                --require-build=rc1-60-g)
         ;;
+    27)
+        # RUN 27: no-reflash test of the RVBAR-lock hypothesis (H1). RUN 26
+        # proved every core's RVBAR is correct (== _vectors_start) but LOCKED,
+        # and the UART never printed "RVBAR entry on secondary CPU" -- the cores
+        # never leave reset. m1n1 only re-writes RVBAR (which clears RVBAR_LOCK,
+        # smp.c:161) inside `if (cpu_features->cyc_ovrd)`, and features_m4 omits
+        # cyc_ovrd, so on M4 that unlock is skipped.
+        #
+        # --smp-release-probe manually replicates smp_start_cpu for ONE core
+        # (default reg=0x1): clears its RVBAR_LOCK via write64, then strobes the
+        # CPU-start register -- the same writes m1n1 does, no reflash. Watch the
+        # TTY> console for "RVBAR entry on secondary CPU": if it appears, the
+        # core left reset -> H1 CONFIRMED -> RUN 28 = minimal smp.c fix + reflash.
+        # (--smp-start first records the normal "Failed!" on the same boot;
+        # --smp-probe re-captures the pre-release RVBAR/LOCK state.)
+        RUNNER=soc_bringup.sh
+        FLAGS=(--smp-start
+               --smp-probe
+               --smp-release-probe
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26} [extra perstn.py/soc_bringup.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27} [extra perstn.py/soc_bringup.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

@@ -28,6 +28,7 @@ Outcome decides RUN 26: boot the ACIO IOP vs fix core power first.
 import argparse
 import io
 import pathlib
+import time
 
 from m4_common import (
     u, p, GUARD,
@@ -339,6 +340,180 @@ def smp_probe(buf):
               "missing die-1 RVBAR or unlatched enables -> address-math bug.)\n")
 
 
+# ---------------------------------------------------------------- SMP release probe
+
+def smp_release_probe(buf, target_reg=0x1):
+    """RUN 27 (WRITES MMIO): manually replicate m1n1's smp_start_cpu (smp.c:
+    149-183) for ONE secondary core, from Python, to test the RVBAR-lock
+    hypothesis (H1) with NO reflash.
+
+    RUN 26 showed every core's RVBAR is correct (== _vectors_start) but LOCKED,
+    and the UART never printed 'RVBAR entry on secondary CPU' -- the cores never
+    left reset. m1n1 only re-writes RVBAR (which also clears RVBAR_LOCK) inside
+    `if (cpu_features->cyc_ovrd)` (smp.c:161), and features_m4 omits cyc_ovrd,
+    so on M4 that unlock-write is skipped. Here we do it by hand: clear the lock
+    (write64 _vectors_start into RVBAR), then strobe the CPU-start register, and
+    watch for the 'RVBAR entry on secondary CPU' UART marker.
+
+    WRITES: only this one core's RVBAR (cpu-impl-reg[0]) + the CPU-start enable/
+    start words -- the identical registers smp_start_cpu writes. No proxy
+    spin_table bookkeeping is wired, so SUCCESS = the UART marker, not a proxy
+    return. Worst case the core still doesn't start (same as the normal path).
+    """
+    buf.write("\n=== SMP release probe (manual smp_start_cpu, WRITES MMIO) "
+              "===\n")
+    log("SMP release probe (manual core release, writes RVBAR + CPU-start)...")
+
+    # CPU-start base = pmgr reg[0] + CPU_START_OFF_T8112 (same as smp_probe).
+    try:
+        pmgr_reg = u.adt["arm-io/pmgr"].get_reg(0)[0]
+    except Exception as e:
+        buf.write(f"  cannot resolve pmgr reg[0]: {e.__class__.__name__}: {e}\n")
+        return
+    cpu_start_base0 = pmgr_reg + CPU_START_OFF_T8112
+
+    # Find the target /cpus node by its 'reg' value.
+    node = None
+    try:
+        for cpu in u.adt["cpus"]:
+            r = cpu.getprop("reg", None)
+            if r is not None and int(r) == target_reg:
+                node = cpu
+                break
+    except Exception as e:
+        buf.write(f"  cannot walk /cpus: {e.__class__.__name__}: {e}\n")
+        return
+    if node is None:
+        buf.write(f"  no /cpus node with reg=0x{target_reg:x}; aborting\n")
+        return
+
+    name = getattr(node, "name", "?")
+    reg = int(node.getprop("reg"))
+    core = reg & CPU_REG_CORE_MASK
+    cluster = (reg & CPU_REG_CLUSTER_MASK) >> 8
+    die = (reg & CPU_REG_DIE_MASK) >> 11
+    state = node.getprop("state", None)
+    try:
+        impl_arr = list(node.getprop("cpu-impl-reg", []) or [])
+    except Exception:
+        impl_arr = []
+    if not impl_arr:
+        buf.write(f"  cpu '{name}': no cpu-impl-reg; cannot release\n")
+        return
+    impl = int(impl_arr[0])
+    cpu_start_base = cpu_start_base0 + die * PMGR_DIE_OFFSET
+
+    buf.write(f"  target cpu '{name}' reg=0x{reg:x} die={die} cluster={cluster} "
+              f"core={core} state={state!r}\n")
+    buf.write(f"  impl(RVBAR)=0x{impl:x}  CPU-start base=0x{cpu_start_base:x}\n")
+
+    if str(state) == "running":
+        buf.write("  REFUSING: target is the running boot core; pick a "
+                  "'waiting' core via --release-core\n")
+        return
+
+    exc0 = 0
+    try:
+        exc0 = p.get_exc_count()
+    except Exception:
+        pass
+
+    # 1) Pre-state (read-only).
+    try:
+        rv_pre = p.read64(impl)
+    except Exception as e:
+        buf.write(f"  RVBAR pre-read FAILED: {e.__class__.__name__}: {e}; "
+                  f"aborting\n")
+        return
+    locked_pre = bool(rv_pre & RVBAR_LOCK)
+    vectors = rv_pre & RVBAR_ADDR_MASK
+    buf.write(f"  [pre] RVBAR=0x{rv_pre:016x} (addr=0x{vectors:x}, "
+              f"LOCK={locked_pre})\n")
+    try:
+        en_pre = p.read32(cpu_start_base + 0x4)
+        st_pre = p.read32(cpu_start_base + 0x8 + 4 * cluster)
+        buf.write(f"  [pre] cpustart+0x4=0x{en_pre:08x}  "
+                  f"cpustart+0x8+4*{cluster}=0x{st_pre:08x}\n")
+    except Exception as e:
+        buf.write(f"  [pre] CPU-start read FAILED: "
+                  f"{e.__class__.__name__}: {e}\n")
+
+    # 2) Clear LOCK / re-arm RVBAR (smp.c:161). Writing _vectors_start back also
+    #    clears RVBAR_LOCK on Apple cores.
+    buf.write(f"  [write] RVBAR <- 0x{vectors:x} (clears LOCK, re-arms vector)\n")
+    log(f"    write64(0x{impl:x}, 0x{vectors:x}) [{name}.RVBAR unlock]...")
+    try:
+        p.write64(impl, vectors)
+    except Exception as e:
+        buf.write(f"  RVBAR write FAILED: {e.__class__.__name__}: {e}; "
+                  f"aborting\n")
+        return
+    if not check_alive():
+        buf.write("  [ABORT] m1n1 wedged after RVBAR write; stopping\n")
+        return
+    rv_post = p.read64(impl)
+    locked_post = bool(rv_post & RVBAR_LOCK)
+    buf.write(f"  [post] RVBAR=0x{rv_post:016x} (LOCK={locked_post})\n")
+    if locked_post:
+        buf.write("  -> LOCK STAYED SET after write -> RVBAR lock is sticky-"
+                  "until-reset; m1n1's in-line write64 can't clear it either. "
+                  "H1's fix must avoid needing to clear it. NOT strobing "
+                  "start.\n")
+        return
+    buf.write("  -> LOCK CLEARED. Proceeding to CPU-start strobe.\n")
+
+    # 3) Enable + start strobes (smp.c:168, smp.c:171).
+    en_val = 1 << (4 * cluster + core)
+    st_val = 1 << core
+    buf.write(f"  [write] cpustart+0x4 <- 0x{en_val:x} (enable, smp.c:168)\n")
+    log(f"    write32(0x{cpu_start_base + 0x4:x}, 0x{en_val:x}) [enable]...")
+    try:
+        p.write32(cpu_start_base + 0x4, en_val)
+        if not check_alive():
+            buf.write("  [ABORT] m1n1 wedged after enable write; stopping\n")
+            return
+        buf.write(f"  [write] cpustart+0x8+4*{cluster} <- 0x{st_val:x} "
+                  f"(start, smp.c:171)\n")
+        log(f"    write32(0x{cpu_start_base + 0x8 + 4 * cluster:x}, "
+            f"0x{st_val:x}) [start]...")
+        p.write32(cpu_start_base + 0x8 + 4 * cluster, st_val)
+    except Exception as e:
+        buf.write(f"  CPU-start write FAILED: {e.__class__.__name__}: {e}\n")
+        return
+    if not check_alive():
+        buf.write("  [ABORT] m1n1 wedged after start write; stopping\n")
+        return
+
+    # 4) Observe. The core, if released, prints 'RVBAR entry on secondary CPU'
+    #    from _cpu_reset_c (startup.c:222) on the TTY console. We can't read
+    #    m1n1's spin_table flag, so the UART marker is the success signal.
+    buf.write("  [observe] started strobe issued. WATCH THE TTY> CONSOLE for "
+              "'RVBAR entry on secondary CPU' (the _cpu_reset_c marker) --\n"
+              "            that string appearing == the core LEFT RESET == H1 "
+              "CONFIRMED.\n")
+    log("    strobe issued; watch TTY for 'RVBAR entry on secondary CPU'...")
+    # Give the core a moment; keep the proxy alive-check cheap.
+    for _ in range(10):
+        time.sleep(0.05)
+        if not check_alive():
+            buf.write("  [ABORT] m1n1 stopped responding during observe "
+                      "window\n")
+            return
+    try:
+        exc1 = p.get_exc_count()
+        buf.write(f"  [observe] boot-core exc_count delta = {exc1 - exc0} "
+                  f"(0 = boot core did not fault)\n")
+    except Exception:
+        pass
+
+    buf.write("  (Marker on TTY -> H1 CONFIRMED: locked-un-rearmed RVBAR was "
+              "the blocker -> RUN 28 = minimal m1n1-source fix (unconditional "
+              "RVBAR re-write in smp_start_cpu, or rvbar_rewrite flag on "
+              "features_m4) + reflash. LOCK cleared but NO marker -> start-"
+              "register layout (H3). LOCK never cleared -> sticky lock, rethink."
+              ")\n")
+
+
 # ---------------------------------------------------------------- ACIO status
 
 def _acio_asc_bases(node):
@@ -516,6 +691,15 @@ def build_argparser():
                          "bit + CPU-start block words, mirroring m1n1 smp.c's "
                          "address derivation. Evidence for the 'cores powered "
                          "but Failed!' spin-table lead.")
+    ap.add_argument("--smp-release-probe", action="store_true",
+                    help="WRITES MMIO: manually release ONE secondary core "
+                         "(replicates smp_start_cpu) -- clears its RVBAR_LOCK "
+                         "and strobes CPU-start. Tests the RVBAR-lock "
+                         "hypothesis with no reflash. Watch TTY for 'RVBAR "
+                         "entry on secondary CPU'.")
+    ap.add_argument("--release-core", default="0x1",
+                    help="target /cpus 'reg' value for --smp-release-probe "
+                         "(hex, default 0x1 = die0/cluster0/core1).")
     ap.add_argument("--acio-status", action="store_true",
                     help="read-only: each acio-cpuN rtkit's CPU_STATUS/"
                          "CPU_CONTROL -- running / stopped / in reset. Does "
@@ -557,6 +741,16 @@ def main():
         try_(lambda: smp_probe(buf), "smp_probe")
         flush("smp-probe")
 
+    if args.smp_release_probe:
+        try:
+            target = int(args.release_core, 0)
+        except ValueError:
+            target = 0x1
+            log(f"bad --release-core={args.release_core!r}; using 0x1")
+        try_(lambda: smp_release_probe(buf, target_reg=target),
+             "smp_release_probe")
+        flush("smp-release-probe")
+
     if args.soc_recon:
         try_(lambda: soc_recon(buf), "soc_recon")
         flush("soc-recon")
@@ -566,9 +760,9 @@ def main():
         flush("acio-status")
 
     if not (args.smp_start or args.smp_diag or args.smp_probe
-            or args.soc_recon or args.acio_status):
+            or args.smp_release_probe or args.soc_recon or args.acio_status):
         log("no probe selected; pass --smp-start/--smp-diag/--smp-probe/"
-            "--soc-recon/--acio-status")
+            "--smp-release-probe/--soc-recon/--acio-status")
 
     flush("done")
     log(f"done; log at {runtime_path}")
