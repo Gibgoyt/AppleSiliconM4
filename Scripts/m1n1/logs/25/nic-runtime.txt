@@ -1,0 +1,108 @@
+=== soc_bringup: SoC-first bring-up recon ===
+
+=== SMP: p.smp_start_secondaries() ===
+(see TTY console for 'Starting CPU N ...' lines)
+
+
+=== SMP diagnosis (why do the cores refuse?, read-only) ===
+  cpu 'cpu0' cluster=0 cpu-id=0 state='waiting' clock-gates=[]
+  cpu 'cpu1' cluster=0 cpu-id=1 state='waiting' clock-gates=[]
+  cpu 'cpu2' cluster=0 cpu-id=2 state='waiting' clock-gates=[]
+  cpu 'cpu3' cluster=0 cpu-id=3 state='waiting' clock-gates=[]
+  cpu 'cpu4' cluster=0 cpu-id=4 state='waiting' clock-gates=[]
+  cpu 'cpu5' cluster=0 cpu-id=5 state='waiting' clock-gates=[]
+  cpu 'cpu6' cluster=1 cpu-id=6 state='running' clock-gates=[]
+  cpu 'cpu7' cluster=1 cpu-id=7 state='waiting' clock-gates=[]
+  cpu 'cpu8' cluster=1 cpu-id=8 state='waiting' clock-gates=[]
+  cpu 'cpu9' cluster=1 cpu-id=9 state='waiting' clock-gates=[]
+  --- pmgr devices matching CPU/cluster power domains ---
+      gate    1 name='ECPU0'                  ps@0x380700000 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate    2 name='ECPU1'                  ps@0x380700008 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate    3 name='ECPU2'                  ps@0x380700010 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate    4 name='ECPU3'                  ps@0x380700018 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate    5 name='ECPU4'                  ps@0x380700020 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate    6 name='ECPU5'                  ps@0x380700028 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate    7 name='PCPU0'                  ps@0x380700030 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate    8 name='PCPU1'                  ps@0x380700038 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate    9 name='PCPU2'                  ps@0x380700040 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate   10 name='PCPU3'                  ps@0x380700048 = 0x000001f0 (target=0x0, actual=0xf, ON; was_pwrgated)
+      gate   42 name='DISPEXT0_CPU'           ps@0x3807001e8 = 0x0f0000ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+      gate   58 name='SIO_CPU'                ps@0x380700268 = 0x0f000200 (target=0x0, actual=0x0, OFF; ps_auto=0xf, was_clkgated)
+      gate  139 name='DISPEXT1_CPU'           ps@0x3807004f0 = 0x0f0000ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+      gate  159 name='ISP_CPU'                VIRTUAL (no PS reg, flags.on=False)
+      gate  160 name='ISP_CPU_CORE0'          VIRTUAL (no PS reg, flags.on=False)
+      gate  161 name='ISP_CPU_CORE1'          VIRTUAL (no PS reg, flags.on=False)
+      gate  178 name='ANE_CPU'                ps@0x38070c008 = 0x0f000300 (target=0x0, actual=0x0, OFF; ps_auto=0xf, was_pwrgated, was_clkgated)
+      gate  181 name='DISP_CPU'               ps@0x380710000 = 0x0f0000ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+      gate  221 name='AOP_CPU'                VIRTUAL (no PS reg, flags.on=False)
+      gate  274 name='SMC_CPU'                VIRTUAL (no PS reg, flags.on=False)
+      gate  282 name='MTP_CPU'                VIRTUAL (no PS reg, flags.on=False)
+      gate  291 name='SIO-CPU-V'              VIRTUAL (no PS reg, flags.on=False)
+      gate  336 name='CPU-BUSY'               VIRTUAL (no PS reg, flags.on=False)
+  (Cores power-gated / parent-off -> fix cluster power in RUN 26. Cores ON but refused -> spin-table / reset-vector path, not power.)
+
+=== SoC recon (companion IOPs + asleep domains, read-only) ===
+  --- companion processors (/arm-io IOP/ASC nodes) ---
+  IOP node 'acio-cpu0' role=ACIO0 compat=[iop,mxwrap-acio]
+    clock-gates=[338]
+      gate  338 name='CIO0_RECONFIG-V'        VIRTUAL (no PS reg, flags.on=False)
+    gate 338: VIRTUAL(on=False)
+  IOP node 'acio-cpu1' role=ACIO1 compat=[iop,mxwrap-acio]
+    clock-gates=[339]
+      gate  339 name='CIO1_RECONFIG-V'        VIRTUAL (no PS reg, flags.on=False)
+    gate 339: VIRTUAL(on=False)
+  IOP node 'acio-cpu3' role=ACIO3 compat=[iop,mxwrap-acio]
+    clock-gates=[341]
+      gate  341 name='CIO3_RECONFIG-V'        VIRTUAL (no PS reg, flags.on=False)
+    gate 341: VIRTUAL(on=False)
+  IOP node 'aop' role=AOP compat=[iop,ascwrap-v6]
+    clock-gates=[]
+  IOP node 'pmp' role=PMP compat=[iop,ascwrap-v6]
+    clock-gates=[126, 127]
+      gate  126 name='PMP'                    ps@0x380700488 = 0x0f0000ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+    gate 126: ON
+      gate  127 name='PMS_SRAM'               ps@0x380700490 = 0x0f0000ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+    gate 127: ON
+  IOP node 'sep' role=SEP compat=[iop-sep,ascwrap-v6]
+    clock-gates=[]
+  IOP node 'esm' role=None compat=[iop,exclave-sep-manager]
+    clock-gates=[]
+  IOP node 'sio' role=SIO compat=[iop,ascwrap-v6]
+    clock-gates=[291]
+      gate  291 name='SIO-CPU-V'              VIRTUAL (no PS reg, flags.on=False)
+    gate 291: VIRTUAL(on=False)
+  IOP node 'ans' role=ANS2 compat=[iop,ascwrap-v6]
+    clock-gates=[]
+  IOP node 'smc' role=SMC compat=[iop,ascwrap-v6]
+    clock-gates=[]
+  IOP node 'dcp' role=DCP compat=[iop,ascwrap-v6]
+    clock-gates=[181]
+      gate  181 name='DISP_CPU'               ps@0x380710000 = 0x0f0000ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+    gate 181: ON
+  IOP node 'dcpext0' role=DCPEXT0 compat=[iop,ascwrap-v6]
+    clock-gates=[42]
+      gate   42 name='DISPEXT0_CPU'           ps@0x3807001e8 = 0x0f0000ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+    gate 42: ON
+  IOP node 'dcpext1' role=DCPEXT1 compat=[iop,ascwrap-v6]
+    clock-gates=[139]
+      gate  139 name='DISPEXT1_CPU'           ps@0x3807004f0 = 0x0f0000ff (target=0xf, actual=0xf, ON; ps_auto=0xf)
+    gate 139: ON
+  IOP node 'gfx-asc' role=GFX compat=[iop,ascwrap-v6]
+    clock-gates=[315]
+      gate  315 name='GFX-ASC'                VIRTUAL (no PS reg, flags.on=False)
+    gate 315: VIRTUAL(on=False)
+  --- apcie power-gates ---
+  apcie power-gates=[379, 380, 381, 382, 383, 151]
+      gate  379 name='ANS-V'                  VIRTUAL (no PS reg, flags.on=False)
+    gate 379: VIRTUAL(on=False)
+      gate  380 name='APCIE-GP-V'             VIRTUAL (no PS reg, flags.on=False)
+    gate 380: VIRTUAL(on=False)
+      gate  381 name='APCIE-SYS-GP-V'         VIRTUAL (no PS reg, flags.on=False)
+    gate 381: VIRTUAL(on=False)
+      gate  382 name='APCIE-ST-V'             VIRTUAL (no PS reg, flags.on=False)
+    gate 382: VIRTUAL(on=False)
+      gate  383 name='APCIE-SYS-ST-V'         VIRTUAL (no PS reg, flags.on=False)
+    gate 383: VIRTUAL(on=False)
+      gate  151 name='APCIE_PHY_SW'           ps@0x380700550 = 0x1400024f (target=0xf, actual=0x4, OFF; auto_enable ps_auto=0x4, was_clkgated)
+    gate 151: OFF
+  (No IOP boot performed. If acio-cpu0 is powered but its rtkit is not running, RUN 26 = boot the ACIO IOP before pcie_init.)
