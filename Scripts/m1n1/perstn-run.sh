@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..29} [extra args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..30} [extra args...]
 #
 # RUNs 1-24 drive perstn.sh (PCIe bring-up). RUN 25+ drive soc_bringup.sh
 # (SoC-first: SMP + companion-IOP recon). The RUNNER var selects which.
@@ -1503,8 +1503,31 @@ case "${RUN^^}" in
                --cpustart-decode
                --require-build=rc1-60-g)
         ;;
+    30)
+        # RUN 30: find the REAL M4 CPU-start register (READ-ONLY). RUN 29
+        # confirmed pmgr+0x34000 is inert on M4 (after --smp-start the running
+        # core cpu6's bit is absent under every encoding at every offset).
+        # KEY: upstream m1n1 gave the sibling M4 die T6040 a DIFFERENT offset
+        # (CPU_START_OFF_T6031 = 0x88000), while our T8132 kept the unverified
+        # 0x34000. --cpustart-decode now probes a CANDIDATE offset and flags any
+        # word whose bits EXACTLY match the running core set -> the real
+        # register.
+        #
+        # This arm probes 0x88000 (T6040, strongest candidate) first. A wrong
+        # offset may SError and wedge m1n1, so run ONE candidate per boot and
+        # POWER-CYCLE between. Other candidates (re-run with the override):
+        #   ./perstn-run.sh 30 --cpustart-offset=0x30000   (then 0x38000,
+        #   0x54000, 0x28000). A candidate whose word matches cpu6 -> RUN 31 =
+        #   reflash smp.c with CPU_START_OFF_T8132=<that offset> + case T8132.
+        RUNNER=soc_bringup.sh
+        FLAGS=(--smp-start
+               --smp-probe
+               --cpustart-decode
+               --cpustart-offset=0x88000
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29} [extra perstn.py/soc_bringup.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30} [extra perstn.py/soc_bringup.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
