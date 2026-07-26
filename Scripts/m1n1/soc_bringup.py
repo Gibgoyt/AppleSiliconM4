@@ -340,6 +340,109 @@ def smp_probe(buf):
               "missing die-1 RVBAR or unlatched enables -> address-math bug.)\n")
 
 
+# ---------------------------------------------------------------- CPU-start decode
+
+def _decode_bits_to_cores(word, cores):
+    """Given a 32-bit word and the list of core dicts (each with die/cluster/
+    core/cpu_id), return three lists of core names whose bit would be set under:
+      - per-cluster m1n1 '+0x4' encoding: bit 4*cluster+core (smp.c:168)
+      - per-core 'core' encoding: bit == core (smp.c:171, per-cluster word)
+      - flat cpu_id encoding: bit == cpu_id (function-enable_core Core(1<<cpu_id))
+    """
+    pcl, pcore, flat = [], [], []
+    for c in cores:
+        nm = c["name"]
+        if word & (1 << (4 * c["cluster"] + c["core"])):
+            pcl.append(nm)
+        if word & (1 << c["core"]):
+            pcore.append(nm)
+        if word & (1 << c["cpu_id"]):
+            flat.append(nm)
+    return pcl, pcore, flat
+
+
+def cpustart_decode(buf):
+    """RUN 29 (READ-ONLY, pmgr-space only): dump and decode the CPU-start block
+    at pmgr_reg+0x34000, to test the wrong-offset/encoding hypothesis (H5).
+
+    The M4 SMP fix is NOT upstream (our smp.c already matches/exceeds it; no
+    sysreg-unlock exists). m1n1 lumps T8132 into CPU_START_OFF_T8112=0x34000 --
+    an unverified M2/M3 guess. M4 provably relocated per-cluster MMIO (the
+    acc-impl-reg SError). If M4 also moved the CPU-start block, the strobe lands
+    on the wrong address and the core never leaves reset (zero UART output --
+    exactly the symptom). This decode looks for WHERE the running core's bit
+    actually is, and under WHICH encoding (per-cluster 1<<(4*cluster+core) vs
+    flat 1<<cpu_id).
+
+    SAFETY (RUN 28 lesson): stays entirely in the pmgr reg window
+    (0x380700000+, proven AP-readable). Does NOT touch acc-impl/cpm-impl -- those
+    SError, and an SError desyncs the proxy UART even under guarded() (worse than
+    an AXI stall). guarded()+check_alive() here is belt-and-suspenders on
+    known-safe reads.
+    """
+    buf.write("\n=== CPU-start block decode (pmgr+0x34000, read-only) ===\n")
+    log("CPU-start block decode (H5: wrong offset/encoding)...")
+
+    try:
+        pmgr_reg = u.adt["arm-io/pmgr"].get_reg(0)[0]
+    except Exception as e:
+        buf.write(f"  cannot resolve pmgr reg[0]: {e.__class__.__name__}: {e}\n")
+        return
+    base = pmgr_reg + CPU_START_OFF_T8112
+    buf.write(f"  pmgr reg[0]=0x{pmgr_reg:x}  CPU-start base (die0)="
+              f"0x{base:x} (+0x{CPU_START_OFF_T8112:x})\n")
+
+    # Build the live core set with decoded die/cluster/core + cpu_id + state.
+    cores, running = [], []
+    nodes = _cpu_nodes_by_reg(buf)
+    for reg, node in sorted(nodes.items()):
+        cpu_id = node.getprop("cpu-id", None)
+        state = str(node.getprop("state", None))
+        c = {
+            "name": getattr(node, "name", f"reg{reg:#x}"),
+            "reg": reg,
+            "core": reg & CPU_REG_CORE_MASK,
+            "cluster": (reg & CPU_REG_CLUSTER_MASK) >> 8,
+            "die": (reg & CPU_REG_DIE_MASK) >> 11,
+            "cpu_id": int(cpu_id) if cpu_id is not None else -1,
+            "state": state,
+        }
+        cores.append(c)
+        if state == "running":
+            running.append(c["name"])
+    buf.write(f"  running cores: {running}  (all others waiting)\n")
+    buf.write("  m1n1 writes (smp.c): +0x4 |= 1<<(4*cluster+core) [enable]; "
+              "+0x8+4*cluster |= 1<<core [start]\n")
+
+    # Dump the block (bounded) and decode each non-zero word.
+    buf.write("  --- block dump + per-word decode ---\n")
+    off = 0x0
+    with guarded(buf, label="cpustart-decode"):
+        while off < 0x40:
+            v = _read32_live(base + off, f"cpustart+0x{off:x}", buf,
+                             log_progress=False)
+            if not check_alive():
+                buf.write("    [ABORT] m1n1 wedged reading CPU-start block; "
+                          "stopping\n")
+                return
+            if v and v != GUARD_SENTINEL:
+                pcl, pcore, flat = _decode_bits_to_cores(v, cores)
+                buf.write(f"      +0x{off:x} = 0x{v:08x}  bits set -> "
+                          f"per-cluster(4*cl+core)={pcl}  per-core(core)={pcore}"
+                          f"  flat(cpu_id)={flat}\n")
+            off += 4
+
+    buf.write("  (If a word's set bits match the RUNNING core(s) under the flat "
+              "cpu_id encoding but NOT under m1n1's per-cluster encoding, the "
+              "real enable register uses the flat Core(1<<cpu_id) encoding and "
+              "m1n1's strobe is wrong for M4. If m1n1's intended per-cluster "
+              "bits are ABSENT after --smp-start, the writes aren't landing at "
+              "0x34000 -> wrong offset. Either way -> RUN 30 = corrected "
+              "CPU_START_OFF_T8132 / flat-bitmask strobe + reflash. If the "
+              "intended bits ARE present yet cores don't start -> offset right, "
+              "blocker elsewhere.)\n")
+
+
 # ---------------------------------------------------------------- SMP release probe
 
 def smp_release_probe(buf, target_reg=0x1):
@@ -913,6 +1016,11 @@ def build_argparser():
     ap.add_argument("--wait-core", default="0x101",
                     help="waiting-core 'reg' for --core-diff-scan "
                          "(hex, default 0x101 = cpu7, same cluster).")
+    ap.add_argument("--cpustart-decode", action="store_true",
+                    help="read-only (pmgr-space only): dump+decode the CPU-start "
+                         "block at pmgr+0x34000 vs the running/waiting core set, "
+                         "to test the wrong-offset/encoding hypothesis. Does NOT "
+                         "touch the SError-ing acc/cpm windows.")
     ap.add_argument("--acio-status", action="store_true",
                     help="read-only: each acio-cpuN rtkit's CPU_STATUS/"
                          "CPU_CONTROL -- running / stopped / in reset. Does "
@@ -954,6 +1062,10 @@ def main():
         try_(lambda: smp_probe(buf), "smp_probe")
         flush("smp-probe")
 
+    if args.cpustart_decode:
+        try_(lambda: cpustart_decode(buf), "cpustart_decode")
+        flush("cpustart-decode")
+
     if args.smp_release_probe:
         try:
             target = int(args.release_core, 0)
@@ -988,11 +1100,12 @@ def main():
         flush("acio-status")
 
     if not (args.smp_start or args.smp_diag or args.smp_probe
-            or args.smp_release_probe or args.enable_core_parse
-            or args.core_diff_scan or args.soc_recon or args.acio_status):
+            or args.cpustart_decode or args.smp_release_probe
+            or args.enable_core_parse or args.core_diff_scan
+            or args.soc_recon or args.acio_status):
         log("no probe selected; pass --smp-start/--smp-diag/--smp-probe/"
-            "--smp-release-probe/--enable-core-parse/--core-diff-scan/"
-            "--soc-recon/--acio-status")
+            "--cpustart-decode/--smp-release-probe/--enable-core-parse/"
+            "--core-diff-scan/--soc-recon/--acio-status")
 
     flush("done")
     log(f"done; log at {runtime_path}")

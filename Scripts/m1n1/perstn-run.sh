@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..28} [extra args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..29} [extra args...]
 #
 # RUNs 1-24 drive perstn.sh (PCIe bring-up). RUN 25+ drive soc_bringup.sh
 # (SoC-first: SMP + companion-IOP recon). The RUNNER var selects which.
@@ -1480,8 +1480,31 @@ case "${RUN^^}" in
                --core-diff-scan
                --require-build=rc1-60-g)
         ;;
+    29)
+        # RUN 29: test the wrong-CPU-start-offset hypothesis (H5), READ-ONLY.
+        # RUN 28 confirmed the function-enable_core = pmgr:Core(1<<cpu_id) recipe
+        # (a FLAT per-core bitmask, unlike m1n1's per-cluster 1<<core strobe),
+        # and its --core-diff-scan SError'd + wedged m1n1 reading the per-cluster
+        # acc-impl window (0x211F00000) -- proof M4 relocated per-cluster MMIO.
+        # A full m1n1 branch-diff proved the SMP fix is NOT upstream (our smp.c
+        # already matches/exceeds it; features_m4 is // XXX everywhere; no
+        # sysreg-unlock exists). Leading hypothesis: m1n1's CPU-start offset
+        # 0x34000 (CPU_START_OFF_T8112, an unverified M2/M3 guess for T8132) is
+        # wrong for M4, so the strobe never releases the core (zero UART output).
+        #
+        # --cpustart-decode dumps+decodes the CPU-start block at pmgr+0x34000
+        # (proven-readable pmgr space) vs the running/waiting core set, under
+        # both per-cluster and flat cpu_id encodings. NO --core-diff-scan (it
+        # SErrors). Power-cycle the M4 first (RUN 28 left it wedged).
+        # Outcome -> RUN 30: corrected CPU_START_OFF_T8132 / flat strobe + reflash.
+        RUNNER=soc_bringup.sh
+        FLAGS=(--smp-start
+               --smp-probe
+               --cpustart-decode
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28} [extra perstn.py/soc_bringup.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29} [extra perstn.py/soc_bringup.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
