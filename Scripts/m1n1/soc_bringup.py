@@ -474,6 +474,155 @@ def cpustart_decode(buf, start_off=CPU_START_OFF_T8112):
                   f"(SMC/AIC/mailbox) -> deeper RE.\n")
 
 
+# ---------------------------------------------------------------- CPU-start scan
+
+def _running_core_masks(buf):
+    """Return (cores, flat_mask, pcl_mask): the live core set (list of dicts
+    with die/cluster/core/cpu_id/state) and the register value that would encode
+    the RUNNING cores under the flat (1<<cpu_id) and per-cluster
+    (1<<(4*cluster+core)) schemes. Shared by cpustart_decode/cpustart_scan."""
+    cores = []
+    flat_mask = 0
+    pcl_mask = 0
+    for reg, node in sorted(_cpu_nodes_by_reg(buf).items()):
+        cpu_id = node.getprop("cpu-id", None)
+        c = {
+            "name": getattr(node, "name", f"reg{reg:#x}"),
+            "reg": reg,
+            "core": reg & CPU_REG_CORE_MASK,
+            "cluster": (reg & CPU_REG_CLUSTER_MASK) >> 8,
+            "die": (reg & CPU_REG_DIE_MASK) >> 11,
+            "cpu_id": int(cpu_id) if cpu_id is not None else -1,
+            "state": str(node.getprop("state", None)),
+        }
+        cores.append(c)
+        if c["state"] == "running":
+            flat_mask |= 1 << c["cpu_id"]
+            pcl_mask |= 1 << (4 * c["cluster"] + c["core"])
+    return cores, flat_mask, pcl_mask
+
+
+# Curated pmgr sub-regions to scan for the real M4 CPU-start register. The known
+# per-SoC CPU_START_OFF values (smp.c:18-23) are the most likely real register
+# banks; ordered most-likely-mapped first (0x34000/0x88000 are proven-safe reads)
+# so an SError abort still leaves the high-value offsets covered.
+_CPUSTART_SCAN_OFFSETS = [
+    0x34000,   # T8112 (current guess; inert but proven-readable)
+    0x38000,   # 0x34000 + 0x4000 neighbor
+    0x30000,   # S5L8960X; 0x34000 - 0x4000 neighbor
+    0x88000,   # T6031/T6040 (proven-readable, all-zero)
+    0x28000,   # T6020
+    0x54000,   # T8103
+    0xd4000,   # S8000 (least likely; venture last)
+]
+
+
+def cpustart_scan(buf, max_reads=300):
+    """RUN 31 (READ-ONLY): curated bounded scan of the pmgr window for the real
+    M4 CPU-start register -- the LAST read-only offset search. m1n1's 0x34000 is
+    inert and the T6040 0x88000 is all-zero; the register is bootloader-private
+    (Linux t8132 uses spin-table; no dtsi/ADT names it). This scans the known
+    per-SoC CPU_START_OFF banks + a bounded neighborhood around 0x34000 for a
+    word that reflects the RUNNING core (== flat 0x40 / per-cluster 0x10, or a
+    plausible single-core mask).
+
+    SAFETY (RUN 28 lesson): a wrong/unmapped offset SErrors -> desyncs the proxy
+    -> wedges m1n1 (power-cycle). So read the FIRST word of each region first and
+    ABORT THE WHOLE SCAN on the first wedge (the proxy is desynced; probing on is
+    futile), naming the offset reached. Bounded to max_reads words total.
+    """
+    buf.write("\n=== CPU-start scan (curated pmgr offsets, read-only) ===\n")
+    log("CPU-start scan (last read-only offset search)...")
+
+    try:
+        pmgr_reg = u.adt["arm-io/pmgr"].get_reg(0)[0]
+    except Exception as e:
+        buf.write(f"  cannot resolve pmgr reg[0]: {e.__class__.__name__}: {e}\n")
+        return
+    cores, flat_mask, pcl_mask = _running_core_masks(buf)
+    run_names = [c["name"] for c in cores if c["state"] == "running"]
+    buf.write(f"  pmgr reg[0]=0x{pmgr_reg:x}  running cores: {run_names}\n")
+    buf.write(f"  looking for a word == flat 0x{flat_mask:x} (running cpu_id "
+              f"bits) or per-cluster 0x{pcl_mask:x}, or a single-core mask\n")
+
+    # Build the ordered region list: the neighborhood sweep around 0x34000
+    # (0x30000..0x3c000 step 0x1000) merged with the known-SoC offsets, dedup'd,
+    # most-likely-first.
+    neighborhood = list(range(0x30000, 0x3D000, 0x1000))
+    seen = set()
+    offsets = []
+    for o in _CPUSTART_SCAN_OFFSETS[:1] + neighborhood + _CPUSTART_SCAN_OFFSETS[1:]:
+        if o not in seen:
+            seen.add(o)
+            offsets.append(o)
+
+    single_core_bits = {1 << c["cpu_id"] for c in cores}  # any lone-core flat bit
+    single_core_bits |= {1 << (4 * c["cluster"] + c["core"]) for c in cores}
+    candidates = []
+    reads = 0
+
+    for start_off in offsets:
+        if reads >= max_reads:
+            buf.write(f"  [cap] hit max_reads={max_reads}; stopping scan "
+                      f"(remaining offsets not probed)\n")
+            break
+        base = pmgr_reg + start_off
+        buf.write(f"  --- pmgr+0x{start_off:x} (0x{base:x}) ---\n")
+        nonzero = []
+        with guarded(buf, label=f"cpustart-scan-{start_off:#x}"):
+            off = 0x0
+            while off < 0x40 and reads < max_reads:
+                v = _read32_live(base + off, f"+0x{start_off:x}+0x{off:x}", buf,
+                                 log_progress=False)
+                reads += 1
+                if not check_alive():
+                    buf.write(f"    [ABORT] scan SError'd/wedged at pmgr+0x"
+                              f"{start_off:x}+0x{off:x} -- proxy desynced; "
+                              f"power-cycle. Stopping scan (release not an "
+                              f"AP-visible pmgr strobe in the covered range).\n")
+                    _cpustart_scan_summary(buf, candidates, aborted=True)
+                    return
+                if v and v != GUARD_SENTINEL:
+                    nonzero.append((off, v))
+                    pcl, pcore, flat = _decode_bits_to_cores(v, cores)
+                    tag = ""
+                    if flat_mask and v == flat_mask:
+                        tag = "  <== CPU-start CANDIDATE (flat==running)"
+                    elif pcl_mask and v == pcl_mask:
+                        tag = "  <== CPU-start CANDIDATE (per-cluster==running)"
+                    elif v in single_core_bits:
+                        tag = "  <== maybe (single-core mask)"
+                    if tag:
+                        candidates.append((start_off, off, v, tag.strip()))
+                    buf.write(f"      +0x{off:x} = 0x{v:08x}  "
+                              f"pcl={pcl} flat={flat}{tag}\n")
+                off += 4
+        if not nonzero:
+            buf.write("      (all zero)\n")
+
+    _cpustart_scan_summary(buf, candidates, aborted=False)
+
+
+def _cpustart_scan_summary(buf, candidates, aborted):
+    buf.write("  --- scan summary ---\n")
+    if candidates:
+        buf.write(f"  {len(candidates)} candidate word(s) found:\n")
+        for start_off, off, v, tag in candidates:
+            buf.write(f"    pmgr+0x{start_off:x}+0x{off:x} = 0x{v:08x}  {tag}\n")
+        buf.write("  -> STRONGEST candidate = the one flagged 'CPU-start "
+                  "CANDIDATE' (==running set). RUN 32 = reflash smp.c with "
+                  "CPU_START_OFF_T8132=<that offset> + case T8132.\n")
+    else:
+        tail = ("(scan aborted on SError before full coverage)" if aborted
+                else "(full curated coverage, no SError)")
+        buf.write(f"  NO candidate word reflects the running core anywhere in "
+                  f"the scanned pmgr offsets {tail}. -> The M4 CPU-start is NOT "
+                  f"an AP-visible pmgr strobe (bootloader-private; Linux uses "
+                  f"spin-table). STOP the offset hunt: reassess whether SMP is "
+                  f"needed for the PCIe goal, or escalate to Asahi/m1n1 devs "
+                  f"with the RUN 24-31 evidence.\n")
+
+
 # ---------------------------------------------------------------- SMP release probe
 
 def smp_release_probe(buf, target_reg=0x1):
@@ -1058,6 +1207,12 @@ def build_argparser():
                          "candidates: 0x88000 (T6040), 0x30000, 0x38000, "
                          "0x54000, 0x28000. A wrong offset may SError -- run one "
                          "per boot, power-cycle between.")
+    ap.add_argument("--cpustart-scan", action="store_true",
+                    help="RUN 31 read-only: curated bounded scan of the pmgr "
+                         "window (known SoC CPU_START_OFF banks + 0x34000 "
+                         "neighborhood) for the word that reflects the running "
+                         "core -- the last read-only offset search. Aborts on "
+                         "the first SError (power-cycle between runs).")
     ap.add_argument("--acio-status", action="store_true",
                     help="read-only: each acio-cpuN rtkit's CPU_STATUS/"
                          "CPU_CONTROL -- running / stopped / in reset. Does "
@@ -1108,6 +1263,10 @@ def main():
         try_(lambda: cpustart_decode(buf, start_off=start_off), "cpustart_decode")
         flush("cpustart-decode")
 
+    if args.cpustart_scan:
+        try_(lambda: cpustart_scan(buf), "cpustart_scan")
+        flush("cpustart-scan")
+
     if args.smp_release_probe:
         try:
             target = int(args.release_core, 0)
@@ -1142,12 +1301,12 @@ def main():
         flush("acio-status")
 
     if not (args.smp_start or args.smp_diag or args.smp_probe
-            or args.cpustart_decode or args.smp_release_probe
-            or args.enable_core_parse or args.core_diff_scan
-            or args.soc_recon or args.acio_status):
+            or args.cpustart_decode or args.cpustart_scan
+            or args.smp_release_probe or args.enable_core_parse
+            or args.core_diff_scan or args.soc_recon or args.acio_status):
         log("no probe selected; pass --smp-start/--smp-diag/--smp-probe/"
-            "--cpustart-decode/--smp-release-probe/--enable-core-parse/"
-            "--core-diff-scan/--soc-recon/--acio-status")
+            "--cpustart-decode/--cpustart-scan/--smp-release-probe/"
+            "--enable-core-parse/--core-diff-scan/--soc-recon/--acio-status")
 
     flush("done")
     log(f"done; log at {runtime_path}")

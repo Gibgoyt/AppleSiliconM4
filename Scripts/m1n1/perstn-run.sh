@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..30} [extra args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..31} [extra args...]
 #
 # RUNs 1-24 drive perstn.sh (PCIe bring-up). RUN 25+ drive soc_bringup.sh
 # (SoC-first: SMP + companion-IOP recon). The RUNNER var selects which.
@@ -1526,8 +1526,29 @@ case "${RUN^^}" in
                --cpustart-offset=0x88000
                --require-build=rc1-60-g)
         ;;
+    31)
+        # RUN 31: LAST read-only offset search for the M4 CPU-start register.
+        # RUN 29 proved pmgr+0x34000 is inert; RUN 30 eliminated 0x88000
+        # (all-zero). Research: the register is BOOTLOADER-PRIVATE -- Linux
+        # t8132 uses spin-table (cores pre-released by iBoot), no dtsi/ADT names
+        # it, it's not in the AIC. --cpustart-scan does a curated bounded scan
+        # of the pmgr window (known SoC CPU_START_OFF banks + a 0x34000
+        # neighborhood) for the word that reflects the running core (== flat
+        # 0x40 / per-cluster 0x10). It aborts on the first SError (proxy
+        # desync); POWER-CYCLE the M4 first and between runs.
+        #
+        # Outcome fork: candidate found -> RUN 32 = reflash CPU_START_OFF_T8132.
+        # Nothing found / SError abort -> the release is NOT an AP-visible pmgr
+        # strobe -> STOP guessing; reassess whether SMP is needed for PCIe, or
+        # escalate to Asahi/m1n1 devs with the RUN 24-31 evidence.
+        RUNNER=soc_bringup.sh
+        FLAGS=(--smp-start
+               --smp-probe
+               --cpustart-scan
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30} [extra perstn.py/soc_bringup.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31} [extra perstn.py/soc_bringup.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
