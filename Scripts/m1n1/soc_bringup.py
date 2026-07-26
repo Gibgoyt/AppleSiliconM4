@@ -514,6 +514,204 @@ def smp_release_probe(buf, target_reg=0x1):
               ")\n")
 
 
+# ---------------------------------------------------------------- enable_core parse
+
+# The M4 PMGR node phandle (compatible=[pmgr1,t8132]); every /cpus node's
+# function-enable_core targets it. From m4_recon/adt.txt.
+PMGR_PHANDLE = 138
+
+
+def _cpu_nodes_by_reg(buf):
+    """Return {reg: node} for /cpus children, or {} on failure."""
+    out = {}
+    try:
+        for cpu in u.adt["cpus"]:
+            r = cpu.getprop("reg", None)
+            if r is not None:
+                out[int(r)] = cpu
+    except Exception as e:
+        buf.write(f"  cannot walk /cpus: {e.__class__.__name__}: {e}\n")
+    return out
+
+
+def enable_core_parse(buf):
+    """RUN 28 (read-only, ADT only -- zero MMIO): decode each /cpus node's
+    function-enable_core recipe. On M4 this is `138:Core(<core-bitmask>)` --
+    a PMGR (phandle 138) device-function that iBoot uses to release cores, and
+    which m1n1's SMP path never invokes (it only writes the legacy 0x34000
+    strobe). Confirms the (phandle, name, args) tuple and that the arg is the
+    per-core bit (1<<cpu_id). This documents the lead before any MMIO."""
+    buf.write("\n=== enable_core parse (function-enable_core recipe, ADT-only) "
+              "===\n")
+    log("enable_core parse (function-enable_core ADT recipe)...")
+
+    try:
+        cpus = u.adt["cpus"]
+    except Exception as e:
+        buf.write(f"  cannot open /cpus: {e.__class__.__name__}: {e}\n")
+        return
+
+    for cpu in cpus:
+        name = getattr(cpu, "name", "?")
+        cpu_id = cpu.getprop("cpu-id", None)
+        fn = cpu.getprop("function-enable_core", None)
+        if fn is None:
+            buf.write(f"  {name}: no function-enable_core\n")
+            continue
+        try:
+            phandle = int(fn.phandle)
+            fname = str(fn.name)
+            fargs = [int(a) for a in fn.args]
+        except Exception as e:
+            buf.write(f"  {name}: function-enable_core unparsable ({fn!r}): "
+                      f"{e.__class__.__name__}: {e}\n")
+            continue
+        arg0 = fargs[0] if fargs else None
+        expect = (1 << int(cpu_id)) if cpu_id is not None else None
+        match = "match" if (arg0 is not None and arg0 == expect) else "MISMATCH"
+        expect_s = f"0x{expect:x}" if expect is not None else "?"
+        pmgr_s = "pmgr" if phandle == PMGR_PHANDLE else "OTHER"
+        idle = cpu.getprop("function-cpu_idle", None)
+        buf.write(f"  {name} cpu-id={cpu_id}: enable_core = "
+                  f"{phandle}:{fname}({', '.join(hex(a) for a in fargs)})  "
+                  f"[phandle {phandle}={pmgr_s}, "
+                  f"arg vs 1<<cpu_id ({expect_s}): {match}]"
+                  f"  cpu_idle={idle}\n")
+
+    buf.write(f"  (phandle {PMGR_PHANDLE} = /arm-io/pmgr [pmgr1,t8132]. "
+              f"'Core(bit)' is a PMGR device-function iBoot uses to release "
+              f"cores; m1n1's smp_start_cpu never calls it -- it writes the "
+              f"legacy pmgr+0x34000 strobe with per-cluster 1<<core, a "
+              f"DIFFERENT encoding than this flat per-core bitmask. The 'Core' "
+              f"function has no register impl in m1n1/Linux -> the register is "
+              f"found by the live running-vs-waiting diff scan below.)\n")
+
+
+# ---------------------------------------------------------------- core diff scan
+
+# Per-core ADT reg windows to compare running-vs-waiting. Shared (per-cluster)
+# windows are the primary suspects for a per-core enable/run bit.
+_DIFF_WINDOWS = [
+    # (adt-prop, shared?, list of (start,end) byte bands to sample, note)
+    ("acc-impl-reg", True,  [(0x0, 0x200), (0x2000, 0x2200)], "cluster ACC"),
+    ("cpm-impl-reg", True,  [(0x0, 0x200), (0x2000, 0x2200)], "cluster CPM"),
+    ("cpu-impl-reg", False, [(0x100, 0x108)],                 "per-core status (smp.c:223)"),
+    ("coresight-reg", False, [(0x0, 0x4)],                    "per-core control"),
+]
+
+
+def core_diff_scan(buf, run_reg=0x100, wait_reg=0x101):
+    """RUN 28 (READ-ONLY): differential scan of a RUNNING core vs a WAITING
+    core in the SAME cluster, to reveal the per-core enable/run bit that the
+    function-enable_core PMGR recipe sets (H4). cpu6 (reg 0x100, running) and
+    cpu7 (reg 0x101, waiting) share the cluster ACC/CPM windows, so a bit set
+    for cpu6 and clear for cpu7 in a SHARED window is the release-register
+    candidate. All reads gated on the cluster PMGR gate being ACTIVE and
+    wrapped in guarded()+check_alive(); aborts on the first wedge."""
+    buf.write(f"\n=== core diff scan (running 0x{run_reg:x} vs waiting "
+              f"0x{wait_reg:x}, read-only) ===\n")
+    log("core diff scan (running vs waiting per-core windows)...")
+
+    nodes = _cpu_nodes_by_reg(buf)
+    run_node = nodes.get(run_reg)
+    wait_node = nodes.get(wait_reg)
+    if run_node is None or wait_node is None:
+        buf.write(f"  missing node(s): run(0x{run_reg:x})="
+                  f"{run_node is not None} wait(0x{wait_reg:x})="
+                  f"{wait_node is not None}; aborting\n")
+        return
+
+    run_state = run_node.getprop("state", None)
+    wait_state = wait_node.getprop("state", None)
+    run_cl = run_node.getprop("cluster-id", None)
+    wait_cl = wait_node.getprop("cluster-id", None)
+    buf.write(f"  run  cpu reg=0x{run_reg:x} cluster={run_cl} "
+              f"state={run_state!r}\n")
+    buf.write(f"  wait cpu reg=0x{wait_reg:x} cluster={wait_cl} "
+              f"state={wait_state!r}\n")
+    if str(run_state) != "running":
+        buf.write(f"  WARNING: run core is not 'running' (state={run_state!r}); "
+                  f"differential may be meaningless\n")
+    if run_cl != wait_cl:
+        buf.write(f"  NOTE: cores are in DIFFERENT clusters -- shared-window "
+                  f"diffs will be cluster-relative, not per-core\n")
+
+    # Gate precondition: the cluster's CPU PMGR gate must be ACTIVE, else any
+    # MMIO into these windows AXI-stalls (guarded() can't catch that).
+    _pmgr, dev_by_idx = _load_pmgr_devices(buf)
+    if dev_by_idx is None:
+        buf.write("  no PMGR devices; refusing MMIO (cannot confirm ACTIVE)\n")
+        return
+    # PCPU gate for the target cluster: PCPU0..3 are gates 7..10 (cluster 1).
+    # Use the run core's own PMGR CPU gate if discoverable; else check that
+    # some PCPU gate for this cluster is ACTIVE. Conservative: confirm at least
+    # one non-virtual CPU gate reads actual=0xf (cores are known powered).
+    buf.write("  gate precondition (cluster CPU gate must be ACTIVE):\n")
+    cluster_ok = False
+    try:
+        for idx, dev in sorted(dev_by_idx.items()):
+            nm = getattr(dev, "name", b"")
+            if isinstance(nm, (bytes, bytearray)):
+                nm = nm.rstrip(b"\x00").decode("ascii", "replace")
+            nm = str(nm).upper()
+            if ("PCPU" in nm) or ("ECPU" in nm):
+                st = _read_pmgr_gate_state(dev_by_idx, idx, buf, indent="    ")
+                if st and not st.get("virtual") and st.get("on"):
+                    cluster_ok = True
+    except Exception as e:
+        buf.write(f"    gate scan failed: {e.__class__.__name__}: {e}\n")
+    if not cluster_ok:
+        buf.write("  no ACTIVE CPU gate found -> refusing MMIO (would "
+                  "AXI-stall). Aborting scan.\n")
+        return
+    buf.write("  -> CPU gate(s) ACTIVE; proceeding with guarded reads.\n")
+
+    # Differential read per window/band. cpu6 (proven-live) FIRST at each
+    # offset so a cpu7 stall is attributable; abort on first wedge.
+    for prop, shared, bands, note in _DIFF_WINDOWS:
+        try:
+            run_base = int(list(run_node.getprop(prop, []) or [])[0])
+            wait_base = int(list(wait_node.getprop(prop, []) or [])[0])
+        except Exception:
+            buf.write(f"  {prop}: unresolved on one node; skipping\n")
+            continue
+        tag = "SHARED" if shared else "per-core"
+        buf.write(f"  --- {prop} ({note}, {tag})  run=0x{run_base:x} "
+                  f"wait=0x{wait_base:x} ---\n")
+        for (start, end) in bands:
+            off = start
+            while off < end:
+                with guarded(buf, label=f"diff-{prop}-{off:#x}"):
+                    rv = _read32_live(run_base + off, f"run {prop}+0x{off:x}",
+                                      buf, log_progress=False)
+                    if not check_alive():
+                        buf.write("    [ABORT] wedged reading running core "
+                                  "window; stopping scan\n")
+                        return
+                    wv = _read32_live(wait_base + off, f"wait {prop}+0x{off:x}",
+                                      buf, log_progress=False)
+                    if not check_alive():
+                        buf.write("    [ABORT] wedged reading waiting core "
+                                  "window; stopping scan\n")
+                        return
+                if rv is not None and wv is not None and rv != wv:
+                    diff = rv ^ wv
+                    flag = ("  <== CANDIDATE (shared-window diff)"
+                            if shared else "  (per-core, expected)")
+                    buf.write(f"    DIFF @ +0x{off:x}: run=0x{rv:08x} "
+                              f"wait=0x{wv:08x} xor=0x{diff:08x}{flag}\n")
+                off += 4
+
+    buf.write("  (A SHARED-window bit SET on the running core and CLEAR on the "
+              "waiting core is the enable-register candidate -> RUN 29 gated "
+              "write test writes it for the waiting core and watches TTY for "
+              "'RVBAR entry on secondary CPU'. No memory-mapped diff -> the "
+              "'Core' recipe pokes SMC/AOP or a pmgr offset outside these "
+              "windows -> RUN 29 becomes a reflash/instrumentation experiment. "
+              "cpu-impl+0x100 differing = the definitive 'held in reset' "
+              "signal.)\n")
+
+
 # ---------------------------------------------------------------- ACIO status
 
 def _acio_asc_bases(node):
@@ -700,6 +898,21 @@ def build_argparser():
     ap.add_argument("--release-core", default="0x1",
                     help="target /cpus 'reg' value for --smp-release-probe "
                          "(hex, default 0x1 = die0/cluster0/core1).")
+    ap.add_argument("--enable-core-parse", action="store_true",
+                    help="read-only ADT: decode each /cpus function-enable_core "
+                         "recipe (the PMGR Core(bitmask) release function m1n1 "
+                         "ignores). Zero MMIO.")
+    ap.add_argument("--core-diff-scan", action="store_true",
+                    help="read-only: differential MMIO scan of a running vs a "
+                         "waiting core (same cluster) across acc/cpm/cpu-impl "
+                         "windows, to find the per-core enable/run bit. Gated "
+                         "on the cluster PMGR gate being ACTIVE.")
+    ap.add_argument("--run-core", default="0x100",
+                    help="running-core 'reg' for --core-diff-scan "
+                         "(hex, default 0x100 = cpu6, cluster1 boot core).")
+    ap.add_argument("--wait-core", default="0x101",
+                    help="waiting-core 'reg' for --core-diff-scan "
+                         "(hex, default 0x101 = cpu7, same cluster).")
     ap.add_argument("--acio-status", action="store_true",
                     help="read-only: each acio-cpuN rtkit's CPU_STATUS/"
                          "CPU_CONTROL -- running / stopped / in reset. Does "
@@ -751,6 +964,21 @@ def main():
              "smp_release_probe")
         flush("smp-release-probe")
 
+    if args.enable_core_parse:
+        try_(lambda: enable_core_parse(buf), "enable_core_parse")
+        flush("enable-core-parse")
+
+    if args.core_diff_scan:
+        try:
+            run_reg = int(args.run_core, 0)
+            wait_reg = int(args.wait_core, 0)
+        except ValueError:
+            run_reg, wait_reg = 0x100, 0x101
+            log(f"bad --run-core/--wait-core; using 0x100/0x101")
+        try_(lambda: core_diff_scan(buf, run_reg=run_reg, wait_reg=wait_reg),
+             "core_diff_scan")
+        flush("core-diff-scan")
+
     if args.soc_recon:
         try_(lambda: soc_recon(buf), "soc_recon")
         flush("soc-recon")
@@ -760,9 +988,11 @@ def main():
         flush("acio-status")
 
     if not (args.smp_start or args.smp_diag or args.smp_probe
-            or args.smp_release_probe or args.soc_recon or args.acio_status):
+            or args.smp_release_probe or args.enable_core_parse
+            or args.core_diff_scan or args.soc_recon or args.acio_status):
         log("no probe selected; pass --smp-start/--smp-diag/--smp-probe/"
-            "--smp-release-probe/--soc-recon/--acio-status")
+            "--smp-release-probe/--enable-core-parse/--core-diff-scan/"
+            "--soc-recon/--acio-status")
 
     flush("done")
     log(f"done; log at {runtime_path}")

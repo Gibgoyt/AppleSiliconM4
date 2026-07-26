@@ -3,7 +3,7 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..27} [extra args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..28} [extra args...]
 #
 # RUNs 1-24 drive perstn.sh (PCIe bring-up). RUN 25+ drive soc_bringup.sh
 # (SoC-first: SMP + companion-IOP recon). The RUNNER var selects which.
@@ -1458,8 +1458,30 @@ case "${RUN^^}" in
                --smp-release-probe
                --require-build=rc1-60-g)
         ;;
+    28)
+        # RUN 28: find the M4 core-release register (READ-ONLY). RUN 27 killed
+        # the RVBAR-lock hypothesis (the lock is sticky-until-reset AND non-
+        # blocking -- the boot core runs locked). The lead: every /cpus node
+        # has function-enable_core = 138:Core(<core-bit>), a PMGR (phandle 138,
+        # pmgr1,t8132) release recipe iBoot uses and m1n1's smp_start_cpu never
+        # invokes (it only writes the legacy pmgr+0x34000 strobe). The 'Core'
+        # function has no register impl in m1n1/Linux, so the register is found
+        # by a live running-vs-waiting differential:
+        #   --enable-core-parse : decode the recipe (ADT-only, zero MMIO).
+        #   --core-diff-scan    : diff cpu6(running) vs cpu7(waiting), same
+        #                         cluster, across the shared acc/cpm windows +
+        #                         cpu-impl+0x100 status. A shared-window bit set
+        #                         for cpu6 / clear for cpu7 = the enable register.
+        # No writes this run. Candidate -> RUN 29 gated write test.
+        RUNNER=soc_bringup.sh
+        FLAGS=(--smp-start
+               --smp-probe
+               --enable-core-parse
+               --core-diff-scan
+               --require-build=rc1-60-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27} [extra perstn.py/soc_bringup.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28} [extra perstn.py/soc_bringup.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
