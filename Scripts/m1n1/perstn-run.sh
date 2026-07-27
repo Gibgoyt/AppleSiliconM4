@@ -3,10 +3,12 @@
 # perstn-run.sh -- dispatch a specific PCIe bring-up RUN by letter or number.
 #
 # Usage:
-#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..31} [extra args...]
+#   ./Scripts/m1n1/perstn-run.sh {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18..32} [extra args...]
 #
-# RUNs 1-24 drive perstn.sh (PCIe bring-up). RUN 25+ drive soc_bringup.sh
-# (SoC-first: SMP + companion-IOP recon). The RUNNER var selects which.
+# RUNs 1-24 drive perstn.sh (PCIe bring-up). RUNs 25-31 drive soc_bringup.sh
+# (SoC-first: SMP + companion-IOP recon). RUN 32 drives nic_bringup.sh
+# (PLAN_3 Phase 3.5: full PCIe bring-up + descend behind the bridge to identify
+# the NIC). The RUNNER var selects which.
 #
 # BUILD GUARD: all runnable arms now guard on --require-build=v1.6.0-42-g for
 # the currently-enrolled m1n1 (v1.6.0-42-gdf2ae61, branch t8132-rebase). Older
@@ -1554,8 +1556,26 @@ case "${RUN^^}" in
                --cpustart-scan
                --require-build=v1.6.0-42-g)
         ;;
+    32)
+        # RUN 32: PIVOT BACK TO THE GOAL. Runs 28-31 dead-ended on SMP; SMP is
+        # parked (a single-core TCP server needs one core, which we have). This
+        # run does PLAN_3 Phase 3.5 via the new nic_bringup.sh: full PCIe
+        # bring-up (SMC -> CLKREQ/PERSTN -> pcie_init -> LINKSTS BUSY-clear) to
+        # prove the link is solid, THEN programs bridge bus numbers
+        # (primary/secondary/subordinate at cfg+0x18 -- the step ecam_walk never
+        # did, leaving secondary=0) and descends behind pci-bridge2 to read the
+        # NIC's VID:DID + class + BAR0.
+        #
+        # Milestone M3.5: a real VID:DID for a class-0x02 device on the
+        # downstream bus. Commit it to m4_recon/recon-summary.md; the VID decides
+        # Phase 5 (5A discrete driver vs 5B Apple-silicon / USB-CDC-ECM fork).
+        # If no bridges / still-BUSY: run `perstn-run.sh 20` (proven full
+        # sequence) first, then re-run 32.
+        RUNNER=nic_bringup.sh
+        FLAGS=(--require-build=v1.6.0-42-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31} [extra perstn.py/soc_bringup.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32} [extra perstn.py/soc_bringup.py/nic_bringup.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1

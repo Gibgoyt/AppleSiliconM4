@@ -75,25 +75,33 @@ from m1n1 import asm as m1n1_asm
 
 from pcie_regs import ApcieMap
 
-
-# PCI config space offsets.
-PCI_VENDOR_ID     = 0x00
-PCI_DEVICE_ID     = 0x02
-PCI_COMMAND       = 0x04
-PCI_STATUS        = 0x06
-PCI_REVISION      = 0x08
-PCI_CLASS_PROG    = 0x09
-PCI_CLASS_DEV     = 0x0a
-PCI_CLASS_BASE    = 0x0b
-PCI_HEADER_TYPE   = 0x0e
-PCI_BAR0          = 0x10
-PCI_PRIMARY_BUS   = 0x18   # bridge only
-PCI_SECONDARY_BUS = 0x19   # bridge only
-PCI_SUBORDINATE   = 0x1a   # bridge only
-
-PCI_CMD_IO     = 0x0001
-PCI_CMD_MEM    = 0x0002
-PCI_CMD_BM     = 0x0004
+# PCIe/ECAM primitives now live in pcie_common (shared with nic_bringup.py):
+# PCI config-space constants + accessors, SMC power-on, PERSTN/CLKREQ GPIO
+# helpers, the ECAM enumeration walk, and the LINKSTS decode/watch. Imported
+# here by name so every existing call site in this file is unchanged.
+from pcie_common import (
+    # PCI config space offsets + command bits
+    PCI_VENDOR_ID, PCI_DEVICE_ID, PCI_COMMAND, PCI_STATUS, PCI_REVISION,
+    PCI_CLASS_PROG, PCI_CLASS_DEV, PCI_CLASS_BASE, PCI_HEADER_TYPE, PCI_BAR0,
+    PCI_PRIMARY_BUS, PCI_SECONDARY_BUS, PCI_SUBORDINATE,
+    PCI_CMD_IO, PCI_CMD_MEM, PCI_CMD_BM,
+    # config-space accessors
+    ecam_addr, cfg_read32, cfg_read16, cfg_read8,
+    cfg_write32, cfg_write16, cfg_write8,
+    # SMC power
+    smc_power,
+    # PERSTN / CLKREQ GPIO
+    GPIO0_PIN_COUNT, PERSTN_PIN, CLKREQ_PIN,
+    REG_GPIOx_DATA, REG_GPIOx_MODE_MASK, REG_GPIOx_MODE_OUT,
+    REG_GPIOx_MODE_IN_IRQ_OFF, REG_GPIOx_PERIPH_MASK, REG_GPIOx_PULL_MASK,
+    REG_GPIOx_PULL_UP, REG_GPIOx_INPUT_ENABLE, REG_GPIOx_LOCK,
+    _gpio0_base, _gpio_reg_addr, gpio_read, gpio_set_output,
+    deassert_perstn, gpio_set_periph, assert_clkreq,
+    # ECAM enumeration
+    _describe_class, probe_device, ecam_walk, enable_nic,
+    # LINKSTS
+    _linksts_decode, watch_linksts,
+)
 
 
 # NOTE: log, try_, guarded, check_alive, check_alive_fast, flush_partial_log,
@@ -101,52 +109,7 @@ PCI_CMD_BM     = 0x0004
 # gate-state helpers/constants are imported from m4_common (see top of file).
 
 
-def ecam_addr(base, bus, dev, fn, off):
-    return base + (bus << 20) + (dev << 15) + (fn << 12) + off
-
-
-def cfg_read32(base, bus, dev, fn, off):
-    return p.read32(ecam_addr(base, bus, dev, fn, off))
-
-
-def cfg_read16(base, bus, dev, fn, off):
-    return p.read16(ecam_addr(base, bus, dev, fn, off))
-
-
-def cfg_read8(base, bus, dev, fn, off):
-    return p.read8(ecam_addr(base, bus, dev, fn, off))
-
-
-def cfg_write16(base, bus, dev, fn, off, val):
-    p.write16(ecam_addr(base, bus, dev, fn, off), val)
-
-
-# ---------------------------------------------------------------- SMC power
-
-def smc_power(buf):
-    smc_addr = u.adt["arm-io/smc"].get_reg(0)[0]
-    buf.write(f"SMC smc_addr = 0x{smc_addr:x}\n")
-    smc = SMCClient(u, smc_addr, None)
-    smc.start()
-    smc.start_ep(0x20)
-    smc.smcep.write32("gP0d", 0x800001)
-    buf.write("gP0d <- 0x800001  (apcie power)\n")
-    smc.smcep.write32("gP1a", 1)
-    buf.write("gP1a <- 1         (apcie-ge power)\n")
-    # RUN 23: read the keys back IN THE SAME SESSION (before stop()). RUN 22's
-    # endpoint_diag read them in a fresh session post-stop() and got 0 --
-    # confounded. This tells us whether the writes stick vs whether gP0d/gP1a
-    # are write-triggered keys that read 0 by design.
-    for key, want in (("gP0d", 0x800001), ("gP1a", 1)):
-        try:
-            val = smc.smcep.read32(key)
-            ok = "OK" if val == want else "MISMATCH"
-            buf.write(f"gP{key[2:]} same-session readback = 0x{val:x} "
-                      f"(want 0x{want:x}) [{ok}]\n")
-        except Exception as e:
-            buf.write(f"{key} same-session read RAISED: "
-                      f"{e.__class__.__name__}: {e}\n")
-    smc.stop()
+# smc_power now lives in pcie_common (imported above).
 
 
 # ---------------------------------------------------------------- PERSTN GPIO
@@ -164,317 +127,12 @@ def smc_power(buf):
 # = 0xf19a000000 -- via m1n1's 0xf alias that lands on PA 0x19a000000, which
 # is a dead hole on t8132. Same reason SMC's ADT reg 0x18c600000 works only
 # after get_reg() translates it to PA 0x38c600000.
-GPIO0_PIN_COUNT = 224
+# GPIO constants + helpers (gpio_read/gpio_set_output/deassert_perstn/
+# gpio_set_periph/assert_clkreq) and PERSTN_PIN/CLKREQ_PIN now live in
+# pcie_common (imported above).
 
-
-def _gpio0_base():
-    return u.adt["arm-io/gpio0"].get_reg(0)[0]
-
-# Bit layout of the per-pin register, verbatim from Linux
-# drivers/pinctrl/pinctrl-apple-gpio.c.
-REG_GPIOx_DATA          = 1 << 0
-REG_GPIOx_MODE_MASK     = 0x7 << 1
-REG_GPIOx_MODE_OUT      = 1 << 1
-REG_GPIOx_MODE_IN_IRQ_OFF = 7 << 1
-REG_GPIOx_PERIPH_MASK   = 0x3 << 5
-REG_GPIOx_PULL_MASK     = 0x3 << 7
-REG_GPIOx_PULL_UP       = 3 << 7
-REG_GPIOx_INPUT_ENABLE  = 1 << 9
-REG_GPIOx_LOCK          = 1 << 21
-
-# NIC PERSTN pin, from m4_recon/nic-adt.txt:
-#   function_perst = GPIO(phandle=120 -> gpio0, args=[165, 0])
-PERSTN_PIN = 165
-
-# NIC CLKREQ pin, from m4_recon/nic-adt.txt:
-#   function_clkreq = GPIO(phandle=120 -> gpio0, args=[162, 2])
-# args[1]=2 in the ADT would normally mean "peripheral function alt-2" (the
-# PCIe controller drives CLKREQ# itself). For this experiment we drive it as
-# a manual GPIO output LOW throughout the reset dance so the endpoint sees
-# CLKREQ# asserted (== refclk request active) before/during/after PERSTN
-# deassert. If this un-sticks port 2's LINKSTS BUSY, we know CLKREQ was the
-# missing piece; either way, the runtime dump lets us iterate.
-CLKREQ_PIN = 162
-
-
-def _gpio_reg_addr(pin):
-    return _gpio0_base() + pin * 4
-
-
-def gpio_read(pin):
-    return p.read32(_gpio_reg_addr(pin))
-
-
-def gpio_set_output(pin, value, buf=None):
-    """Drive `pin` as a GPIO output at level `value` (0 or 1).
-
-    Mirrors what pinctrl-apple-gpio.c does in .direction_output/.set:
-        clear PERIPH | MODE | DATA,
-        set   MODE = OUT | (DATA if value else 0).
-    Preserves pull, drive-strength, and other unrelated bits.
-    """
-    addr = _gpio_reg_addr(pin)
-    old = p.read32(addr)
-    new = old & ~(REG_GPIOx_PERIPH_MASK | REG_GPIOx_MODE_MASK | REG_GPIOx_DATA)
-    new |= REG_GPIOx_MODE_OUT
-    if value:
-        new |= REG_GPIOx_DATA
-    p.write32(addr, new)
-    read_back = p.read32(addr)
-    if buf is not None:
-        buf.write(f"gpio0[{pin}] @ 0x{addr:x}: 0x{old:08x} -> 0x{new:08x} "
-                  f"(read-back 0x{read_back:08x})\n")
-    return old, new, read_back
-
-
-def deassert_perstn(buf, pin=PERSTN_PIN, cold_reset_us=10000, settle_ms=100):
-    """Cold-reset the endpoint on `pin` (PERSTN#): drive low briefly, then high.
-
-    Endpoints on Apple silicon expect PERSTN# asserted (low) while the fabric
-    powers up, then deasserted (high) at least 100 ms before the host starts
-    LTSSM training. m1n1's pcie_init handles the internal controller reset;
-    this handles the external endpoint reset.
-    """
-    buf.write(f"=== PERSTN deassert (gpio0 pin {pin}) ===\n")
-
-    # Safety probe: read pin 0's reg before touching pin 165. If gpio0
-    # addressing is wrong, this fails cleanly (Python exception, wrapped by
-    # try_() in main) leaving nic-runtime.txt behind instead of wedging m1n1.
-    probe = _gpio_reg_addr(0)
-    buf.write(f"gpio0 probe: read32(0x{probe:x}) = ")
-    v = p.read32(probe)
-    buf.write(f"0x{v:08x}\n")
-
-    log(f"PERSTN cold reset: drive gpio0[{pin}] low")
-    gpio_set_output(pin, 0, buf)
-    time.sleep(cold_reset_us / 1e6)
-
-    log(f"PERSTN: drive gpio0[{pin}] high")
-    gpio_set_output(pin, 1, buf)
-    time.sleep(settle_ms / 1e3)
-    buf.write(f"settled {settle_ms} ms after deassert\n\n")
-
-
-def gpio_set_periph(pin, func, buf=None):
-    """Mux `pin` to peripheral function `func` (0-3), mirroring Linux
-    pinctrl-apple-gpio.c's pinmux_set_mux: modify only the PERIPH field
-    and set INPUT_ENABLE, preserving everything else. RUN 18: the ADT
-    declares CLKREQ as GPIO(162, 2) -- alt-function 2, i.e. the PCIe
-    controller manages CLKREQ# itself -- but every run since the pcie_up
-    era has forced it to a manual GPIO output LOW, overriding the
-    hardware handshake. This restores the ADT-declared function.
-    """
-    addr = _gpio_reg_addr(pin)
-    old = p.read32(addr)
-    new = old & ~REG_GPIOx_PERIPH_MASK
-    new |= (func & 0x3) << 5
-    new |= REG_GPIOx_INPUT_ENABLE
-    p.write32(addr, new)
-    read_back = p.read32(addr)
-    if buf is not None:
-        buf.write(f"gpio0[{pin}] @ 0x{addr:x}: 0x{old:08x} -> "
-                  f"0x{new:08x} (read-back 0x{read_back:08x}) "
-                  f"[periph func {func}]\n")
-    return old, new, read_back
-
-
-def assert_clkreq(buf, pin=CLKREQ_PIN, settle_ms=1):
-    """Drive CLKREQ# (gpio0 pin `pin`) low so the endpoint has a valid refclk
-    request asserted before we release PERSTN#. Called BEFORE deassert_perstn.
-
-    Left in this state through pcie_init() so the endpoint continues to see
-    CLKREQ# asserted while LTSSM trains. If iteration N+1 needs the pin muxed
-    back to peripheral function, we'll do that after link-up.
-    """
-    buf.write(f"=== CLKREQ assert (gpio0 pin {pin}) ===\n")
-    log(f"CLKREQ: drive gpio0[{pin}] low (assert)")
-    gpio_set_output(pin, 0, buf)
-    time.sleep(settle_ms / 1e3)
-    buf.write(f"settled {settle_ms} ms after CLKREQ assert\n\n")
-
-
-# ---------------------------------------------------------------- ECAM walk
-
-def _describe_class(cls_base, cls_dev, cls_prog):
-    """Best-effort human class-code label."""
-    if cls_base == 0x02 and cls_dev == 0x00:
-        return "network / ethernet controller"
-    if cls_base == 0x02:
-        return "network / other"
-    if cls_base == 0x04 and cls_dev == 0x30:
-        return "wireless controller"
-    if cls_base == 0x06 and cls_dev == 0x04:
-        return "PCI bridge"
-    if cls_base == 0x0c and cls_dev == 0x03:
-        return "USB controller"
-    if cls_base == 0x0c and cls_dev == 0x33:
-        return "USB4 host"
-    return f"class {cls_base:#04x}/{cls_dev:#04x}"
-
-
-def probe_device(base, bus, dev, fn, buf):
-    """Read one BDF's config header. Return dict or None if vacant."""
-    tag = f"{bus:02x}:{dev:02x}.{fn}"
-    try:
-        vid_did = cfg_read32(base, bus, dev, fn, PCI_VENDOR_ID)
-    except Exception as e:
-        buf.write(f"  {tag}: config read failed: "
-                  f"{e.__class__.__name__}: {e}\n")
-        return None
-    if vid_did == 0xffffffff or vid_did == 0x00000000:
-        buf.write(f"  {tag}: vacant (VID:DID = 0x{vid_did:08x})\n")
-        return None
-
-    vid = vid_did & 0xffff
-    did = (vid_did >> 16) & 0xffff
-
-    dev_info = {"bus": bus, "dev": dev, "fn": fn, "vid": vid, "did": did}
-
-    try:
-        cls32 = cfg_read32(base, bus, dev, fn, PCI_REVISION)
-        rev = cls32 & 0xff
-        cls_prog = (cls32 >> 8) & 0xff
-        cls_dev = (cls32 >> 16) & 0xff
-        cls_base = (cls32 >> 24) & 0xff
-        dev_info.update(rev=rev, cls_prog=cls_prog, cls_dev=cls_dev,
-                        cls_base=cls_base)
-    except Exception as e:
-        buf.write(f"  {tag}: class read failed: {e}\n")
-
-    try:
-        header_type = cfg_read8(base, bus, dev, fn, PCI_HEADER_TYPE)
-        dev_info["header_type"] = header_type
-    except Exception as e:
-        buf.write(f"  {tag}: header_type read failed: {e}\n")
-        header_type = 0
-
-    try:
-        cmd = cfg_read16(base, bus, dev, fn, PCI_COMMAND)
-        status = cfg_read16(base, bus, dev, fn, PCI_STATUS)
-        dev_info.update(cmd=cmd, status=status)
-    except Exception as e:
-        buf.write(f"  {tag}: cmd/status read failed: {e}\n")
-
-    try:
-        bar0 = cfg_read32(base, bus, dev, fn, PCI_BAR0)
-        dev_info["bar0"] = bar0
-    except Exception as e:
-        buf.write(f"  {tag}: BAR0 read failed: {e}\n")
-
-    if (header_type & 0x7f) == 0x01:
-        # PCI-to-PCI bridge
-        try:
-            prim = cfg_read8(base, bus, dev, fn, PCI_PRIMARY_BUS)
-            sec  = cfg_read8(base, bus, dev, fn, PCI_SECONDARY_BUS)
-            sub  = cfg_read8(base, bus, dev, fn, PCI_SUBORDINATE)
-            dev_info.update(primary=prim, secondary=sec, subordinate=sub)
-        except Exception as e:
-            buf.write(f"  {tag}: bus-number read failed: {e}\n")
-
-    label = _describe_class(dev_info.get("cls_base", 0xff),
-                            dev_info.get("cls_dev", 0xff),
-                            dev_info.get("cls_prog", 0xff))
-    buf.write(f"  {tag}: VID:DID = {vid:04x}:{did:04x}  "
-              f"rev={dev_info.get('rev', '?')}  "
-              f"class={dev_info.get('cls_base', 0xff):02x}."
-              f"{dev_info.get('cls_dev', 0xff):02x}."
-              f"{dev_info.get('cls_prog', 0xff):02x}  ({label})\n")
-    buf.write(f"          cmd=0x{dev_info.get('cmd', 0):04x} "
-              f"status=0x{dev_info.get('status', 0):04x} "
-              f"hdr=0x{header_type:02x} "
-              f"BAR0=0x{dev_info.get('bar0', 0):08x}\n")
-    if "secondary" in dev_info:
-        buf.write(f"          bridge: primary={dev_info['primary']} "
-                  f"secondary={dev_info['secondary']} "
-                  f"subordinate={dev_info['subordinate']}\n")
-    return dev_info
-
-
-def ecam_walk(base, buf, active_ports=None):
-    """Walk bus 0 devs 0..3 (root + up to 3 switches), then each active
-    switch's downstream bus dev 0. Returns list of dev_info dicts.
-
-    active_ports (from ApcieMap.active_ports) filters which downstream buses
-    to touch -- reading an inactive port's ECAM range faults the fabric.
-    Bus number for downstream = m1n1's implicit "port index + 1" convention
-    when maximum-link-speed is set (root ports are 00:0N.0 -> bus N+1)."""
-    devices = []
-    buf.write("=== ECAM walk ===\n")
-    buf.write(f"ecam_base = 0x{base:x}\n\n")
-    active_set = set(active_ports) if active_ports is not None else None
-    if active_set is not None:
-        buf.write(f"active ports: {sorted(active_set)}\n\n")
-
-    buf.write("--- root bus 0 ---\n")
-    root_devs = []
-    # On t8132 the three root complex functions live at 00:00.0/00:01.0/
-    # 00:02.0 (one per port). Probe just the port count, not 0..7.
-    for d in range(3):
-        # Skip inactive-port root functions -- their downstream config isn't
-        # backed by anything and even a header read can fault.
-        if active_set is not None and d not in active_set:
-            buf.write(f"  00:{d:02x}.0: skipped (port {d} inactive)\n")
-            continue
-        info = try_(lambda d=d: probe_device(base, 0, d, 0, buf),
-                    f"cfg 00:{d:02x}.0")
-        if info is not None:
-            info["port"] = d
-            root_devs.append(info)
-            devices.append(info)
-
-    for bridge in root_devs:
-        sec = bridge.get("secondary")
-        if sec is None or sec == 0:
-            continue
-        buf.write(f"\n--- downstream bus {sec} "
-                  f"(behind {bridge['bus']:02x}:{bridge['dev']:02x}."
-                  f"{bridge['fn']}, port {bridge.get('port', '?')}) ---\n")
-        # Endpoints normally at dev 0; probe dev 1 as belt-and-braces.
-        for d in range(2):
-            info = try_(lambda d=d, sec=sec: probe_device(base, sec, d, 0, buf),
-                        f"cfg {sec:02x}:{d:02x}.0")
-            if info is not None:
-                info["parent_bridge"] = f"{bridge['bus']:02x}:{bridge['dev']:02x}.{bridge['fn']}"
-                info["parent_port"] = bridge.get("port")
-                devices.append(info)
-    return devices
-
-
-def enable_nic(base, nic, buf):
-    """Set MEM+BM in NIC config+0x04. Read BAR0 back."""
-    tag = f"{nic['bus']:02x}:{nic['dev']:02x}.{nic['fn']}"
-    buf.write(f"\n=== enable NIC {tag} ===\n")
-    try:
-        old_cmd = cfg_read16(base, nic['bus'], nic['dev'], nic['fn'],
-                             PCI_COMMAND)
-        new_cmd = old_cmd | PCI_CMD_MEM | PCI_CMD_BM
-        cfg_write16(base, nic['bus'], nic['dev'], nic['fn'],
-                    PCI_COMMAND, new_cmd)
-        read_back = cfg_read16(base, nic['bus'], nic['dev'], nic['fn'],
-                               PCI_COMMAND)
-        buf.write(f"CMD: 0x{old_cmd:04x} -> 0x{new_cmd:04x} "
-                  f"(readback 0x{read_back:04x})\n")
-    except Exception as e:
-        buf.write(f"CMD write failed: {e.__class__.__name__}: {e}\n")
-        return
-
-    try:
-        bar0 = cfg_read32(base, nic['bus'], nic['dev'], nic['fn'], PCI_BAR0)
-        buf.write(f"BAR0 (raw)         = 0x{bar0:08x}\n")
-        bar0_masked = bar0 & 0xfffffff0
-        buf.write(f"BAR0 (mem-mapped)  = 0x{bar0_masked:08x}\n")
-        nic["bar0_masked"] = bar0_masked
-        # Probe MMIO: read the first word of the BAR window.
-        try:
-            first_word = p.read32(bar0_masked)
-            buf.write(f"read32(BAR0)       = 0x{first_word:08x}"
-                      f"{' (SLVERR-like)' if first_word == 0xffffffff else ''}\n")
-            nic["bar0_first_word"] = first_word
-        except Exception as e:
-            buf.write(f"read32(BAR0) failed: {e.__class__.__name__}: {e}\n")
-    except Exception as e:
-        buf.write(f"BAR0 read failed: {e.__class__.__name__}: {e}\n")
-
+# _describe_class, probe_device, ecam_walk, enable_nic now live in
+# pcie_common (imported above).
 
 # ---------------------------------------------------------------- diagnostics
 
@@ -4282,55 +3940,7 @@ def dump_pcie_regs(apcie, buf, tag="post-init", tier=1, phyextra=False):
 
 # ---------------------------------------------------------------- LTSSM kick
 
-def _linksts_decode(v):
-    """Human-readable decode of APCIE_PORT_LINKSTS bits we know about."""
-    bits = []
-    if v & (1 << 0):  bits.append("UP")
-    if v & (1 << 2):  bits.append("BUSY")
-    if v & (1 << 3):  bits.append("bit3")
-    if v & (1 << 6):  bits.append("L2")
-    if v & (1 << 9):  bits.append("bit9")
-    if v & (1 << 24): bits.append("bit24")
-    if v & (1 << 25): bits.append("bit25")
-    if v & (1 << 31): bits.append("bit31")
-    return "|".join(bits) if bits else "none"
-
-
-def watch_linksts(apcie, buf, secs=5.0, label="post-init"):
-    """Watch each active port's LINKSTS (port_base+0x208) for up to `secs`,
-    logging every state change and exiting early per port when BUSY (bit 2)
-    clears. The C-side idle poll only allows 250 ms; a slow endpoint would
-    look identical to a dead one. Pure reads on proven-safe port_base
-    windows -- abandons a port's watch on a read exception rather than
-    wedging."""
-    buf.write(f"=== {label} LINKSTS watch ({secs:.0f} s per active "
-              f"port) ===\n")
-    log(f"{label} LINKSTS watch (up to {secs:.0f} s per port)...")
-    for pi in apcie.active_ports:
-        pb = apcie.ports[pi].port_base
-        last = None
-        t0 = time.monotonic()
-        while time.monotonic() - t0 < secs:
-            try:
-                v = p.read32(pb + 0x208)
-            except Exception as e:
-                buf.write(f"  port{pi}: LINKSTS read RAISED "
-                          f"{e.__class__.__name__}; abandoning watch\n")
-                break
-            if v != last:
-                buf.write(f"  port{pi}: LINKSTS=0x{v:08x} "
-                          f"[{_linksts_decode(v)}] at "
-                          f"+{time.monotonic() - t0:.2f}s\n")
-                last = v
-            if not (v & (1 << 2)):
-                buf.write(f"  port{pi}: BUSY CLEARED after "
-                          f"{time.monotonic() - t0:.2f}s!\n")
-                break
-            time.sleep(0.1)
-        else:
-            buf.write(f"  port{pi}: still BUSY after {secs:.0f} s "
-                      f"(LINKSTS=0x{last:08x})\n")
-
+# _linksts_decode + watch_linksts now live in pcie_common (imported above).
 
 # ---------------------------------------------------------------- PERST re-sequence
 
