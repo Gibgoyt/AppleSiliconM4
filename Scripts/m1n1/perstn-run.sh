@@ -8,6 +8,11 @@
 # RUNs 1-24 drive perstn.sh (PCIe bring-up). RUN 25+ drive soc_bringup.sh
 # (SoC-first: SMP + companion-IOP recon). The RUNNER var selects which.
 #
+# BUILD GUARD: all runnable arms now guard on --require-build=v1.6.0-42-g for
+# the currently-enrolled m1n1 (v1.6.0-42-gdf2ae61, branch t8132-rebase). Older
+# arm comments still narrate the rc1-59-g / rc1-60-g builds they were authored
+# against (historical record); only the guard flag was bumped.
+#
 # Letters (A..S) are the historical RUN series (A-H were the pre-RUN-I
 # scouting phase; I onward were single-hypothesis bisections). Numbers
 # (1..N) begin a NEW series starting 2026-07-21 that iterates on top of
@@ -1025,7 +1030,7 @@ case "${RUN^^}" in
         FLAGS=(--preinit-probe
                --tier3
                --post-init-phy-ip
-               --require-build=rc1-59-g)
+               --require-build=v1.6.0-42-g)
         ;;
     15)
         # RUN 15: the 2026-07-11 recipe -- Phase F AFTER pcie_init.
@@ -1069,7 +1074,7 @@ case "${RUN^^}" in
         FLAGS=(--preinit-probe
                --tier3
                --t8140-replay-post-init
-               --require-build=rc1-59-g)
+               --require-build=v1.6.0-42-g)
         ;;
     16)
         # RUN 16: RUN 15 with its two tooling interactions fixed.
@@ -1109,7 +1114,7 @@ case "${RUN^^}" in
         FLAGS=(--preinit-probe
                --tier3
                --t8140-replay-post-init
-               --require-build=rc1-59-g)
+               --require-build=v1.6.0-42-g)
         ;;
     17)
         # RUN 17: cold-boot Phase F with C-applicator 6.g -- the
@@ -1155,7 +1160,7 @@ case "${RUN^^}" in
                --reachable-scan
                --phy-ip-diag-at=none
                --phyip-apply-local
-               --require-build=rc1-59-g)
+               --require-build=v1.6.0-42-g)
         ;;
     18)
         # RUN 18: THE PIVOT. The phy-ip tunables axis is CLOSED after
@@ -1205,7 +1210,7 @@ case "${RUN^^}" in
         FLAGS=(--preinit-probe
                --tier3
                --clkreq-mode=periph
-               --require-build=rc1-59-g)
+               --require-build=v1.6.0-42-g)
         ;;
     19)
         # RUN 19: link training, part 2. RUN 18's --clkreq-mode=periph did
@@ -1236,7 +1241,7 @@ case "${RUN^^}" in
                --tier3
                --clkreq-mode=periph
                --setup-refclk=both
-               --require-build=rc1-59-g)
+               --require-build=v1.6.0-42-g)
         ;;
     20)
         # RUN 20: link training, part 3. RUN 19 proved the refclk REQ->ACK
@@ -1267,7 +1272,7 @@ case "${RUN^^}" in
                --t602x-init
                --t602x-aggressive
                --t602x-do-again
-               --require-build=rc1-59-g)
+               --require-build=v1.6.0-42-g)
         ;;
     21)
         # RUN 21: link training, part 4. RUN 20 landed the LTSSM config
@@ -1295,7 +1300,7 @@ case "${RUN^^}" in
                --clkreq-mode=periph
                --setup-refclk=both
                --perst-resequence
-               --require-build=rc1-59-g)
+               --require-build=v1.6.0-42-g)
         ;;
     22)
         # RUN 22: patched-m1n1 in-window T602X LTSSM enable. RUNs 18-21
