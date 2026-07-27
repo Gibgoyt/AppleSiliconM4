@@ -1,5 +1,13 @@
 [ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/perstn-run.sh 16
-[sudo] password for ahmed: 
+error: no m1n1 uartproxy device found on any /dev/ttyACM*
+       (checked USB product strings for 'm1n1 uartproxy')
+       Is the M4 booted into m1n1? If it is on a known port, set
+       M1N1DEVICE=/dev/ttyACMx explicitly. Otherwise long-press
+       power on the M4 to force off, then short-press to boot.
+[ahmed@admin AppleSiliconM4]$ claer
+bash: claer: command not found
+[ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/perstn-run.sh 16
+using m1n1 device: /dev/ttyACM0
 TTY> Initialized dockchannel UART at 0x388128000
 TTY> Device info:
 TTY>   Model: Mac16,10
@@ -11,13 +19,13 @@ TTY> CPU init (MIDR: 0x611f0531 smp_id:0x6)...
 TTY>   CPU part: 0x53 rev: 0x11
 TTY>   CPU: M4 Donan (P core)
 TTY> 
-TTY> boot_args at 0x10002988000
+TTY> boot_args at 0x1000329c000
 TTY>   revision:     3
 TTY>   version:      2
-TTY>   virt_base:    0x30f0000
+TTY>   virt_base:    0x110f0000
 TTY>   phys_base:    0x100010f0000
 TTY>   mem_size:     0x3df834000
-TTY>   top_of_kdata: 0x10002998000
+TTY>   top_of_kdata: 0x100032ac000
 TTY>   video:
 TTY>     base:       0x103e5234000
 TTY>     display:    0x1
@@ -27,7 +35,7 @@ TTY>     height:     1136
 TTY>     depth:      32bpp
 TTY>     density:    1
 TTY>   machine_type: 0
-TTY>   devtree:      0x413c000
+TTY>   devtree:      0x12a50000
 TTY>   devtree_size: 0x68000
 TTY>   cmdline:      
 TTY>   boot_flags:   0x0
@@ -35,7 +43,7 @@ TTY>   mem_size_act: 0x400000000
 TTY> 
 TTY> 
 TTY> 
-TTY> m1n1 v1.6.0-rc1-59-g8a569ad
+TTY> m1n1 v1.6.0-42-gdf2ae61
 TTY> Copyright The Asahi Linux Contributors
 TTY> Licensed under the MIT license
 TTY> 
@@ -43,7 +51,7 @@ TTY> Running in EL2
 TTY> 
 TTY> OS FW version: 15.1 (iBoot-11881.41.5)
 TTY> System FW version: 15.1 (iBoot-11881.41.5)
-TTY> Heap base: 0x10002998000
+TTY> Heap base: 0x100032ac000
 TTY> MCC: Unsupported version:mcc,t8132
 TTY> MMU: Initializing...
 TTY> MMU: RAM base: 0x10000000000
@@ -77,6 +85,7 @@ TTY> dart: dart /arm-io/dart-dcp at 0x30a340000 is a t8110 (locked)
 TTY> dart: dart /arm-io/dart-disp0 at 0x30a300000 is a t8110 (locked)
 TTY> dart: dart /arm-io/dart-disp0.0.0 L1 0 is real-time at 0x103fff1c000
 TTY> dart: allocating L2 tbl at 0, 1 to 0x103fff24000
+TTY> dcp: Mapping segment #2 10002c20000 -> 10002c20000 [24000]
 TTY> rtkit(dcp): booting with version 12
 TTY> rtkit(dcp): unknown system endpoint 0x0a
 TTY> rtkit(dcp): pre-allocated buffer (ep 0x1, dva 0x100025eb000, phys 0x103e51a3000)
@@ -110,20 +119,20 @@ TTY> cpufreq: Chip 0x8132 is unsupported
 TTY> Initialization complete.
 TTY> Checking for payloads...
 TTY> Devicetree compatible value: apple,j773g
-TTY> Unknown payload at 0x1000230c000 (magic: 5b41464b)
+TTY> Unknown payload at 0x10002c20000 (magic: 5b41464b)
 TTY> No valid payload found
 TTY> dart: dart /arm-io/dart-usb0 at 0x402f80000 is a t8110
-TTY> USB0: initialized at 0x10002d86030
+TTY> USB0: initialized at 0x10003696030
 TTY> dart: dart /arm-io/dart-usb1 at 0x40af80000 is a t8110
-TTY> USB1: initialized at 0x10002d86360
+TTY> USB1: initialized at 0x10003696360
 TTY> dart: dart /arm-io/dart-usb2 at 0x412f80000 is a t8110
-TTY> USB2: initialized at 0x10002d86690
+TTY> USB2: initialized at 0x10003696690
 TTY> dart: dart /arm-io/dart-usb3 at 0x41af80000 is a t8110
-TTY> USB3: initialized at 0x10002d869c0
+TTY> USB3: initialized at 0x100036969c0
 TTY> Running proxy...
-m1n1 base: 0x10002200000
+m1n1 base: 0x10002b14000
 Fetching ADT (0x00068000 bytes)...
-[pcie_up] require-build OK: 'm1n1 uartproxy v1.6.0-rc1-59-g' contains 'rc1-59-g'
+[pcie_up] require-build OK: 'm1n1 uartproxy v1.6.0-42-gdf2a' contains 'v1.6.0-42-g'
 [pcie_up] === Phase 3.3 pcie_up ===
 [pcie_up] building ApcieMap from ADT...
 [pcie_up] [flush:adt-map] wrote partial log (2430 bytes) to /tmp/m4-recon/nic-runtime.txt
@@ -176,42 +185,34 @@ Starting endpoint #0x20 (smcep)
 [mgmt] Stopping via message
 [mgmt] AP power state is now 0x10
 [mgmt] IOP power state is now 0x10
-[pcie_up] [flush:smc-power] wrote partial log (26253 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:smc-power] wrote partial log (26368 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] CLKREQ assert on gpio0 pin 162...
 [pcie_up] CLKREQ: drive gpio0[162] low (assert)
-[pcie_up] [flush:clkreq] wrote partial log (26399 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:clkreq] wrote partial log (26514 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] PERSTN deassert on gpio0 pin 165...
 [pcie_up] PERSTN cold reset: drive gpio0[165] low
 [pcie_up] PERSTN: drive gpio0[165] high
-[pcie_up] [flush:perstn] wrote partial log (26664 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:perstn] wrote partial log (26779 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] Phase 0: PMGR gate readout (no apcie MMIO)...
-[pcie_up] [flush:phase0-pmgr-state] wrote partial log (27303 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phase0-pmgr-state] wrote partial log (27418 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] Phase 0.5: PMGR parent-chain readout (no apcie MMIO)...
-[pcie_up] [flush:phase0.5-parents] wrote partial log (31514 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phase0.5-parents] wrote partial log (31629 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] Phase A: single pre-PMGR probe at phy_ip_base+0...
-[pcie_up] [flush:phaseA-preinit-single] wrote partial log (32554 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseA-preinit-single] wrote partial log (32669 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] p.pcie_init()...
 TTY> pcie: Initializing t8132 PCIe controller
 TTY> pcie: ADT uses 6 reg entries per port
-TTY> pcie: BC pmgr power enable...
-TTY> pcie: BC pmgr power enable done
-TTY> pcie: BC axi2af tunables done
 TTY> pcie: No common tunables
-TTY> pcie: BC common tunables done
-TTY> pcie: BC phy tunables done
-TTY> pcie: BC phy 0 CLK handshake done
-TTY> pcie: t8132: skipping phy-ip tunables pre-port-init (host applies post-init)
-TTY> pcie: BC shared init done (rc handshake ok)
 TTY> pcie: Initializing port 0
-TTY> pcie: Port failed to become idle on /arm-io/apcie/pci-bridge0
+TTY> pcie: Port 0 max speed = 2
 TTY> pcie: Initializing port 2
-TTY> pcie: Port failed to become idle on /arm-io/apcie/pci-bridge2
+TTY> pcie: Port 2 max speed = 1
 TTY> pcie: Initialized controller 0
 TTY> pcie: Error getting node /arm-io/apcie0
 TTY> pcie: Error getting node /arm-io/apcie-ge0
 TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up] p.pcie_init returned 0
-[pcie_up] [flush:pcie-init] wrote partial log (32575 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:pcie-init] wrote partial log (32690 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] active ports (per ADT): [0, 2]
 [pcie_up] early post-init tier-1 dump (safe windows only)...
 [pcie_up]   dump_pcie_regs tier=1 tag=post-init-early active_ports=[0, 2]
@@ -221,9 +222,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
 [pcie_up]       -> 0x00100101
 [pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
-[pcie_up]       -> 0x00000005
+[pcie_up]       -> 0x0000000d
 [pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
-[pcie_up]       -> 0x8300020c
+[pcie_up]       -> 0xab000208
 [pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
 [pcie_up]       -> 0x00000001
 [pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
@@ -254,9 +255,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
 [pcie_up]       -> 0x00100101
 [pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
-[pcie_up]       -> 0x00000005
+[pcie_up]       -> 0x0000000d
 [pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
-[pcie_up]       -> 0x83000204
+[pcie_up]       -> 0xab000200
 [pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
 [pcie_up]       -> 0x00000001
 [pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
@@ -283,37 +284,39 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]       -> 0x001000ff
 [pcie_up]     read32(0x49202b97c) [port2 +0x397c (T602X only)]...
 [pcie_up]       -> 0x00000000
-[pcie_up] [flush:dump-post-init-early] wrote partial log (34652 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:dump-post-init-early] wrote partial log (34767 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] post-init LINKSTS watch (up to 5 s per port)...
+[pcie_up] [flush:postinit-linksts-watch] wrote partial log (35022 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] post-init PMGR verification: all apcie gates ACTIVE -- enabling Phase F
-[pcie_up] [flush:postinit-pmgr-verify] wrote partial log (35302 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:postinit-pmgr-verify] wrote partial log (35672 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] Phase F post-init replay (2026-07-11 recipe)...
-[pcie_up] [flush:phaseF.pre.1.pmgr_adt_power_enable('/arm-io] wrote partial log (35919 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.1.pmgr_adt_power_enable('/arm-io] wrote partial log (36018 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.2.tunables apcie-axi2af-tunables] wrote partial log (36071 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.2.tunables apcie-axi2af-tunables] wrote partial log (36172 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.3.write32(rc_base+0x4, 0) [pcie.] wrote partial log (36225 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.3.write32(rc_base+0x4, 0) [pcie.] wrote partial log (36317 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.skip.4] wrote partial log (36509 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.5.tunables apcie-phy-tunables re] wrote partial log (36559 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.5.tunables apcie-phy-tunables re] wrote partial log (36657 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.skip.5.5] wrote partial log (36728 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.6.a.set32(phy_shared+0, CLK0REQ=] wrote partial log (36778 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.6.a.set32(phy_shared+0, CLK0REQ=] wrote partial log (36885 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.6.b.poll_CLK0ACK] wrote partial log (36969 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.6.b.poll_CLK0ACK] wrote partial log (37073 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.6.c.set32(phy_shared+0, CLK1REQ=] wrote partial log (37123 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.6.c.set32(phy_shared+0, CLK1REQ=] wrote partial log (37230 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.6.d.poll_CLK1ACK] wrote partial log (37314 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.6.d.poll_CLK1ACK] wrote partial log (37418 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.6.e.clear32(phy_shared+0, RESET=] wrote partial log (37468 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.6.e.clear32(phy_shared+0, RESET=] wrote partial log (37575 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.6.f.readback-enter] wrote partial log (37634 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.6.f.readback] wrote partial log (37725 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.pre.6.f.set32(phy_shared+4, 0x01) [T] wrote partial log (37792 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.6.f.set32(phy_shared+4, 0x01) [T] wrote partial log (37907 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.6.f.readback-enter] wrote partial log (37967 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.post.6.f.readback] wrote partial log (38060 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.plan.6.g] wrote partial log (38410 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] [flush:phaseF.raise.6.g.0] wrote partial log (38492 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.1.pmgr_adt_power_enable('/arm-io] wrote partial log (36289 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.1.pmgr_adt_power_enable('/arm-io] wrote partial log (36388 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.2.tunables apcie-axi2af-tunables] wrote partial log (36441 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.2.tunables apcie-axi2af-tunables] wrote partial log (36542 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.3.write32(rc_base+0x4, 0) [pcie.] wrote partial log (36595 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.3.write32(rc_base+0x4, 0) [pcie.] wrote partial log (36687 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.skip.4] wrote partial log (36879 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.5.tunables apcie-phy-tunables re] wrote partial log (36929 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.5.tunables apcie-phy-tunables re] wrote partial log (37027 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.skip.5.5] wrote partial log (37098 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.a.set32(phy_shared+0, CLK0REQ=] wrote partial log (37148 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.a.set32(phy_shared+0, CLK0REQ=] wrote partial log (37255 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.b.poll_CLK0ACK] wrote partial log (37339 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.b.poll_CLK0ACK] wrote partial log (37443 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.c.set32(phy_shared+0, CLK1REQ=] wrote partial log (37493 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.c.set32(phy_shared+0, CLK1REQ=] wrote partial log (37600 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.d.poll_CLK1ACK] wrote partial log (37684 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.d.poll_CLK1ACK] wrote partial log (37788 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.e.clear32(phy_shared+0, RESET=] wrote partial log (37838 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.e.clear32(phy_shared+0, RESET=] wrote partial log (37945 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.f.readback-enter] wrote partial log (38004 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.f.readback] wrote partial log (38095 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.pre.6.f.set32(phy_shared+4, 0x01) [T] wrote partial log (38162 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.f.set32(phy_shared+4, 0x01) [T] wrote partial log (38278 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.f.readback-enter] wrote partial log (38338 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.post.6.f.readback] wrote partial log (38431 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.plan.6.g] wrote partial log (38781 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseF.raise.6.g.0] wrote partial log (38863 bytes) to /tmp/m4-recon/nic-runtime.txt
 
 
