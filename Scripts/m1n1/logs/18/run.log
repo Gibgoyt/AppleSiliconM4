@@ -1,5 +1,5 @@
-[ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/perstn-run.sh 19
-[sudo] password for ahmed: 
+[ahmed@admin AppleSiliconM4]$ ./Scripts/m1n1/perstn-run.sh 18
+using m1n1 device: /dev/ttyACM0
 TTY> Initialized dockchannel UART at 0x388128000
 TTY> Device info:
 TTY>   Model: Mac16,10
@@ -11,13 +11,13 @@ TTY> CPU init (MIDR: 0x611f0531 smp_id:0x6)...
 TTY>   CPU part: 0x53 rev: 0x11
 TTY>   CPU: M4 Donan (P core)
 TTY> 
-TTY> boot_args at 0x100041f4000
+TTY> boot_args at 0x10003a48000
 TTY>   revision:     3
 TTY>   version:      2
-TTY>   virt_base:    0x90f0000
+TTY>   virt_base:    0x50f0000
 TTY>   phys_base:    0x100010f0000
 TTY>   mem_size:     0x3df834000
-TTY>   top_of_kdata: 0x10004204000
+TTY>   top_of_kdata: 0x10003a58000
 TTY>   video:
 TTY>     base:       0x103e5234000
 TTY>     display:    0x1
@@ -27,7 +27,7 @@ TTY>     height:     1136
 TTY>     depth:      32bpp
 TTY>     density:    1
 TTY>   machine_type: 0
-TTY>   devtree:      0xb9a8000
+TTY>   devtree:      0x71fc000
 TTY>   devtree_size: 0x68000
 TTY>   cmdline:      
 TTY>   boot_flags:   0x0
@@ -35,7 +35,7 @@ TTY>   mem_size_act: 0x400000000
 TTY> 
 TTY> 
 TTY> 
-TTY> m1n1 v1.6.0-rc1-59-g8a569ad
+TTY> m1n1 v1.6.0-42-gdf2ae61
 TTY> Copyright The Asahi Linux Contributors
 TTY> Licensed under the MIT license
 TTY> 
@@ -43,7 +43,7 @@ TTY> Running in EL2
 TTY> 
 TTY> OS FW version: 15.1 (iBoot-11881.41.5)
 TTY> System FW version: 15.1 (iBoot-11881.41.5)
-TTY> Heap base: 0x10004204000
+TTY> Heap base: 0x10003a58000
 TTY> MCC: Unsupported version:mcc,t8132
 TTY> MMU: Initializing...
 TTY> MMU: RAM base: 0x10000000000
@@ -77,7 +77,7 @@ TTY> dart: dart /arm-io/dart-dcp at 0x30a340000 is a t8110 (locked)
 TTY> dart: dart /arm-io/dart-disp0 at 0x30a300000 is a t8110 (locked)
 TTY> dart: dart /arm-io/dart-disp0.0.0 L1 0 is real-time at 0x103fff1c000
 TTY> dart: allocating L2 tbl at 0, 1 to 0x103fff24000
-TTY> dcp: Mapping segment #2 10003b78000 -> 10003b78000 [24000]
+TTY> dcp: Mapping segment #2 100033cc000 -> 100033cc000 [24000]
 TTY> rtkit(dcp): booting with version 12
 TTY> rtkit(dcp): unknown system endpoint 0x0a
 TTY> rtkit(dcp): pre-allocated buffer (ep 0x1, dva 0x100025eb000, phys 0x103e51a3000)
@@ -111,20 +111,20 @@ TTY> cpufreq: Chip 0x8132 is unsupported
 TTY> Initialization complete.
 TTY> Checking for payloads...
 TTY> Devicetree compatible value: apple,j773g
-TTY> Unknown payload at 0x10003b78000 (magic: 5b41464b)
+TTY> Unknown payload at 0x100033cc000 (magic: 5b41464b)
 TTY> No valid payload found
 TTY> dart: dart /arm-io/dart-usb0 at 0x402f80000 is a t8110
-TTY> USB0: initialized at 0x100045f2030
+TTY> USB0: initialized at 0x10003e42030
 TTY> dart: dart /arm-io/dart-usb1 at 0x40af80000 is a t8110
-TTY> USB1: initialized at 0x100045f2360
+TTY> USB1: initialized at 0x10003e42360
 TTY> dart: dart /arm-io/dart-usb2 at 0x412f80000 is a t8110
-TTY> USB2: initialized at 0x100045f2690
+TTY> USB2: initialized at 0x10003e42690
 TTY> dart: dart /arm-io/dart-usb3 at 0x41af80000 is a t8110
-TTY> USB3: initialized at 0x100045f29c0
+TTY> USB3: initialized at 0x10003e429c0
 TTY> Running proxy...
-m1n1 base: 0x10003a6c000
+m1n1 base: 0x100032c0000
 Fetching ADT (0x00068000 bytes)...
-[pcie_up] require-build OK: 'm1n1 uartproxy v1.6.0-rc1-59-g' contains 'rc1-59-g'
+[pcie_up] require-build OK: 'm1n1 uartproxy v1.6.0-42-gdf2a' contains 'v1.6.0-42-g'
 [pcie_up] === Phase 3.3 pcie_up ===
 [pcie_up] building ApcieMap from ADT...
 [pcie_up] [flush:adt-map] wrote partial log (2430 bytes) to /tmp/m4-recon/nic-runtime.txt
@@ -177,62 +177,33 @@ Starting endpoint #0x20 (smcep)
 [mgmt] Stopping via message
 [mgmt] AP power state is now 0x10
 [mgmt] IOP power state is now 0x10
-[pcie_up] [flush:smc-power] wrote partial log (26253 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:smc-power] wrote partial log (26368 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] CLKREQ -> peripheral func 2 (ADT-declared) on gpio0 pin 162...
-[pcie_up] [flush:clkreq-periph] wrote partial log (26402 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:clkreq-periph] wrote partial log (26517 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] PERSTN deassert on gpio0 pin 165...
 [pcie_up] PERSTN cold reset: drive gpio0[165] low
 [pcie_up] PERSTN: drive gpio0[165] high
-[pcie_up] [flush:perstn] wrote partial log (26667 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:perstn] wrote partial log (26782 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] Phase 0: PMGR gate readout (no apcie MMIO)...
-[pcie_up] [flush:phase0-pmgr-state] wrote partial log (27306 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phase0-pmgr-state] wrote partial log (27421 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] Phase 0.5: PMGR parent-chain readout (no apcie MMIO)...
-[pcie_up] [flush:phase0.5-parents] wrote partial log (31517 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phase0.5-parents] wrote partial log (31632 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] Phase A: single pre-PMGR probe at phy_ip_base+0...
-[pcie_up] [flush:phaseA-preinit-single] wrote partial log (32557 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] setup_refclk (pre-pcie_init)...
-[pcie_up]   setup_refclk ports=[0, 2] refclk_cgen=False
-[pcie_up]     port0 phy_base=0x497020000
-[pcie_up]     read32(0x497020000) [port0 PHY_LANE_CFG (pre-refclk)]...
-[pcie_up]       -> 0x33000070
-[pcie_up]     read32(0x490028208) [port0 LINKSTS (pre-refclk)]...
-[pcie_up]       -> 0x8300020c
-[pcie_up]     read32(0x497020000) [port0 PHY_LANE_CFG (post-refclk)]...
-[pcie_up]       -> 0x3300067f
-[pcie_up]     read32(0x490028208) [port0 LINKSTS (post-refclk)]...
-[pcie_up]       -> 0x8300020c
-[pcie_up]     port2 phy_base=0x497028000
-[pcie_up]     read32(0x497028000) [port2 PHY_LANE_CFG (pre-refclk)]...
-[pcie_up]       -> 0x33000070
-[pcie_up]     read32(0x492028208) [port2 LINKSTS (pre-refclk)]...
-[pcie_up]       -> 0x83000204
-[pcie_up]     read32(0x497028000) [port2 PHY_LANE_CFG (post-refclk)]...
-[pcie_up]       -> 0x3300067f
-[pcie_up]     read32(0x492028208) [port2 LINKSTS (post-refclk)]...
-[pcie_up]       -> 0x83000204
-[pcie_up] [flush:setup-refclk-pre] wrote partial log (34000 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phaseA-preinit-single] wrote partial log (32672 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] p.pcie_init()...
 TTY> pcie: Initializing t8132 PCIe controller
 TTY> pcie: ADT uses 6 reg entries per port
-TTY> pcie: BC pmgr power enable...
-TTY> pcie: BC pmgr power enable done
-TTY> pcie: BC axi2af tunables done
 TTY> pcie: No common tunables
-TTY> pcie: BC common tunables done
-TTY> pcie: BC phy tunables done
-TTY> pcie: BC phy 0 CLK handshake done
-TTY> pcie: t8132: skipping phy-ip tunables pre-port-init (host applies post-init)
-TTY> pcie: BC shared init done (rc handshake ok)
 TTY> pcie: Initializing port 0
-TTY> pcie: Port failed to become idle on /arm-io/apcie/pci-bridge0
+TTY> pcie: Port 0 max speed = 2
 TTY> pcie: Initializing port 2
-TTY> pcie: Port failed to become idle on /arm-io/apcie/pci-bridge2
+TTY> pcie: Port 2 max speed = 1
 TTY> pcie: Initialized controller 0
 TTY> pcie: Error getting node /arm-io/apcie0
 TTY> pcie: Error getting node /arm-io/apcie-ge0
 TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up] p.pcie_init returned 0
-[pcie_up] [flush:pcie-init] wrote partial log (34021 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:pcie-init] wrote partial log (32693 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] active ports (per ADT): [0, 2]
 [pcie_up] early post-init tier-1 dump (safe windows only)...
 [pcie_up]   dump_pcie_regs tier=1 tag=post-init-early active_ports=[0, 2]
@@ -242,9 +213,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
 [pcie_up]       -> 0x00100101
 [pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
-[pcie_up]       -> 0x00000005
+[pcie_up]       -> 0x0000000d
 [pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
-[pcie_up]       -> 0x8300020c
+[pcie_up]       -> 0xab000208
 [pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
 [pcie_up]       -> 0x00000001
 [pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
@@ -275,9 +246,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
 [pcie_up]       -> 0x00100101
 [pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
-[pcie_up]       -> 0x00000005
+[pcie_up]       -> 0x0000000d
 [pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
-[pcie_up]       -> 0x83000204
+[pcie_up]       -> 0xab000200
 [pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
 [pcie_up]       -> 0x00000001
 [pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
@@ -304,30 +275,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]       -> 0x001000ff
 [pcie_up]     read32(0x49202b97c) [port2 +0x397c (T602X only)]...
 [pcie_up]       -> 0x00000000
-[pcie_up] [flush:dump-post-init-early] wrote partial log (36098 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] setup_refclk (post-pcie_init)...
-[pcie_up]   setup_refclk ports=[0, 2] refclk_cgen=False
-[pcie_up]     port0 phy_base=0x497020000
-[pcie_up]     read32(0x497020000) [port0 PHY_LANE_CFG (pre-refclk)]...
-[pcie_up]       -> 0x2300066f
-[pcie_up]     read32(0x490028208) [port0 LINKSTS (pre-refclk)]...
-[pcie_up]       -> 0x8300020c
-[pcie_up]     read32(0x497020000) [port0 PHY_LANE_CFG (post-refclk)]...
-[pcie_up]       -> 0x2300066f
-[pcie_up]     read32(0x490028208) [port0 LINKSTS (post-refclk)]...
-[pcie_up]       -> 0x8300020c
-[pcie_up]     port2 phy_base=0x497028000
-[pcie_up]     read32(0x497028000) [port2 PHY_LANE_CFG (pre-refclk)]...
-[pcie_up]       -> 0x2300066f
-[pcie_up]     read32(0x492028208) [port2 LINKSTS (pre-refclk)]...
-[pcie_up]       -> 0x83000204
-[pcie_up]     read32(0x497028000) [port2 PHY_LANE_CFG (post-refclk)]...
-[pcie_up]       -> 0x2300066f
-[pcie_up]     read32(0x492028208) [port2 LINKSTS (post-refclk)]...
-[pcie_up]       -> 0x83000204
-[pcie_up] [flush:setup-refclk-post] wrote partial log (37542 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:dump-post-init-early] wrote partial log (34770 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] post-init LINKSTS watch (up to 5 s per port)...
-[pcie_up] [flush:postinit-linksts-watch] wrote partial log (37839 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:postinit-linksts-watch] wrote partial log (35025 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] dumping PCIe controller registers (post-init, tier=3)...
 [pcie_up]   dump_pcie_regs tier=3 tag=post-init active_ports=[0, 2]
 [pcie_up]     read32(0x49400003c) [rc_base + 0x03c]...
@@ -336,9 +286,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
 [pcie_up]       -> 0x00100101
 [pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
-[pcie_up]       -> 0x00000005
+[pcie_up]       -> 0x0000000d
 [pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
-[pcie_up]       -> 0x8300020c
+[pcie_up]       -> 0xab000208
 [pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
 [pcie_up]       -> 0x00000001
 [pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
@@ -369,9 +319,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
 [pcie_up]       -> 0x00100101
 [pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
-[pcie_up]       -> 0x00000005
+[pcie_up]       -> 0x0000000d
 [pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
-[pcie_up]       -> 0x83000204
+[pcie_up]       -> 0xab000200
 [pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
 [pcie_up]       -> 0x00000001
 [pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
@@ -433,11 +383,11 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]       -> 0x00000000
 [pcie_up]     read32(0x49203c020) [port2 LTSSM +0x20]...
 [pcie_up]       -> 0x00000000
-[pcie_up] [flush:dump-post-init] wrote partial log (41324 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:dump-post-init] wrote partial log (38510 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] trying LTSSM kick sequences on ports [0, 2] (aggressive=False)...
 [pcie_up]   try_ltssm_kick ports=[0, 2] aggressive=False
 [pcie_up]     read32(0x490028208) [port0 LINKSTS (baseline)]...
-[pcie_up]       -> 0x8300020c
+[pcie_up]       -> 0xab000208
 [pcie_up]     seq A on port0
 [pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A pre)]...
 [pcie_up]       -> 0x00000000
@@ -448,14 +398,14 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x490028010) [port0 +0x10 (seq A post)]...
 [pcie_up]       -> 0x00000000
 [pcie_up]     read32(0x490028208) [port0 LINKSTS (after seq A)]...
-[pcie_up]       -> 0x8300020c
+[pcie_up]       -> 0xab000208
 [pcie_up]     seq C on port0
 [pcie_up]     read32(0x490028208) [port0 LINKSTS (after seq C)]...
-[pcie_up]       -> 0x8300020c
+[pcie_up]       -> 0xab000208
 [pcie_up]     read32(0x490028208) [port0 LINKSTS (after 200ms settle)]...
-[pcie_up]       -> 0x8300020c
+[pcie_up]       -> 0xab000208
 [pcie_up]     read32(0x492028208) [port2 LINKSTS (baseline)]...
-[pcie_up]       -> 0x83000204
+[pcie_up]       -> 0xab000200
 [pcie_up]     seq A on port2
 [pcie_up]     read32(0x49400003c) [rc_base+0x3c (seq A pre)]...
 [pcie_up]       -> 0x00000000
@@ -466,13 +416,13 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x492028010) [port2 +0x10 (seq A post)]...
 [pcie_up]       -> 0x00000000
 [pcie_up]     read32(0x492028208) [port2 LINKSTS (after seq A)]...
-[pcie_up]       -> 0x83000204
+[pcie_up]       -> 0xab000200
 [pcie_up]     seq C on port2
 [pcie_up]     read32(0x492028208) [port2 LINKSTS (after seq C)]...
-[pcie_up]       -> 0x83000204
+[pcie_up]       -> 0xab000200
 [pcie_up]     read32(0x492028208) [port2 LINKSTS (after 200ms settle)]...
-[pcie_up]       -> 0x83000204
-[pcie_up] [flush:ltssm-kick] wrote partial log (43559 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up]       -> 0xab000200
+[pcie_up] [flush:ltssm-kick] wrote partial log (40705 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] dumping PCIe controller registers (post-kick, tier=3)...
 [pcie_up]   dump_pcie_regs tier=3 tag=post-kick active_ports=[0, 2]
 [pcie_up]     read32(0x49400003c) [rc_base + 0x03c]...
@@ -481,9 +431,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x490028800) [port0 APPCLK      (+0x800)]...
 [pcie_up]       -> 0x00100101
 [pcie_up]     read32(0x490028804) [port0 STATUS      (+0x804)]...
-[pcie_up]       -> 0x00000005
+[pcie_up]       -> 0x0000000d
 [pcie_up]     read32(0x490028208) [port0 LINKSTS     (+0x208)]...
-[pcie_up]       -> 0x8300020c
+[pcie_up]       -> 0xab000208
 [pcie_up]     read32(0x49002882c) [port0 T602X_RESET (+0x82c)]...
 [pcie_up]       -> 0x00000001
 [pcie_up]     read32(0x490028814) [port0 PORT_RESET  (+0x814)]...
@@ -514,9 +464,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]     read32(0x492028800) [port2 APPCLK      (+0x800)]...
 [pcie_up]       -> 0x00100101
 [pcie_up]     read32(0x492028804) [port2 STATUS      (+0x804)]...
-[pcie_up]       -> 0x00000005
+[pcie_up]       -> 0x0000000d
 [pcie_up]     read32(0x492028208) [port2 LINKSTS     (+0x208)]...
-[pcie_up]       -> 0x83000204
+[pcie_up]       -> 0xab000200
 [pcie_up]     read32(0x49202882c) [port2 T602X_RESET (+0x82c)]...
 [pcie_up]       -> 0x00000001
 [pcie_up]     read32(0x492028814) [port2 PORT_RESET  (+0x814)]...
@@ -578,9 +528,9 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up]       -> 0x00000000
 [pcie_up]     read32(0x49203c020) [port2 LTSSM +0x20]...
 [pcie_up]       -> 0x00000000
-[pcie_up] [flush:dump-post-kick] wrote partial log (47044 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:dump-post-kick] wrote partial log (44190 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] ECAM walk @ 0x1cb0000000 ...
-[pcie_up] [flush:ecam-walk] wrote partial log (47307 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:ecam-walk] wrote partial log (44735 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] wrote /tmp/m4-recon/nic-runtime.txt
 [pcie_up] done. Copy /tmp/m4-recon/nic-runtime.txt into m4_recon/ if it looks sane.
 
@@ -980,6 +930,8 @@ NIC GPIO pins: PERSTN=gpio0[165] CLKREQ=gpio0[162]
 SMC smc_addr = 0x38c600000
 gP0d <- 0x800001  (apcie power)
 gP1a <- 1         (apcie-ge power)
+gP0d same-session readback = 0x0 (want 0x800001) [MISMATCH]
+gP1a same-session readback = 0x0 (want 0x1) [MISMATCH]
 === CLKREQ periph mux (gpio0 pin 162, ADT alt-func 2) ===
 gpio0[162] @ 0x39a000288: 0x00074a10 -> 0x00074a50 (read-back 0x00074a50) [periph func 2]
 
@@ -1068,35 +1020,6 @@ apcie.power_gates from ADT: [379, 380, 381, 382, 383, 151]
       Skipping pre-PMGR MMIO. Phase B will call p.pmgr_adt_power_enable('/arm-io/apcie') first, then read.
 
 
-=== setup_refclk (apple_pcie_setup_refclk analog, refclk_cgen=False) ===
-
---- port0 refclk (phy_base=0x497020000) ---
-  port0 PHY_LANE_CFG (pre-refclk) @ 0x497020000 = 0x33000070
-  port0 LINKSTS (pre-refclk) @ 0x490028208 = 0x8300020c
-  port0 pre-refclk             LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
-    set32(phy+0x000, 0x1) [REFCLK0REQ]
-    REFCLK0ACK asserted (phy+0x000=0x33000075)
-    set32(phy+0x000, 0x2) [REFCLK1REQ]
-    REFCLK1ACK asserted (phy+0x000=0x3300007f)
-    set32(phy+0x000, 0x600) [REFCLKEN]
-  port0 PHY_LANE_CFG (post-refclk) @ 0x497020000 = 0x3300067f
-  port0 LINKSTS (post-refclk) @ 0x490028208 = 0x8300020c
-  port0 post-refclk            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
-
---- port2 refclk (phy_base=0x497028000) ---
-  port2 PHY_LANE_CFG (pre-refclk) @ 0x497028000 = 0x33000070
-  port2 LINKSTS (pre-refclk) @ 0x492028208 = 0x83000204
-  port2 pre-refclk             LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
-    set32(phy+0x000, 0x1) [REFCLK0REQ]
-    REFCLK0ACK asserted (phy+0x000=0x33000075)
-    set32(phy+0x000, 0x2) [REFCLK1REQ]
-    REFCLK1ACK asserted (phy+0x000=0x3300007f)
-    set32(phy+0x000, 0x600) [REFCLKEN]
-  port2 PHY_LANE_CFG (post-refclk) @ 0x497028000 = 0x3300067f
-  port2 LINKSTS (post-refclk) @ 0x492028208 = 0x83000204
-  port2 post-refclk            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
-[guard] setup_refclk(pre): exc_count delta = 0 (before=0, after=0)
-
 p.pcie_init() -> 0
 
 === PCIe controller register dump (post-init-early, tier=1) ===
@@ -1104,8 +1027,8 @@ p.pcie_init() -> 0
 
 --- port0 (T1) port_base=0x490028000 ---
   port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100101
-  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
-  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x0000000d
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0xab000208
   port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
   port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
   port0 +0x010               @ 0x490028010 = 0x00000000
@@ -1122,8 +1045,8 @@ p.pcie_init() -> 0
 
 --- port2 (T1) port_base=0x492028000 ---
   port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100101
-  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
-  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x0000000d
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0xab000200
   port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
   port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
   port2 +0x010               @ 0x492028010 = 0x00000000
@@ -1138,47 +1061,18 @@ p.pcie_init() -> 0
   port2 +0x808               @ 0x492028808 = 0x001000ff
   port2 +0x397c (T602X only) @ 0x49202b97c = 0x00000000
 [guard] dump_pcie_regs(post-init-early): exc_count delta = 0 (before=0, after=0)
-
-=== setup_refclk (apple_pcie_setup_refclk analog, refclk_cgen=False) ===
-
---- port0 refclk (phy_base=0x497020000) ---
-  port0 PHY_LANE_CFG (pre-refclk) @ 0x497020000 = 0x2300066f
-  port0 LINKSTS (pre-refclk) @ 0x490028208 = 0x8300020c
-  port0 pre-refclk             LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
-    set32(phy+0x000, 0x1) [REFCLK0REQ]
-    REFCLK0ACK asserted (phy+0x000=0x2300066f)
-    set32(phy+0x000, 0x2) [REFCLK1REQ]
-    REFCLK1ACK asserted (phy+0x000=0x2300066f)
-    set32(phy+0x000, 0x600) [REFCLKEN]
-  port0 PHY_LANE_CFG (post-refclk) @ 0x497020000 = 0x2300066f
-  port0 LINKSTS (post-refclk) @ 0x490028208 = 0x8300020c
-  port0 post-refclk            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
-
---- port2 refclk (phy_base=0x497028000) ---
-  port2 PHY_LANE_CFG (pre-refclk) @ 0x497028000 = 0x2300066f
-  port2 LINKSTS (pre-refclk) @ 0x492028208 = 0x83000204
-  port2 pre-refclk             LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
-    set32(phy+0x000, 0x1) [REFCLK0REQ]
-    REFCLK0ACK asserted (phy+0x000=0x2300066f)
-    set32(phy+0x000, 0x2) [REFCLK1REQ]
-    REFCLK1ACK asserted (phy+0x000=0x2300066f)
-    set32(phy+0x000, 0x600) [REFCLKEN]
-  port2 PHY_LANE_CFG (post-refclk) @ 0x497028000 = 0x2300066f
-  port2 LINKSTS (post-refclk) @ 0x492028208 = 0x83000204
-  port2 post-refclk            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
-[guard] setup_refclk(post): exc_count delta = 0 (before=0, after=0)
 === post-init LINKSTS watch (5 s per active port) ===
-  port0: LINKSTS=0x8300020c [BUSY|bit3|bit9|bit24|bit25|bit31] at +0.00s
-  port0: still BUSY after 5 s (LINKSTS=0x8300020c)
-  port2: LINKSTS=0x83000204 [BUSY|bit9|bit24|bit25|bit31] at +0.00s
-  port2: still BUSY after 5 s (LINKSTS=0x83000204)
+  port0: LINKSTS=0xab000208 [bit3|bit9|bit24|bit25|bit31] at +0.00s
+  port0: BUSY CLEARED after 0.00s!
+  port2: LINKSTS=0xab000200 [bit9|bit24|bit25|bit31] at +0.00s
+  port2: BUSY CLEARED after 0.00s!
 === PCIe controller register dump (post-init, tier=3) ===
   rc_base + 0x03c            @ 0x49400003c = 0x00000000
 
 --- port0 (T1) port_base=0x490028000 ---
   port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100101
-  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
-  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x0000000d
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0xab000208
   port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
   port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
   port0 +0x010               @ 0x490028010 = 0x00000000
@@ -1195,8 +1089,8 @@ p.pcie_init() -> 0
 
 --- port2 (T1) port_base=0x492028000 ---
   port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100101
-  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
-  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x0000000d
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0xab000200
   port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
   port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
   port2 +0x010               @ 0x492028010 = 0x00000000
@@ -1245,48 +1139,48 @@ p.pcie_init() -> 0
 === LTSSM kick experiment (post-init) ===
 
 --- port0 @ port_base=0x490028000 ltssm=0x49003c000 ---
-  port0 LINKSTS (baseline)   @ 0x490028208 = 0x8300020c
-  port0 baseline               LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (baseline)   @ 0x490028208 = 0xab000208
+  port0 baseline               LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
   rc_base+0x3c (seq A pre)   @ 0x49400003c = 0x00000000
   seq A: set32(rc_base+0x3c, 0x1)  # 0x49400003c
   rc_base+0x3c (seq A post-set) @ 0x49400003c = 0x00000000
   port0 +0x10 (seq A pre)    @ 0x490028010 = 0x00000000
   seq A: write32(port_base+0x10, 0x2)
   port0 +0x10 (seq A post)   @ 0x490028010 = 0x00000000
-  port0 LINKSTS (after seq A) @ 0x490028208 = 0x8300020c
-  port0 after seq A            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (after seq A) @ 0x490028208 = 0xab000208
+  port0 after seq A            LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
   seq B: skipped (--ltssm-kick-aggressive to enable; writes ltssm_base which may AXI-stall)
   seq C: clear+set T602X_RESET (port_base+0x82c)
-  port0 LINKSTS (after seq C) @ 0x490028208 = 0x8300020c
-  port0 after seq C            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
-  port0 LINKSTS (after 200ms settle) @ 0x490028208 = 0x8300020c
-  port0 after 200ms settle     LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (after seq C) @ 0x490028208 = 0xab000208
+  port0 after seq C            LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (after 200ms settle) @ 0x490028208 = 0xab000208
+  port0 after 200ms settle     LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
 
 --- port2 @ port_base=0x492028000 ltssm=0x49203c000 ---
-  port2 LINKSTS (baseline)   @ 0x492028208 = 0x83000204
-  port2 baseline               LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (baseline)   @ 0x492028208 = 0xab000200
+  port2 baseline               LINKSTS decode: [bit9|bit24|bit25|bit31]
   rc_base+0x3c (seq A pre)   @ 0x49400003c = 0x00000000
   seq A: set32(rc_base+0x3c, 0x1)  # 0x49400003c
   rc_base+0x3c (seq A post-set) @ 0x49400003c = 0x00000000
   port2 +0x10 (seq A pre)    @ 0x492028010 = 0x00000000
   seq A: write32(port_base+0x10, 0x2)
   port2 +0x10 (seq A post)   @ 0x492028010 = 0x00000000
-  port2 LINKSTS (after seq A) @ 0x492028208 = 0x83000204
-  port2 after seq A            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (after seq A) @ 0x492028208 = 0xab000200
+  port2 after seq A            LINKSTS decode: [bit9|bit24|bit25|bit31]
   seq B: skipped (--ltssm-kick-aggressive to enable; writes ltssm_base which may AXI-stall)
   seq C: clear+set T602X_RESET (port_base+0x82c)
-  port2 LINKSTS (after seq C) @ 0x492028208 = 0x83000204
-  port2 after seq C            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
-  port2 LINKSTS (after 200ms settle) @ 0x492028208 = 0x83000204
-  port2 after 200ms settle     LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (after seq C) @ 0x492028208 = 0xab000200
+  port2 after seq C            LINKSTS decode: [bit9|bit24|bit25|bit31]
+  port2 LINKSTS (after 200ms settle) @ 0x492028208 = 0xab000200
+  port2 after 200ms settle     LINKSTS decode: [bit9|bit24|bit25|bit31]
 [guard] try_ltssm_kick: exc_count delta = 0 (before=0, after=0)
 === PCIe controller register dump (post-kick, tier=3) ===
   rc_base + 0x03c            @ 0x49400003c = 0x00000000
 
 --- port0 (T1) port_base=0x490028000 ---
   port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100101
-  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
-  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x0000000d
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0xab000208
   port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
   port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
   port0 +0x010               @ 0x490028010 = 0x00000000
@@ -1303,8 +1197,8 @@ p.pcie_init() -> 0
 
 --- port2 (T1) port_base=0x492028000 ---
   port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100101
-  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
-  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x0000000d
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0xab000200
   port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
   port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
   port2 +0x010               @ 0x492028010 = 0x00000000
@@ -1355,9 +1249,13 @@ ecam_base = 0x1cb0000000
 active ports: [0, 2]
 
 --- root bus 0 ---
-  00:00.0: vacant (VID:DID = 0xffffffff)
+  00:00.0: VID:DID = 106b:100c  rev=1  class=06.04.00  (PCI bridge)
+          cmd=0x0000 status=0x0010 hdr=0x01 BAR0=0x00000000
+          bridge: primary=0 secondary=0 subordinate=0
   00:01.0: skipped (port 1 inactive)
-  00:02.0: vacant (VID:DID = 0xffffffff)
+  00:02.0: VID:DID = 106b:100c  rev=1  class=06.04.00  (PCI bridge)
+          cmd=0x0000 status=0x0010 hdr=0x01 BAR0=0x00000000
+          bridge: primary=0 secondary=0 subordinate=0
 [guard] ecam_walk: exc_count delta = 0 (before=0, after=0)
 
 === enable NIC ===
