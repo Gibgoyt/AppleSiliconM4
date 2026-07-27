@@ -30,6 +30,7 @@ p.pcie_init() -> 0
 
 === Phase A.2: downstream link-up gate ===
   port2: LINKSTS=0xab000200 [bit9|bit24|bit25|bit31] at +0.00s
+  port2: NOT UP after 2 s (LINKSTS=0xab000200)
 [guard] poll_linksts_up: exc_count delta = 0 (before=0, after=0)
 
 --- LTSSM kick (T602X sequence, skipped for T8132 in C) ---
@@ -41,6 +42,7 @@ p.pcie_init() -> 0
     ltssm+0x14 (START) readback = 0x00000000
 [guard] ltssm_kick: exc_count delta = 0 (before=0, after=0)
   port2: LINKSTS=0xab000200 [bit9|bit24|bit25|bit31] at +0.00s
+  port2: NOT UP after 2 s (LINKSTS=0xab000200)
 [guard] poll_linksts_up(post-kick): exc_count delta = 0 (before=0, after=0)
 
 === initial root-bus walk ===

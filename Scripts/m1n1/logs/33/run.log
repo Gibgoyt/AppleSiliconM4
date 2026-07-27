@@ -12,13 +12,13 @@ TTY> CPU init (MIDR: 0x611f0531 smp_id:0x6)...
 TTY>   CPU part: 0x53 rev: 0x11
 TTY>   CPU: M4 Donan (P core)
 TTY> 
-TTY> boot_args at 0x10003e3c000
+TTY> boot_args at 0x10004614000
 TTY>   revision:     3
 TTY>   version:      2
-TTY>   virt_base:    0x130f0000
+TTY>   virt_base:    0x90f0000
 TTY>   phys_base:    0x100010f0000
 TTY>   mem_size:     0x3df834000
-TTY>   top_of_kdata: 0x10003e4c000
+TTY>   top_of_kdata: 0x10004624000
 TTY>   video:
 TTY>     base:       0x103e5234000
 TTY>     display:    0x1
@@ -28,7 +28,7 @@ TTY>     height:     1136
 TTY>     depth:      32bpp
 TTY>     density:    1
 TTY>   machine_type: 0
-TTY>   devtree:      0x155f0000
+TTY>   devtree:      0xbdc8000
 TTY>   devtree_size: 0x68000
 TTY>   cmdline:      
 TTY>   boot_flags:   0x0
@@ -44,7 +44,7 @@ TTY> Running in EL2
 TTY> 
 TTY> OS FW version: 15.1 (iBoot-11881.41.5)
 TTY> System FW version: 15.1 (iBoot-11881.41.5)
-TTY> Heap base: 0x10003e4c000
+TTY> Heap base: 0x10004624000
 TTY> MCC: Unsupported version:mcc,t8132
 TTY> MMU: Initializing...
 TTY> MMU: RAM base: 0x10000000000
@@ -78,7 +78,7 @@ TTY> dart: dart /arm-io/dart-dcp at 0x30a340000 is a t8110 (locked)
 TTY> dart: dart /arm-io/dart-disp0 at 0x30a300000 is a t8110 (locked)
 TTY> dart: dart /arm-io/dart-disp0.0.0 L1 0 is real-time at 0x103fff1c000
 TTY> dart: allocating L2 tbl at 0, 1 to 0x103fff24000
-TTY> dcp: Mapping segment #2 100037c0000 -> 100037c0000 [24000]
+TTY> dcp: Mapping segment #2 10003f98000 -> 10003f98000 [24000]
 TTY> rtkit(dcp): booting with version 12
 TTY> rtkit(dcp): unknown system endpoint 0x0a
 TTY> rtkit(dcp): pre-allocated buffer (ep 0x1, dva 0x100025eb000, phys 0x103e51a3000)
@@ -112,18 +112,18 @@ TTY> cpufreq: Chip 0x8132 is unsupported
 TTY> Initialization complete.
 TTY> Checking for payloads...
 TTY> Devicetree compatible value: apple,j773g
-TTY> Unknown payload at 0x100037c0000 (magic: 5b41464b)
+TTY> Unknown payload at 0x10003f98000 (magic: 5b41464b)
 TTY> No valid payload found
 TTY> dart: dart /arm-io/dart-usb0 at 0x402f80000 is a t8110
-TTY> USB0: initialized at 0x10004236030
+TTY> USB0: initialized at 0x10004a0e030
 TTY> dart: dart /arm-io/dart-usb1 at 0x40af80000 is a t8110
-TTY> USB1: initialized at 0x10004236360
+TTY> USB1: initialized at 0x10004a0e360
 TTY> dart: dart /arm-io/dart-usb2 at 0x412f80000 is a t8110
-TTY> USB2: initialized at 0x10004236690
+TTY> USB2: initialized at 0x10004a0e690
 TTY> dart: dart /arm-io/dart-usb3 at 0x41af80000 is a t8110
-TTY> USB3: initialized at 0x100042369c0
+TTY> USB3: initialized at 0x10004a0e9c0
 TTY> Running proxy...
-m1n1 base: 0x100036b4000
+m1n1 base: 0x10003e8c000
 Fetching ADT (0x00068000 bytes)...
 [pcie_up] require-build OK: 'm1n1 uartproxy v1.6.0-43-ge81d' contains 'v1.6.0-43-g'
 [pcie_up] building ApcieMap from ADT...
@@ -196,39 +196,13 @@ TTY> pcie: Error getting node /arm-io/apcie-ge1
 [pcie_up] [flush:pcie-init] wrote partial log (776 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] post-init LINKSTS watch (up to 5 s per port)...
 [pcie_up] [flush:linksts-watch] wrote partial log (1094 bytes) to /tmp/m4-recon/nic-runtime.txt
-[pcie_up] WARN poll_linksts_up: ValueError: Invalid format specifier '08x if last is not None else 0' for object of type 'int'
-Traceback (most recent call last):
-  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/m4_common.py", line 97, in try_
-    return fn()
-  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/nic_bringup.py", line 263, in <lambda>
-    up, _ = try_(lambda: poll_linksts_up(apcie, nic_pi, buf,
-                         ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
-                                         secs=args.link_up_secs),
-                                         ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/pcie_common.py", line 514, in poll_linksts_up
-    f"(LINKSTS=0x{last:08x if last is not None else 0})\n")
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: Invalid format specifier '08x if last is not None else 0' for object of type 'int'
-[pcie_up] [flush:linkup-poll] wrote partial log (1266 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:linkup-poll] wrote partial log (1313 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] port2 not UP -- replaying T602X LTSSM kick...
-[pcie_up] WARN poll_linksts_up(post-kick): ValueError: Invalid format specifier '08x if last is not None else 0' for object of type 'int'
-Traceback (most recent call last):
-  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/m4_common.py", line 97, in try_
-    return fn()
-  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/nic_bringup.py", line 275, in <lambda>
-    try_(lambda: poll_linksts_up(apcie, nic_pi, buf,
-                 ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
-                                 secs=args.link_up_secs),
-                                 ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/ahmed/Projects/C/embedded/AppleSiliconM4/Scripts/m1n1/pcie_common.py", line 514, in poll_linksts_up
-    f"(LINKSTS=0x{last:08x if last is not None else 0})\n")
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: Invalid format specifier '08x if last is not None else 0' for object of type 'int'
-[pcie_up] [flush:ltssm-kick] wrote partial log (1734 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:ltssm-kick] wrote partial log (1828 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] initial root-bus walk (find bridges)...
-[pcie_up] [flush:root-walk] wrote partial log (2188 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:root-walk] wrote partial log (2282 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] === Phase B: program bridge bus numbers ===
-[pcie_up] [flush:bus-numbers] wrote partial log (2726 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:bus-numbers] wrote partial log (2820 bytes) to /tmp/m4-recon/nic-runtime.txt
 [pcie_up] === Phase C: ECAM re-walk @ 0x1cb0000000 ===
 TTY> Exception: SYNC
 
