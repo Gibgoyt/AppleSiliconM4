@@ -1310,10 +1310,12 @@ case "${RUN^^}" in
         # phy_ip/PHY_CTRL writes that SError on j773g. PCIE_BC breadcrumbs name
         # any wedge line; watch the TTY console for the arm/ltssm+0x14 readback.
         #
-        # REQUIRES the patched build enrolled: tag v1.6.0-rc1-60-g4b77755
-        # (guard --require-build=rc1-60-g -- the survivable 30-char USB window
-        # substring; the enrolled RUN18-21 build was rc1-59-g). --endpoint-diag
-        # (read-only) reports SMC power + MAC + LINKSTS bit3 delta.
+        # REQUIRES the patched build enrolled. Guard substring updated to
+        # --require-build=v1.6.0-42-g for the currently-enrolled m1n1
+        # (v1.6.0-42-gdf2ae61, branch t8132-rebase; the survivable ~30-char USB
+        # window substring). Earlier this run targeted rc1-60-g4b77755; the
+        # RUN18-21 build was rc1-59-g. --endpoint-diag (read-only) reports SMC
+        # power + MAC + LINKSTS bit3 delta.
         #
         # Matrix: arm reads back 0x1 in-window + ltssm+0x14=0x1 + BUSY clears
         # -> LINK TRAINS -> ECAM finds the NIC. arm latches but BUSY persists
@@ -1326,7 +1328,7 @@ case "${RUN^^}" in
                --clkreq-mode=periph
                --setup-refclk=both
                --endpoint-diag
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     23)
         # RUN 23: force APCIE_PHY_SW (gate 151) ACTIVE before pcie_init.
@@ -1352,7 +1354,7 @@ case "${RUN^^}" in
                --clkreq-mode=periph
                --setup-refclk=both
                --endpoint-diag
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     24)
         # RUN 24: SoC-first pivot. 6 falsified PCIe runs (18-23); two
@@ -1386,7 +1388,7 @@ case "${RUN^^}" in
                --clkreq-mode=periph
                --setup-refclk=both
                --endpoint-diag
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     25)
         # RUN 25: SoC-first bring-up moves to its own script, soc_bringup.py
@@ -1409,7 +1411,7 @@ case "${RUN^^}" in
                --soc-recon
                --smp-diag
                --acio-status
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     26)
         # RUN 26: RUN 25 established the refusing cores are POWERED (ECPU/PCPU
@@ -1435,7 +1437,7 @@ case "${RUN^^}" in
                --smp-diag
                --smp-probe
                --soc-recon
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     27)
         # RUN 27: no-reflash test of the RVBAR-lock hypothesis (H1). RUN 26
@@ -1456,7 +1458,7 @@ case "${RUN^^}" in
         FLAGS=(--smp-start
                --smp-probe
                --smp-release-probe
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     28)
         # RUN 28: find the M4 core-release register (READ-ONLY). RUN 27 killed
@@ -1478,7 +1480,7 @@ case "${RUN^^}" in
                --smp-probe
                --enable-core-parse
                --core-diff-scan
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     29)
         # RUN 29: test the wrong-CPU-start-offset hypothesis (H5), READ-ONLY.
@@ -1501,7 +1503,7 @@ case "${RUN^^}" in
         FLAGS=(--smp-start
                --smp-probe
                --cpustart-decode
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     30)
         # RUN 30: find the REAL M4 CPU-start register (READ-ONLY). RUN 29
@@ -1524,7 +1526,7 @@ case "${RUN^^}" in
                --smp-probe
                --cpustart-decode
                --cpustart-offset=0x88000
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     31)
         # RUN 31: LAST read-only offset search for the M4 CPU-start register.
@@ -1545,7 +1547,7 @@ case "${RUN^^}" in
         FLAGS=(--smp-start
                --smp-probe
                --cpustart-scan
-               --require-build=rc1-60-g)
+               --require-build=v1.6.0-42-g)
         ;;
     *)
         echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31} [extra perstn.py/soc_bringup.py args...]" >&2
