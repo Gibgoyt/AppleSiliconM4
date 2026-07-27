@@ -109,8 +109,15 @@
 
 === ACIO rtkit status (running/stopped/reset, read-only) ===
   --- acio-cpu0 (role=ACIO0) ---
-    reg[self] base=0x401108000
-  acio-cpu0.self.CPU_CONTROL @ 0x401108044 = <UartTimeout: Expected 1 bytes, got 0 bytes>
-  [ABORT] m1n1 is not responding; stopping dump
-[guard] acio-acio-cpu0-self: set_exc_guard(OFF) failed: SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
-[guard] acio-acio-cpu0-self: get_exc_count(post) failed: SerialException: write failed: [Errno 5] Input/output error
+      gate  338 name='CIO0_RECONFIG-V'        VIRTUAL (no PS reg, flags.on=False)
+    gate posture: gate 338: VIRTUAL(on=False)
+    -> acio-cpu0: NO ACTIVE gate -> ASC block un-clocked; NOT reading MMIO (would AXI-stall/wedge m1n1). IOP not booted.
+  --- acio-cpu1 (role=ACIO1) ---
+      gate  339 name='CIO1_RECONFIG-V'        VIRTUAL (no PS reg, flags.on=False)
+    gate posture: gate 339: VIRTUAL(on=False)
+    -> acio-cpu1: NO ACTIVE gate -> ASC block un-clocked; NOT reading MMIO (would AXI-stall/wedge m1n1). IOP not booted.
+  --- acio-cpu3 (role=ACIO3) ---
+      gate  341 name='CIO3_RECONFIG-V'        VIRTUAL (no PS reg, flags.on=False)
+    gate posture: gate 341: VIRTUAL(on=False)
+    -> acio-cpu3: NO ACTIVE gate -> ASC block un-clocked; NOT reading MMIO (would AXI-stall/wedge m1n1). IOP not booted.
+  (All ACIO gates VIRTUAL/OFF -> the IOP that owns the CIO3-PLL/phy_ip PHY is un-clocked and un-booted -> booting it requires powering its gate first, which the AP may not own. If a gate ever reads ACTIVE and the IOP is STOPPED/RUN=0 -> boot it via ASC(u, base).boot() before pcie_init.)
