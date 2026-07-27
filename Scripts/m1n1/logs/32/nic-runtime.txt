@@ -1,0 +1,51 @@
+=== nic_bringup: PLAN_3 Phase 3.5 (identify the NIC) ===
+
+ecam_base   = 0x1cb0000000
+active ports = [0, 2]
+
+=== Phase A: PCIe bring-up ===
+NIC GPIO pins: PERSTN=gpio0[165] CLKREQ=gpio0[162]
+
+SMC smc_addr = 0x38c600000
+gP0d <- 0x800001  (apcie power)
+gP1a <- 1         (apcie-ge power)
+gP0d same-session readback = 0x0 (want 0x800001) [MISMATCH]
+gP1a same-session readback = 0x0 (want 0x1) [MISMATCH]
+gpio0[162] @ 0x39a000288: 0x00074a10 -> 0x00074a50 (read-back 0x00074a50) [periph func 2]
+=== PERSTN deassert (gpio0 pin 165) ===
+gpio0 probe: read32(0x39a000000) = 0x008742c0
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a02 (read-back 0x00074a02)
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a03 (read-back 0x00074a03)
+settled 100 ms after deassert
+
+
+p.pcie_init() -> 0
+
+=== post-init LINKSTS watch (5 s per active port) ===
+  port0: LINKSTS=0xab000208 [bit3|bit9|bit24|bit25|bit31] at +0.00s
+  port0: BUSY CLEARED after 0.00s!
+  port2: LINKSTS=0xab000200 [bit9|bit24|bit25|bit31] at +0.00s
+  port2: BUSY CLEARED after 0.00s!
+[guard] watch_linksts: exc_count delta = 0 (before=0, after=0)
+
+=== initial root-bus walk ===
+  00:00.0: VID:DID = 106b:100c  rev=1  class=06.04.00  (PCI bridge)
+          cmd=0x0000 status=0x0010 hdr=0x01 BAR0=0x00000000
+          bridge: primary=0 secondary=0 subordinate=0
+  00:02.0: VID:DID = 106b:100c  rev=1  class=06.04.00  (PCI bridge)
+          cmd=0x0000 status=0x0010 hdr=0x01 BAR0=0x00000000
+          bridge: primary=0 secondary=0 subordinate=0
+[guard] root-walk: exc_count delta = 0 (before=0, after=0)
+
+=== program bridge bus numbers ===
+--- bridge 00:00.0 (port 0) -> secondary bus 1 ---
+  CMD: 0x0000 -> 0x0006 (readback 0x0006)
+  primary:     0x00 -> 0x00 (want 0x00)
+  secondary:   0x00 -> 0x01 (want 0x01)
+  subordinate: 0x00 -> 0xff (want 0xff)
+--- bridge 00:02.0 (port 2) -> secondary bus 3 ---
+  CMD: 0x0000 -> 0x0006 (readback 0x0006)
+  primary:     0x00 -> 0x00 (want 0x00)
+  secondary:   0x00 -> 0x03 (want 0x03)
+  subordinate: 0x00 -> 0xff (want 0xff)
+[guard] program_bridge_bus_numbers: exc_count delta = 0 (before=0, after=0)
