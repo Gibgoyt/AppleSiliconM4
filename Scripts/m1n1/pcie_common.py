@@ -510,8 +510,9 @@ def poll_linksts_up(apcie, port_index, buf, secs=2.0):
                       f"{time.monotonic() - t0:.2f}s!\n")
             return True, v
         time.sleep(0.05)
+    last_str = f"0x{last:08x}" if last is not None else "<no read>"
     buf.write(f"  port{port_index}: NOT UP after {secs:.0f} s "
-              f"(LINKSTS=0x{last:08x if last is not None else 0})\n")
+              f"(LINKSTS={last_str})\n")
     return False, last
 
 
