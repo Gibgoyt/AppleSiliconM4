@@ -468,3 +468,78 @@ def watch_linksts(apcie, buf, secs=5.0, label="post-init"):
         else:
             buf.write(f"  port{pi}: still BUSY after {secs:.0f} s "
                       f"(LINKSTS=0x{last:08x})\n")
+
+
+# ---------------------------------------------------------------- LTSSM / link-up
+
+# APCIE_PORT_LINKSTS bits (m1n1 src/pcie.c:57-60).
+APCIE_PORT_LINKSTS      = 0x208
+APCIE_PORT_LINKSTS_UP   = 1 << 0
+APCIE_PORT_LINKSTS_BUSY = 1 << 2
+
+# LTSSM debug-block register offsets in ltssm_base. This is the exact "kick"
+# sequence m1n1's C code runs for APCIE_T602X ports (src/pcie.c:718-722, 746-749)
+# but SKIPS for T8132 (compat T8122). Replaying it host-side tests whether the
+# T8132 downstream link needs it to leave Detect and reach L0 (LINKSTS bit0 UP).
+LTSSM_KICK_10 = 0x10  # write 0x2
+LTSSM_KICK_1C = 0x1c  # write 0x4
+LTSSM_KICK_20 = 0x20  # set  0x2
+LTSSM_START   = 0x14  # write 0x1 -- the START/enable bit
+
+
+def poll_linksts_up(apcie, port_index, buf, secs=2.0):
+    """Poll port `port_index` LINKSTS for the UP bit (bit0) for up to `secs`.
+    Returns (is_up, last_value). Pure reads; tolerant of a read fault."""
+    pb = apcie.ports[port_index].port_base
+    last = None
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < secs:
+        try:
+            v = p.read32(pb + APCIE_PORT_LINKSTS)
+        except Exception as e:
+            buf.write(f"  port{port_index}: LINKSTS_UP read RAISED "
+                      f"{e.__class__.__name__}; abandoning poll\n")
+            return False, last
+        if v != last:
+            buf.write(f"  port{port_index}: LINKSTS=0x{v:08x} "
+                      f"[{_linksts_decode(v)}] at "
+                      f"+{time.monotonic() - t0:.2f}s\n")
+            last = v
+        if v & APCIE_PORT_LINKSTS_UP:
+            buf.write(f"  port{port_index}: LINK UP after "
+                      f"{time.monotonic() - t0:.2f}s!\n")
+            return True, v
+        time.sleep(0.05)
+    buf.write(f"  port{port_index}: NOT UP after {secs:.0f} s "
+              f"(LINKSTS=0x{last:08x if last is not None else 0})\n")
+    return False, last
+
+
+def ltssm_kick(apcie, port_index, buf):
+    """Replay the T602X LTSSM kick against port `port_index`'s ltssm_base --
+    the sequence m1n1's C skips for T8132. Writes are guarded by the caller;
+    this logs each write and reads LTSSM_START back."""
+    lt = apcie.ports[port_index].ltssm_base
+    buf.write(f"  port{port_index}: LTSSM kick @ ltssm_base=0x{lt:x}\n")
+    for off, val, op in (
+        (LTSSM_KICK_10, 0x2, "write"),
+        (LTSSM_KICK_1C, 0x4, "write"),
+        (LTSSM_KICK_20, 0x2, "set"),
+        (LTSSM_START,   0x1, "write"),
+    ):
+        try:
+            if op == "set":
+                p.set32(lt + off, val)
+            else:
+                p.write32(lt + off, val)
+        except Exception as e:
+            buf.write(f"    ltssm+0x{off:02x} {op} 0x{val:x} FAILED: "
+                      f"{e.__class__.__name__}: {e}\n")
+            continue
+        buf.write(f"    ltssm+0x{off:02x} <- 0x{val:x} ({op})\n")
+    # Read the START bit back -- in RUN 20 it refused to latch (read 0).
+    try:
+        rb = p.read32(lt + LTSSM_START)
+        buf.write(f"    ltssm+0x{LTSSM_START:02x} (START) readback = 0x{rb:08x}\n")
+    except Exception as e:
+        buf.write(f"    START readback FAILED: {e.__class__.__name__}: {e}\n")

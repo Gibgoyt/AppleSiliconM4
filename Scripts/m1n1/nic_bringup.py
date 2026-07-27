@@ -65,6 +65,7 @@ from pcie_common import (
     cfg_read16, cfg_read8, cfg_write16, cfg_write8,
     smc_power, gpio_set_periph, deassert_perstn,
     probe_device, ecam_walk, enable_nic, watch_linksts, _linksts_decode,
+    poll_linksts_up, ltssm_kick,
 )
 
 
@@ -148,6 +149,12 @@ def main():
                          "link is already up from a prior run this boot")
     ap.add_argument("--link-watch-secs", type=float, default=5.0,
                     help="seconds to watch LINKSTS for BUSY-clear (default: 5)")
+    ap.add_argument("--link-up-secs", type=float, default=2.0,
+                    help="seconds to poll LINKSTS for UP (bit0) on the NIC port "
+                         "before/after the LTSSM kick (default: 2)")
+    ap.add_argument("--no-ltssm-kick", action="store_true",
+                    help="skip Phase A.2 (LINKSTS_UP gate + host-side LTSSM "
+                         "kick); go straight to bus programming + descend")
     args = ap.parse_args()
 
     require_build(args.require_build)
@@ -243,6 +250,32 @@ def main():
                                            label="post-perst-retry"),
                      "watch_linksts(retry)")
             flush("perst-retry")
+
+        # Phase A.2: LINK-UP gate. BUSY clearing means the port controller ran,
+        # but the DOWNSTREAM link may still be in Detect (endpoint config not
+        # ready -> reads fault). m1n1's C waits only for PORT_STATUS_RUN /
+        # !BUSY, never LINKSTS_UP (bit0), and SKIPS the T602X LTSSM kick for
+        # T8132. Poll UP here; if not up, replay the kick host-side and re-poll.
+        nic_pi = apcie.active_ports[-1]  # port 2 on j773g
+        if not args.no_ltssm_kick and liveness_gate("LINKSTS_UP gate"):
+            buf.write("\n=== Phase A.2: downstream link-up gate ===\n")
+            with guarded(buf, "poll_linksts_up", short_timeout=timeout):
+                up, _ = try_(lambda: poll_linksts_up(apcie, nic_pi, buf,
+                                                     secs=args.link_up_secs),
+                             "poll_linksts_up") or (False, None)
+            flush("linkup-poll")
+            if not up and liveness_gate("LTSSM kick"):
+                log(f"port{nic_pi} not UP -- replaying T602X LTSSM kick...")
+                buf.write("\n--- LTSSM kick (T602X sequence, skipped for T8132 "
+                          "in C) ---\n")
+                with guarded(buf, "ltssm_kick", short_timeout=timeout):
+                    try_(lambda: ltssm_kick(apcie, nic_pi, buf), "ltssm_kick")
+                with guarded(buf, "poll_linksts_up(post-kick)",
+                             short_timeout=timeout):
+                    try_(lambda: poll_linksts_up(apcie, nic_pi, buf,
+                                                 secs=args.link_up_secs),
+                         "poll_linksts_up(post-kick)")
+                flush("ltssm-kick")
     else:
         log("Phase A skipped (--no-bringup): assuming link already up.")
         buf.write("=== Phase A skipped (--no-bringup) ===\n\n")

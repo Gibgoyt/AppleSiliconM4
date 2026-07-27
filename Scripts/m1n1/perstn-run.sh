@@ -1574,8 +1574,31 @@ case "${RUN^^}" in
         RUNNER=nic_bringup.sh
         FLAGS=(--require-build=v1.6.0-42-g)
         ;;
+    33)
+        # RUN 33: RUN 32 re-run on the SError-survivable m1n1 fork. RUN 32 got
+        # link up + bridge bus numbers programmed and sticking, then the FIRST
+        # downstream config read (bus 3, ECAM 0x1cb0300000) took a SYNC data
+        # abort (L2C_ERR_STS 0x80) followed by an INFINITE async SError storm
+        # that wedged m1n1 -- because features_m4 leaves apple_sysregs_unlocked
+        # false, so exception.c never cleared the sticky L2C_ERR flag (it
+        # re-fired forever). The fork now clears L2C_ERR_STS unconditionally in
+        # exc_serr + the sync path (src/exception.c), so a guarded downstream
+        # read to an un-linked endpoint returns the sentinel and survives.
+        #
+        # nic_bringup.py also gained Phase A.2: poll LINKSTS_UP (bit0) on the
+        # NIC port and, if not up, replay the T602X LTSSM kick host-side (the
+        # kick m1n1's C skips for T8132) before descending.
+        #
+        # REBUILD + RE-ENROLL m1n1 first (banner bumps to ~v1.6.0-43-g<hash>);
+        # update the guard below to the new banner substring, or override:
+        #   ./perstn-run.sh 33 --require-build=v1.6.0-43-g   (argparse last-wins)
+        # M-phase-1 PASS: log reaches the M3.5 summary with NO SError storm.
+        # M-phase-2 PASS: 03:00.0 shows a real VID:DID class=02.xx.xx.
+        RUNNER=nic_bringup.sh
+        FLAGS=(--require-build=v1.6.0-43-g)
+        ;;
     *)
-        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32} [extra perstn.py/soc_bringup.py/nic_bringup.py args...]" >&2
+        echo "usage: $0 {I|J|K|L|M|N|O|P|Q|R|S|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|33} [extra perstn.py/soc_bringup.py/nic_bringup.py args...]" >&2
         echo "" >&2
         echo "See the file header for what each RUN tests." >&2
         exit 1
