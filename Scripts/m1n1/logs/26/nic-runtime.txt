@@ -45,58 +45,58 @@
   pmgr reg[0] = 0x380700000; CPU-start base (die0) = 0x380734000 (+0x34000)
   --- per-CPU RVBAR (cpu-impl-reg[0]) + status ---
   cpu 'cpu0' reg=0x0 die=0 cluster=0 core=0 state='waiting'
-  cpu0.RVBAR                   @ 0x210050000 = 0x00100100021ec001
+  cpu0.RVBAR                   @ 0x210050000 = 0x0010010002b0c001
   cpu0.impl+0x100              @ 0x210050100 = 0x0080802a0f20d102
 [guard] rvbar-cpu0: exc_count delta = 0 (before=0, after=0)
-      -> cpu0: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu0: RVBAR addr=0x10002b0c000 LOCK=True
   cpu 'cpu1' reg=0x1 die=0 cluster=0 core=1 state='waiting'
-  cpu1.RVBAR                   @ 0x210150000 = 0x00100100021ec001
+  cpu1.RVBAR                   @ 0x210150000 = 0x0010010002b0c001
   cpu1.impl+0x100              @ 0x210150100 = 0x1180802a0f20d102
 [guard] rvbar-cpu1: exc_count delta = 0 (before=0, after=0)
-      -> cpu1: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu1: RVBAR addr=0x10002b0c000 LOCK=True
   cpu 'cpu2' reg=0x2 die=0 cluster=0 core=2 state='waiting'
-  cpu2.RVBAR                   @ 0x210250000 = 0x00100100021ec001
+  cpu2.RVBAR                   @ 0x210250000 = 0x0010010002b0c001
   cpu2.impl+0x100              @ 0x210250100 = 0x2280802a0f20d102
 [guard] rvbar-cpu2: exc_count delta = 0 (before=0, after=0)
-      -> cpu2: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu2: RVBAR addr=0x10002b0c000 LOCK=True
   cpu 'cpu3' reg=0x3 die=0 cluster=0 core=3 state='waiting'
-  cpu3.RVBAR                   @ 0x210350000 = 0x00100100021ec001
+  cpu3.RVBAR                   @ 0x210350000 = 0x0010010002b0c001
   cpu3.impl+0x100              @ 0x210350100 = 0x3380802a0f20d102
 [guard] rvbar-cpu3: exc_count delta = 0 (before=0, after=0)
-      -> cpu3: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu3: RVBAR addr=0x10002b0c000 LOCK=True
   cpu 'cpu4' reg=0x4 die=0 cluster=0 core=4 state='waiting'
-  cpu4.RVBAR                   @ 0x210450000 = 0x00100100021ec001
+  cpu4.RVBAR                   @ 0x210450000 = 0x0010010002b0c001
   cpu4.impl+0x100              @ 0x210450100 = 0x4480802a0f20d102
 [guard] rvbar-cpu4: exc_count delta = 0 (before=0, after=0)
-      -> cpu4: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu4: RVBAR addr=0x10002b0c000 LOCK=True
   cpu 'cpu5' reg=0x5 die=0 cluster=0 core=5 state='waiting'
-  cpu5.RVBAR                   @ 0x210550000 = 0x00100100021ec001
+  cpu5.RVBAR                   @ 0x210550000 = 0x0010010002b0c001
   cpu5.impl+0x100              @ 0x210550100 = 0x5580802a0f20d102
 [guard] rvbar-cpu5: exc_count delta = 0 (before=0, after=0)
-      -> cpu5: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu5: RVBAR addr=0x10002b0c000 LOCK=True
   cpu 'cpu6' reg=0x100 die=0 cluster=1 core=0 state='running'
-  cpu6.RVBAR                   @ 0x211050000 = 0x01100100021ec001
+  cpu6.RVBAR                   @ 0x211050000 = 0x0110010002b0c001
   cpu6.impl+0x100              @ 0x211050100 = 0x0080800aee201102
 [guard] rvbar-cpu6: exc_count delta = 0 (before=0, after=0)
-      -> cpu6: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu6: RVBAR addr=0x10002b0c000 LOCK=True
   cpu 'cpu7' reg=0x101 die=0 cluster=1 core=1 state='waiting'
-  cpu7.RVBAR                   @ 0x211150000 = 0x01100100021ec001
+  cpu7.RVBAR                   @ 0x211150000 = 0x0110010002b0c001
   cpu7.impl+0x100              @ 0x211150100 = 0x1180808aef20d102
 [guard] rvbar-cpu7: exc_count delta = 0 (before=0, after=0)
-      -> cpu7: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu7: RVBAR addr=0x10002b0c000 LOCK=True
   cpu 'cpu8' reg=0x102 die=0 cluster=1 core=2 state='waiting'
-  cpu8.RVBAR                   @ 0x211250000 = 0x01100100021ec001
+  cpu8.RVBAR                   @ 0x211250000 = 0x0110010002b0c001
   cpu8.impl+0x100              @ 0x211250100 = 0x2280808aef20d102
 [guard] rvbar-cpu8: exc_count delta = 0 (before=0, after=0)
-      -> cpu8: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu8: RVBAR addr=0x10002b0c000 LOCK=True
   cpu 'cpu9' reg=0x103 die=0 cluster=1 core=3 state='waiting'
-  cpu9.RVBAR                   @ 0x211350000 = 0x01100100021ec001
+  cpu9.RVBAR                   @ 0x211350000 = 0x0110010002b0c001
   cpu9.impl+0x100              @ 0x211350100 = 0x3380808aef20d102
 [guard] rvbar-cpu9: exc_count delta = 0 (before=0, after=0)
-      -> cpu9: RVBAR addr=0x100021ec000 LOCK=True
+      -> cpu9: RVBAR addr=0x10002b0c000 LOCK=True
   --- RVBAR cross-check ---
   dies seen in /cpus: [0]
-  distinct RVBAR target addresses: ['0x100021ec000']
+  distinct RVBAR target addresses: ['0x10002b0c000']
   -> all cores point at the SAME RVBAR entry (expected: m1n1's _vectors_start). RVBAR delivery looks correct.
   --- CPU-start block words (read-only) ---
   die 0: CPU-start base 0x380734000
