@@ -485,10 +485,10 @@ apcie.power_gates from ADT: [379, 380, 381, 382, 383, 151]
 === Phase D: parents-first PS poke ending at gate 151 (APCIE_PHY_SW) ===
     gate 150 ('APCIE_SYS_ST') ps@0x380700548: initial raw=0x1000030f (auto_enable ps_auto=0x0, was_pwrgated, was_clkgated)
       write #1 (pmgr_set_mode): mask32(0x380700548, clear=0x1000030f, set=0x0000000f)
-      after #1: raw=0x0f0003ff (ps_auto=0xf, was_pwrgated, was_clkgated) [0.1 ms, converged]
+      after #1: raw=0x0f0003ff (ps_auto=0xf, was_pwrgated, was_clkgated) [0.4 ms, converged]
   gate 151 ('APCIE_PHY_SW') ps@0x380700550: initial raw=0x1400024f (auto_enable ps_auto=0x4, was_clkgated)
     write #1 (pmgr_set_mode): mask32(0x380700550, clear=0x1000030f, set=0x0000000f)
-    after #1: raw=0x0f0002ff (ps_auto=0xf, was_clkgated) [0.1 ms, converged]
+    after #1: raw=0x0f0002ff (ps_auto=0xf, was_clkgated) [0.5 ms, converged]
   exc_count during chain poke: 0 -> 0 (delta=0)
   entire gate 151 parent chain is ACTIVE; Phase E may run.
 
@@ -528,9 +528,9 @@ p.pcie_init() -> 0
   rc_base + 0x03c            @ 0x49400003c = 0x00000000
 
 --- port0 (T1) port_base=0x490028000 ---
-  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100001
-  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
-  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100101
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x0000000d
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0xab000208
   port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
   port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
   port0 +0x010               @ 0x490028010 = 0x00000000
@@ -546,9 +546,9 @@ p.pcie_init() -> 0
   port0 +0x397c (T602X only) @ 0x49002b97c = 0x00000000
 
 --- port2 (T1) port_base=0x492028000 ---
-  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100001
-  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
-  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100101
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x0000000d
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0xab000200
   port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
   port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
   port2 +0x010               @ 0x492028010 = 0x00000000
@@ -568,64 +568,192 @@ p.pcie_init() -> 0
 
 --- port0 refclk (phy_base=0x497020000) ---
   port0 PHY_LANE_CFG (pre-refclk) @ 0x497020000 = 0x2300066f
-  port0 LINKSTS (pre-refclk) @ 0x490028208 = 0x8300020c
-  port0 pre-refclk             LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (pre-refclk) @ 0x490028208 = 0xab000208
+  port0 pre-refclk             LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
     set32(phy+0x000, 0x1) [REFCLK0REQ]
     REFCLK0ACK asserted (phy+0x000=0x2300066f)
     set32(phy+0x000, 0x2) [REFCLK1REQ]
     REFCLK1ACK asserted (phy+0x000=0x2300066f)
     set32(phy+0x000, 0x600) [REFCLKEN]
   port0 PHY_LANE_CFG (post-refclk) @ 0x497020000 = 0x2300066f
-  port0 LINKSTS (post-refclk) @ 0x490028208 = 0x8300020c
-  port0 post-refclk            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (post-refclk) @ 0x490028208 = 0xab000208
+  port0 post-refclk            LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
 
 --- port2 refclk (phy_base=0x497028000) ---
   port2 PHY_LANE_CFG (pre-refclk) @ 0x497028000 = 0x2300066f
-  port2 LINKSTS (pre-refclk) @ 0x492028208 = 0x83000204
-  port2 pre-refclk             LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (pre-refclk) @ 0x492028208 = 0xab000200
+  port2 pre-refclk             LINKSTS decode: [bit9|bit24|bit25|bit31]
     set32(phy+0x000, 0x1) [REFCLK0REQ]
     REFCLK0ACK asserted (phy+0x000=0x2300066f)
     set32(phy+0x000, 0x2) [REFCLK1REQ]
     REFCLK1ACK asserted (phy+0x000=0x2300066f)
     set32(phy+0x000, 0x600) [REFCLKEN]
   port2 PHY_LANE_CFG (post-refclk) @ 0x497028000 = 0x2300066f
-  port2 LINKSTS (post-refclk) @ 0x492028208 = 0x83000204
-  port2 post-refclk            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (post-refclk) @ 0x492028208 = 0xab000200
+  port2 post-refclk            LINKSTS decode: [bit9|bit24|bit25|bit31]
 [guard] setup_refclk(post): exc_count delta = 0 (before=0, after=0)
 === post-init LINKSTS watch (5 s per active port) ===
-  port0: LINKSTS=0x8300020c [BUSY|bit3|bit9|bit24|bit25|bit31] at +0.00s
-  port0: still BUSY after 5 s (LINKSTS=0x8300020c)
-  port2: LINKSTS=0x83000204 [BUSY|bit9|bit24|bit25|bit31] at +0.00s
-  port2: still BUSY after 5 s (LINKSTS=0x83000204)
+  port0: LINKSTS=0xab000208 [bit3|bit9|bit24|bit25|bit31] at +0.00s
+  port0: BUSY CLEARED after 0.00s!
+  port2: LINKSTS=0xab000200 [bit9|bit24|bit25|bit31] at +0.00s
+  port2: BUSY CLEARED after 0.00s!
 
 === endpoint diagnostics (read-only) ===
   SMC gP0d = 0x0 (want 0x800001) [MISMATCH]
   SMC gP1a = 0x0 (want 0x1) [MISMATCH]
   --- LINKSTS bit3 delta ---
-  port0 LINKSTS              @ 0x490028208 = 0x8300020c
-  port0: LINKSTS=0x8300020c [BUSY|bit3|bit9|bit24|bit25|bit31] bit3=set
-  port2 LINKSTS              @ 0x492028208 = 0x83000204
-  port2: LINKSTS=0x83000204 [BUSY|bit9|bit24|bit25|bit31] bit3=clear
-  --- RC LTSSM-debug (ltssm_base +0x10/0x14/0x1c/0x20) ---
-  port0 LTSSM +0x10          @ 0x49003c010 = 0x00000002
-  port0 LTSSM +0x14          @ 0x49003c014 = 0x00000000
-  port0 LTSSM +0x1c          @ 0x49003c01c = 0x00000004
-  port0 LTSSM +0x20          @ 0x49003c020 = 0x00000002
-  port0: LTSSM-debug non-zero (RC LTSSM active -- check endpoint)
-  port2 LTSSM +0x10          @ 0x49203c010 = 0x00000002
-  port2 LTSSM +0x14          @ 0x49203c014 = 0x00000000
-  port2 LTSSM +0x1c          @ 0x49203c01c = 0x00000004
-  port2 LTSSM +0x20          @ 0x49203c020 = 0x00000002
-  port2: LTSSM-debug non-zero (RC LTSSM active -- check endpoint)
+  port0 LINKSTS              @ 0x490028208 = 0xab000208
+  port0: LINKSTS=0xab000208 [bit3|bit9|bit24|bit25|bit31] bit3=set
+  port2 LINKSTS              @ 0x492028208 = 0xab000200
+  port2: LINKSTS=0xab000200 [bit9|bit24|bit25|bit31] bit3=clear
+  --- RC LTSSM-debug window sweep (ltssm_base +0x000..+0x100) [*=written by our kick] ---
+  port0 ltssm_base=0x49003c000:
+  port0 LTSSM +0x000         @ 0x49003c000 = 0x00000000
+  port0 LTSSM +0x004         @ 0x49003c004 = 0x00000000
+  port0 LTSSM +0x008         @ 0x49003c008 = 0x00000000
+  port0 LTSSM +0x00c         @ 0x49003c00c = 0x00000000
+  port0 LTSSM +0x010         @ 0x49003c010 = 0x00000000
+  port0 LTSSM +0x014         @ 0x49003c014 = 0x00000000
+  port0 LTSSM +0x018         @ 0x49003c018 = 0x0000000a
+    +0x018 = 0x0000000a
+  port0 LTSSM +0x01c         @ 0x49003c01c = 0x00000000
+  port0 LTSSM +0x020         @ 0x49003c020 = 0x00000000
+  port0 LTSSM +0x024         @ 0x49003c024 = 0x00000000
+  port0 LTSSM +0x028         @ 0x49003c028 = 0x00000000
+  port0 LTSSM +0x02c         @ 0x49003c02c = 0x00000000
+  port0 LTSSM +0x030         @ 0x49003c030 = 0x00000400
+    +0x030 = 0x00000400
+  port0 LTSSM +0x034         @ 0x49003c034 = 0x00000000
+  port0 LTSSM +0x038         @ 0x49003c038 = 0x00000000
+  port0 LTSSM +0x03c         @ 0x49003c03c = 0x00000000
+  port0 LTSSM +0x040         @ 0x49003c040 = 0x00000000
+  port0 LTSSM +0x044         @ 0x49003c044 = 0x00000000
+  port0 LTSSM +0x048         @ 0x49003c048 = 0x00000000
+  port0 LTSSM +0x04c         @ 0x49003c04c = 0x00000000
+  port0 LTSSM +0x050         @ 0x49003c050 = 0x00000000
+  port0 LTSSM +0x054         @ 0x49003c054 = 0x00000020
+    +0x054 = 0x00000020
+  port0 LTSSM +0x058         @ 0x49003c058 = 0x09008000
+    +0x058 = 0x09008000
+  port0 LTSSM +0x05c         @ 0x49003c05c = 0x00000000
+  port0 LTSSM +0x060         @ 0x49003c060 = 0x00000000
+  port0 LTSSM +0x064         @ 0x49003c064 = 0x00000000
+  port0 LTSSM +0x068         @ 0x49003c068 = 0x00000000
+  port0 LTSSM +0x06c         @ 0x49003c06c = 0x00000000
+  port0 LTSSM +0x070         @ 0x49003c070 = 0x00000000
+  port0 LTSSM +0x074         @ 0x49003c074 = 0x00000000
+  port0 LTSSM +0x078         @ 0x49003c078 = 0x00000000
+  port0 LTSSM +0x07c         @ 0x49003c07c = 0x00000000
+  port0 LTSSM +0x080         @ 0x49003c080 = 0x00000000
+  port0 LTSSM +0x084         @ 0x49003c084 = 0x00000000
+  port0 LTSSM +0x088         @ 0x49003c088 = 0x00000000
+  port0 LTSSM +0x08c         @ 0x49003c08c = 0x00000000
+  port0 LTSSM +0x090         @ 0x49003c090 = 0x00000000
+  port0 LTSSM +0x094         @ 0x49003c094 = 0x00000000
+  port0 LTSSM +0x098         @ 0x49003c098 = 0x00000000
+  port0 LTSSM +0x09c         @ 0x49003c09c = 0x00000000
+  port0 LTSSM +0x0a0         @ 0x49003c0a0 = 0x00000000
+  port0 LTSSM +0x0a4         @ 0x49003c0a4 = 0x00000000
+  port0 LTSSM +0x0a8         @ 0x49003c0a8 = 0x00000000
+  port0 LTSSM +0x0ac         @ 0x49003c0ac = 0x00000000
+  port0 LTSSM +0x0b0         @ 0x49003c0b0 = 0x00000000
+  port0 LTSSM +0x0b4         @ 0x49003c0b4 = 0x00000000
+  port0 LTSSM +0x0b8         @ 0x49003c0b8 = 0x00000000
+  port0 LTSSM +0x0bc         @ 0x49003c0bc = 0x00000000
+  port0 LTSSM +0x0c0         @ 0x49003c0c0 = 0x00000000
+  port0 LTSSM +0x0c4         @ 0x49003c0c4 = 0x00000000
+  port0 LTSSM +0x0c8         @ 0x49003c0c8 = 0x00000000
+  port0 LTSSM +0x0cc         @ 0x49003c0cc = 0x00000000
+  port0 LTSSM +0x0d0         @ 0x49003c0d0 = 0x00000000
+  port0 LTSSM +0x0d4         @ 0x49003c0d4 = 0x00000000
+  port0 LTSSM +0x0d8         @ 0x49003c0d8 = 0x00000000
+  port0 LTSSM +0x0dc         @ 0x49003c0dc = 0x00000000
+  port0 LTSSM +0x0e0         @ 0x49003c0e0 = 0x00000000
+  port0 LTSSM +0x0e4         @ 0x49003c0e4 = 0x00000000
+  port0 LTSSM +0x0e8         @ 0x49003c0e8 = 0x00000000
+  port0 LTSSM +0x0ec         @ 0x49003c0ec = 0x00000000
+  port0 LTSSM +0x0f0         @ 0x49003c0f0 = 0x00000000
+  port0 LTSSM +0x0f4         @ 0x49003c0f4 = 0x00000000
+  port0 LTSSM +0x0f8         @ 0x49003c0f8 = 0x00000000
+  port0 LTSSM +0x0fc         @ 0x49003c0fc = 0x00000000
+  port2 ltssm_base=0x49203c000:
+  port2 LTSSM +0x000         @ 0x49203c000 = 0x00000000
+  port2 LTSSM +0x004         @ 0x49203c004 = 0x00000000
+  port2 LTSSM +0x008         @ 0x49203c008 = 0x00000000
+  port2 LTSSM +0x00c         @ 0x49203c00c = 0x00000000
+  port2 LTSSM +0x010         @ 0x49203c010 = 0x00000000
+  port2 LTSSM +0x014         @ 0x49203c014 = 0x00000000
+  port2 LTSSM +0x018         @ 0x49203c018 = 0x0000000a
+    +0x018 = 0x0000000a
+  port2 LTSSM +0x01c         @ 0x49203c01c = 0x00000000
+  port2 LTSSM +0x020         @ 0x49203c020 = 0x00000000
+  port2 LTSSM +0x024         @ 0x49203c024 = 0x00000000
+  port2 LTSSM +0x028         @ 0x49203c028 = 0x00000000
+  port2 LTSSM +0x02c         @ 0x49203c02c = 0x00000000
+  port2 LTSSM +0x030         @ 0x49203c030 = 0x00000400
+    +0x030 = 0x00000400
+  port2 LTSSM +0x034         @ 0x49203c034 = 0x00000000
+  port2 LTSSM +0x038         @ 0x49203c038 = 0x00000000
+  port2 LTSSM +0x03c         @ 0x49203c03c = 0x00000000
+  port2 LTSSM +0x040         @ 0x49203c040 = 0x00000000
+  port2 LTSSM +0x044         @ 0x49203c044 = 0x00000000
+  port2 LTSSM +0x048         @ 0x49203c048 = 0x00000000
+  port2 LTSSM +0x04c         @ 0x49203c04c = 0x00000000
+  port2 LTSSM +0x050         @ 0x49203c050 = 0x00000000
+  port2 LTSSM +0x054         @ 0x49203c054 = 0x00000020
+    +0x054 = 0x00000020
+  port2 LTSSM +0x058         @ 0x49203c058 = 0x08000000
+    +0x058 = 0x08000000
+  port2 LTSSM +0x05c         @ 0x49203c05c = 0x00000000
+  port2 LTSSM +0x060         @ 0x49203c060 = 0x00000000
+  port2 LTSSM +0x064         @ 0x49203c064 = 0x00000000
+  port2 LTSSM +0x068         @ 0x49203c068 = 0x00000000
+  port2 LTSSM +0x06c         @ 0x49203c06c = 0x00000000
+  port2 LTSSM +0x070         @ 0x49203c070 = 0x00000000
+  port2 LTSSM +0x074         @ 0x49203c074 = 0x00000000
+  port2 LTSSM +0x078         @ 0x49203c078 = 0x00000000
+  port2 LTSSM +0x07c         @ 0x49203c07c = 0x00000000
+  port2 LTSSM +0x080         @ 0x49203c080 = 0x00000000
+  port2 LTSSM +0x084         @ 0x49203c084 = 0x00000000
+  port2 LTSSM +0x088         @ 0x49203c088 = 0x00000000
+  port2 LTSSM +0x08c         @ 0x49203c08c = 0x00000000
+  port2 LTSSM +0x090         @ 0x49203c090 = 0x00000000
+  port2 LTSSM +0x094         @ 0x49203c094 = 0x00000000
+  port2 LTSSM +0x098         @ 0x49203c098 = 0x00000000
+  port2 LTSSM +0x09c         @ 0x49203c09c = 0x00000000
+  port2 LTSSM +0x0a0         @ 0x49203c0a0 = 0x00000000
+  port2 LTSSM +0x0a4         @ 0x49203c0a4 = 0x00000000
+  port2 LTSSM +0x0a8         @ 0x49203c0a8 = 0x00000000
+  port2 LTSSM +0x0ac         @ 0x49203c0ac = 0x00000000
+  port2 LTSSM +0x0b0         @ 0x49203c0b0 = 0x00000000
+  port2 LTSSM +0x0b4         @ 0x49203c0b4 = 0x00000000
+  port2 LTSSM +0x0b8         @ 0x49203c0b8 = 0x00000000
+  port2 LTSSM +0x0bc         @ 0x49203c0bc = 0x00000000
+  port2 LTSSM +0x0c0         @ 0x49203c0c0 = 0x00000000
+  port2 LTSSM +0x0c4         @ 0x49203c0c4 = 0x00000000
+  port2 LTSSM +0x0c8         @ 0x49203c0c8 = 0x00000000
+  port2 LTSSM +0x0cc         @ 0x49203c0cc = 0x00000000
+  port2 LTSSM +0x0d0         @ 0x49203c0d0 = 0x00000000
+  port2 LTSSM +0x0d4         @ 0x49203c0d4 = 0x00000000
+  port2 LTSSM +0x0d8         @ 0x49203c0d8 = 0x00000000
+  port2 LTSSM +0x0dc         @ 0x49203c0dc = 0x00000000
+  port2 LTSSM +0x0e0         @ 0x49203c0e0 = 0x00000000
+  port2 LTSSM +0x0e4         @ 0x49203c0e4 = 0x00000000
+  port2 LTSSM +0x0e8         @ 0x49203c0e8 = 0x00000000
+  port2 LTSSM +0x0ec         @ 0x49203c0ec = 0x00000000
+  port2 LTSSM +0x0f0         @ 0x49203c0f0 = 0x00000000
+  port2 LTSSM +0x0f4         @ 0x49203c0f4 = 0x00000000
+  port2 LTSSM +0x0f8         @ 0x49203c0f8 = 0x00000000
+  port2 LTSSM +0x0fc         @ 0x49203c0fc = 0x00000000
   NIC MAC /arm-io/apcie/pci-bridge2/lan-1gb:local-mac-address = b'\xd0\x11\xe5q\x81\xdc' (endpoint provisioned -- present)
 [guard] endpoint_diag: exc_count delta = 0 (before=0, after=0)
 === PCIe controller register dump (post-init, tier=3) ===
   rc_base + 0x03c            @ 0x49400003c = 0x00000000
 
 --- port0 (T1) port_base=0x490028000 ---
-  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100001
-  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
-  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100101
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x0000000d
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0xab000208
   port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
   port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
   port0 +0x010               @ 0x490028010 = 0x00000000
@@ -641,9 +769,9 @@ p.pcie_init() -> 0
   port0 +0x397c (T602X only) @ 0x49002b97c = 0x00000000
 
 --- port2 (T1) port_base=0x492028000 ---
-  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100001
-  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
-  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100101
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x0000000d
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0xab000200
   port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
   port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
   port2 +0x010               @ 0x492028010 = 0x00000000
@@ -675,65 +803,65 @@ p.pcie_init() -> 0
 === Tier 3a SKIPPED: Phase F shared init not up (phaseF_shared_up=False); phy_ip reads would wedge m1n1 -- RUN 15 lesson ===
 
 --- port0 (T3) ltssm=0x49003c000 phy_extra=0x497048000 ctrl_lo=0x490000000 ---
-  port0 LTSSM +0x10          @ 0x49003c010 = 0x00000002
+  port0 LTSSM +0x10          @ 0x49003c010 = 0x00000000
   port0 LTSSM +0x14          @ 0x49003c014 = 0x00000000
-  port0 LTSSM +0x1c          @ 0x49003c01c = 0x00000004
-  port0 LTSSM +0x20          @ 0x49003c020 = 0x00000002
+  port0 LTSSM +0x1c          @ 0x49003c01c = 0x00000000
+  port0 LTSSM +0x20          @ 0x49003c020 = 0x00000000
   port0 phy_extra/ctrl_lo SKIPPED (would AXI-stall -- RUN 18 lesson; pass --tier3-phyextra to force)
 
 --- port2 (T3) ltssm=0x49203c000 phy_extra=0x497058000 ctrl_lo=0x492000000 ---
-  port2 LTSSM +0x10          @ 0x49203c010 = 0x00000002
+  port2 LTSSM +0x10          @ 0x49203c010 = 0x00000000
   port2 LTSSM +0x14          @ 0x49203c014 = 0x00000000
-  port2 LTSSM +0x1c          @ 0x49203c01c = 0x00000004
-  port2 LTSSM +0x20          @ 0x49203c020 = 0x00000002
+  port2 LTSSM +0x1c          @ 0x49203c01c = 0x00000000
+  port2 LTSSM +0x20          @ 0x49203c020 = 0x00000000
   port2 phy_extra/ctrl_lo SKIPPED (would AXI-stall -- RUN 18 lesson; pass --tier3-phyextra to force)
 [guard] dump_pcie_regs(post-init): exc_count delta = 0 (before=0, after=0)
 
 === LTSSM kick experiment (post-init) ===
 
 --- port0 @ port_base=0x490028000 ltssm=0x49003c000 ---
-  port0 LINKSTS (baseline)   @ 0x490028208 = 0x8300020c
-  port0 baseline               LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (baseline)   @ 0x490028208 = 0xab000208
+  port0 baseline               LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
   rc_base+0x3c (seq A pre)   @ 0x49400003c = 0x00000000
   seq A: set32(rc_base+0x3c, 0x1)  # 0x49400003c
   rc_base+0x3c (seq A post-set) @ 0x49400003c = 0x00000000
   port0 +0x10 (seq A pre)    @ 0x490028010 = 0x00000000
   seq A: write32(port_base+0x10, 0x2)
   port0 +0x10 (seq A post)   @ 0x490028010 = 0x00000000
-  port0 LINKSTS (after seq A) @ 0x490028208 = 0x8300020c
-  port0 after seq A            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (after seq A) @ 0x490028208 = 0xab000208
+  port0 after seq A            LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
   seq B: skipped (--ltssm-kick-aggressive to enable; writes ltssm_base which may AXI-stall)
   seq C: clear+set T602X_RESET (port_base+0x82c)
-  port0 LINKSTS (after seq C) @ 0x490028208 = 0x8300020c
-  port0 after seq C            LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
-  port0 LINKSTS (after 200ms settle) @ 0x490028208 = 0x8300020c
-  port0 after 200ms settle     LINKSTS decode: [BUSY|bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (after seq C) @ 0x490028208 = 0xab000208
+  port0 after seq C            LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
+  port0 LINKSTS (after 200ms settle) @ 0x490028208 = 0xab000208
+  port0 after 200ms settle     LINKSTS decode: [bit3|bit9|bit24|bit25|bit31]
 
 --- port2 @ port_base=0x492028000 ltssm=0x49203c000 ---
-  port2 LINKSTS (baseline)   @ 0x492028208 = 0x83000204
-  port2 baseline               LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (baseline)   @ 0x492028208 = 0xab000200
+  port2 baseline               LINKSTS decode: [bit9|bit24|bit25|bit31]
   rc_base+0x3c (seq A pre)   @ 0x49400003c = 0x00000000
   seq A: set32(rc_base+0x3c, 0x1)  # 0x49400003c
   rc_base+0x3c (seq A post-set) @ 0x49400003c = 0x00000000
   port2 +0x10 (seq A pre)    @ 0x492028010 = 0x00000000
   seq A: write32(port_base+0x10, 0x2)
   port2 +0x10 (seq A post)   @ 0x492028010 = 0x00000000
-  port2 LINKSTS (after seq A) @ 0x492028208 = 0x83000204
-  port2 after seq A            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (after seq A) @ 0x492028208 = 0xab000200
+  port2 after seq A            LINKSTS decode: [bit9|bit24|bit25|bit31]
   seq B: skipped (--ltssm-kick-aggressive to enable; writes ltssm_base which may AXI-stall)
   seq C: clear+set T602X_RESET (port_base+0x82c)
-  port2 LINKSTS (after seq C) @ 0x492028208 = 0x83000204
-  port2 after seq C            LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
-  port2 LINKSTS (after 200ms settle) @ 0x492028208 = 0x83000204
-  port2 after 200ms settle     LINKSTS decode: [BUSY|bit9|bit24|bit25|bit31]
+  port2 LINKSTS (after seq C) @ 0x492028208 = 0xab000200
+  port2 after seq C            LINKSTS decode: [bit9|bit24|bit25|bit31]
+  port2 LINKSTS (after 200ms settle) @ 0x492028208 = 0xab000200
+  port2 after 200ms settle     LINKSTS decode: [bit9|bit24|bit25|bit31]
 [guard] try_ltssm_kick: exc_count delta = 0 (before=0, after=0)
 === PCIe controller register dump (post-kick, tier=3) ===
   rc_base + 0x03c            @ 0x49400003c = 0x00000000
 
 --- port0 (T1) port_base=0x490028000 ---
-  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100001
-  port0 STATUS      (+0x804) @ 0x490028804 = 0x00000005
-  port0 LINKSTS     (+0x208) @ 0x490028208 = 0x8300020c
+  port0 APPCLK      (+0x800) @ 0x490028800 = 0x00100101
+  port0 STATUS      (+0x804) @ 0x490028804 = 0x0000000d
+  port0 LINKSTS     (+0x208) @ 0x490028208 = 0xab000208
   port0 T602X_RESET (+0x82c) @ 0x49002882c = 0x00000001
   port0 PORT_RESET  (+0x814) @ 0x490028814 = 0x00200001
   port0 +0x010               @ 0x490028010 = 0x00000000
@@ -749,9 +877,9 @@ p.pcie_init() -> 0
   port0 +0x397c (T602X only) @ 0x49002b97c = 0x00000000
 
 --- port2 (T1) port_base=0x492028000 ---
-  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100001
-  port2 STATUS      (+0x804) @ 0x492028804 = 0x00000005
-  port2 LINKSTS     (+0x208) @ 0x492028208 = 0x83000204
+  port2 APPCLK      (+0x800) @ 0x492028800 = 0x00100101
+  port2 STATUS      (+0x804) @ 0x492028804 = 0x0000000d
+  port2 LINKSTS     (+0x208) @ 0x492028208 = 0xab000200
   port2 T602X_RESET (+0x82c) @ 0x49202882c = 0x00000001
   port2 PORT_RESET  (+0x814) @ 0x492028814 = 0x00200001
   port2 +0x010               @ 0x492028010 = 0x00000000
@@ -783,17 +911,17 @@ p.pcie_init() -> 0
 === Tier 3a SKIPPED: Phase F shared init not up (phaseF_shared_up=False); phy_ip reads would wedge m1n1 -- RUN 15 lesson ===
 
 --- port0 (T3) ltssm=0x49003c000 phy_extra=0x497048000 ctrl_lo=0x490000000 ---
-  port0 LTSSM +0x10          @ 0x49003c010 = 0x00000002
+  port0 LTSSM +0x10          @ 0x49003c010 = 0x00000000
   port0 LTSSM +0x14          @ 0x49003c014 = 0x00000000
-  port0 LTSSM +0x1c          @ 0x49003c01c = 0x00000004
-  port0 LTSSM +0x20          @ 0x49003c020 = 0x00000002
+  port0 LTSSM +0x1c          @ 0x49003c01c = 0x00000000
+  port0 LTSSM +0x20          @ 0x49003c020 = 0x00000000
   port0 phy_extra/ctrl_lo SKIPPED (would AXI-stall -- RUN 18 lesson; pass --tier3-phyextra to force)
 
 --- port2 (T3) ltssm=0x49203c000 phy_extra=0x497058000 ctrl_lo=0x492000000 ---
-  port2 LTSSM +0x10          @ 0x49203c010 = 0x00000002
+  port2 LTSSM +0x10          @ 0x49203c010 = 0x00000000
   port2 LTSSM +0x14          @ 0x49203c014 = 0x00000000
-  port2 LTSSM +0x1c          @ 0x49203c01c = 0x00000004
-  port2 LTSSM +0x20          @ 0x49203c020 = 0x00000002
+  port2 LTSSM +0x1c          @ 0x49203c01c = 0x00000000
+  port2 LTSSM +0x20          @ 0x49203c020 = 0x00000000
   port2 phy_extra/ctrl_lo SKIPPED (would AXI-stall -- RUN 18 lesson; pass --tier3-phyextra to force)
 [guard] dump_pcie_regs(post-kick): exc_count delta = 0 (before=0, after=0)
 === ECAM walk ===
@@ -802,9 +930,13 @@ ecam_base = 0x1cb0000000
 active ports: [0, 2]
 
 --- root bus 0 ---
-  00:00.0: vacant (VID:DID = 0xffffffff)
+  00:00.0: VID:DID = 106b:100c  rev=1  class=06.04.00  (PCI bridge)
+          cmd=0x0000 status=0x0010 hdr=0x01 BAR0=0x00000000
+          bridge: primary=0 secondary=0 subordinate=0
   00:01.0: skipped (port 1 inactive)
-  00:02.0: vacant (VID:DID = 0xffffffff)
+  00:02.0: VID:DID = 106b:100c  rev=1  class=06.04.00  (PCI bridge)
+          cmd=0x0000 status=0x0010 hdr=0x01 BAR0=0x00000000
+          bridge: primary=0 secondary=0 subordinate=0
 [guard] ecam_walk: exc_count delta = 0 (before=0, after=0)
 
 === enable NIC ===
