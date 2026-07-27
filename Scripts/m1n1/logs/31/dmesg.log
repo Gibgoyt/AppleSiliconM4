@@ -11,3 +11,11 @@
 [383564.704583] usb 1-8: USB disconnect, device number 46
 [383566.065677] cdc_acm 1-8:1.1: acm_start_wb - usb_submit_urb(write bulk) failed: -19
 
+# after a while
+[383661.548227] usb usb1-port8: attempt power cycle
+[383663.388661] usb usb1-port8: unable to enumerate USB device
+
+
+[383695.169536] usb usb1-port8: attempt power cycle
+[383697.010830] usb usb1-port8: unable to enumerate USB device
+
