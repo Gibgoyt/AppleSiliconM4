@@ -1,0 +1,13 @@
+# this might have caused the error at the end
+[383262.569571] usb 1-8: new high-speed USB device number 46 using xhci_hcd
+[383262.693539] usb 1-8: New USB device found, idVendor=1209, idProduct=316d, bcdDevice= 1.00
+[383262.693555] usb 1-8: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[383262.693562] usb 1-8: Product: m1n1 uartproxy v1.6.0-42-gdf2a
+[383262.693567] usb 1-8: Manufacturer: Asahi Linux
+[383262.693572] usb 1-8: SerialNumber: MPXJYQDXT0
+[383262.702452] cdc_acm 1-8:1.0: ttyACM0: USB ACM device
+[383262.702926] cdc_acm 1-8:1.2: ttyACM1: USB ACM device
+[383564.704560] usb usb1-port8: disabled by hub (EMI?), re-enabling...
+[383564.704583] usb 1-8: USB disconnect, device number 46
+[383566.065677] cdc_acm 1-8:1.1: acm_start_wb - usb_submit_urb(write bulk) failed: -19
+
