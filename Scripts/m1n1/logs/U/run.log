@@ -1,0 +1,1520 @@
+using m1n1 device: /dev/ttyACM0
+TTY> Initialized dockchannel UART at 0x388128000
+TTY> Device info:
+TTY>   Model: Mac16,10
+TTY>   Target: J773g
+TTY>   Board-ID: 0x2a
+TTY>   Chip-ID: 0x8132
+TTY> 
+TTY> CPU init (MIDR: 0x611f0531 smp_id:0x6)...
+TTY>   CPU part: 0x53 rev: 0x11
+TTY>   CPU: M4 Donan (P core)
+TTY> 
+TTY> boot_args at 0x10003430000
+TTY>   revision:     3
+TTY>   version:      2
+TTY>   virt_base:    0x150f0000
+TTY>   phys_base:    0x100010f0000
+TTY>   mem_size:     0x3df834000
+TTY>   top_of_kdata: 0x10003440000
+TTY>   video:
+TTY>     base:       0x103e5234000
+TTY>     display:    0x1
+TTY>     stride:     0xa00
+TTY>     width:      640
+TTY>     height:     1136
+TTY>     depth:      32bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0x16be4000
+TTY>   devtree_size: 0x68000
+TTY>   cmdline:      
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x400000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 v1.6.0-40-g2ea75b6
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the MIT license
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: 15.1 (iBoot-11881.41.5)
+TTY> System FW version: 15.1 (iBoot-11881.41.5)
+TTY> Heap base: 0x10003440000
+TTY> MCC: Unsupported version:mcc,t8132
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x103e0924000
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c50000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c60000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c70000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c80000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1cb0000000 (0x14000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff1c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe6c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffe4c000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffddc000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffdbc000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x103ffd4c000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x103fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30000180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 3 @ 0x381000000
+TTY> AIC: AIC3 with 1/2 dies, 2048/4096 IRQs, reg_size:40004, config:10000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> Primary WDT register @ 0x3882b0000
+TTY> Primary WDT disabled
+TTY> Secondary WDT register @ 0x3882b8008
+TTY> Secondary WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: initialized, 392 devices on 1 dies found.
+TTY> display: Display is external
+TTY> display: Dummy framebuffer found, initializing display
+TTY> dart: dart /arm-io/dart-dcp at 0x30a340000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0 at 0x30a300000 is a t8110 (locked)
+TTY> dart: dart /arm-io/dart-disp0.0.0 L1 0 is real-time at 0x103fff1c000
+TTY> dart: allocating L2 tbl at 0, 1 to 0x103fff24000
+TTY> dcp: Mapping segment #2 10002db4000 -> 10002db4000 [24000]
+TTY> rtkit(dcp): booting with version 12
+TTY> rtkit(dcp): unknown system endpoint 0x0a
+TTY> rtkit(dcp): pre-allocated buffer (ep 0x1, dva 0x100025eb000, phys 0x103e51a3000)
+TTY> rtkit(dcp): unknown oslog message 105ff8010002604
+TTY> rtkit(dcp): unknown oslog message 3010042100000a1
+TTY> rtkit(dcp): unknown oslog message 4000020d51e4021
+TTY> rtkit(dcp): unknown oslog message 4000040d28078a1
+TTY> rtkit(dcp): unknown oslog message 4000060d51e4001
+TTY> AFK: ring buffer size mismatch
+TTY> AFK: ring buffer size mismatch
+TTY> dcp-iboot: failed to initialize disp0 service
+TTY> display: failed to initialize DCP iBoot interface
+TTY> rtkit(dcp): IOP crashed!
+TTY> rtkit(dcp): == CRASH INFO ==
+TTY> rtkit(dcp):   Message 1: ASSERT!Messenger.c:299 0xc0000000000000 0x7 
+TTY> rtkit(dcp):   0x43766572
+TTY> rtkit(dcp):   0x4374696d
+TTY> rtkit(dcp):   0x43637374
+TTY> rtkit(dcp):   0x4372746b
+TTY> rtkit(dcp):   0x43617343
+TTY> rtkit(dcp):   0x436d6278
+TTY> rtkit(dcp):   0x43636470
+TTY> rtkit(dcp):   0x43706374
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp):   0x43737461
+TTY> rtkit(dcp): IOP died during shutdown
+TTY> fb init: 640x1136 (32) [s=640] @0x103e5234000
+TTY> fb console: max rows 35, max cols 40
+TTY> fb: display logo
+TTY> cpufreq: Chip 0x8132 is unsupported
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j773g
+TTY> Unknown payload at 0x10002db4000 (magic: 5b41464b)
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x402f80000 is a t8110
+TTY> USB0: initialized at 0x1000382a030
+TTY> dart: dart /arm-io/dart-usb1 at 0x40af80000 is a t8110
+TTY> USB1: initialized at 0x1000382a360
+TTY> dart: dart /arm-io/dart-usb2 at 0x412f80000 is a t8110
+TTY> USB2: initialized at 0x1000382a690
+TTY> dart: dart /arm-io/dart-usb3 at 0x41af80000 is a t8110
+TTY> USB3: initialized at 0x1000382a9c0
+TTY> Running proxy...
+m1n1 base: 0x10002ca8000
+Fetching ADT (0x00068000 bytes)...
+[pcie_up] require-build OK: 'm1n1 uartproxy v1.6.0-40-g2ea7' contains 'v1.6.0-40-g'
+[pcie_up] === RUN T/U: macOS MMIO trace replay ===
+[pcie_up] SMC power on apcie fabric...
+[mgmt] Starting via message
+[mgmt] Supported versions 12 .. 12
+[mgmt] Adding endpoint 0x0
+[mgmt] Adding endpoint 0x1
+[mgmt] Adding endpoint 0x2
+[mgmt] Adding endpoint 0x3
+[mgmt] Adding endpoint 0x4
+[mgmt] Adding endpoint 0x8
+[mgmt] Adding endpoint 0x20
+Starting endpoint #0x1 (crash)
+Starting endpoint #0x2 (syslog)
+Starting endpoint #0x3 (kdebug)
+Starting endpoint #0x4 (iorep)
+Starting endpoint #0x8 (iorep)
+[crash] buf prealloc at dva 0x38de5c000
+[iorep] buf prealloc 0x38de61000 / 0x38de61000
+[iorep] start
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[iorep] report!
+[mgmt] IOP power state is now 0x20
+[syslog] count 32, entrysize 96
+[syslog] buf prealloc at dva 0x38de60000
+[iorep] buf prealloc 0xff800038de66000 / 0xff800038de66000
+unknown message: 0x31f10428986d339 / 0x408c0000000008 (EP=0x8)
+unknown message: 0x40000209630790a / 0x309c0000000008 (EP=0x8)
+unknown message: 0x40000402572ab9b / 0x20ac0000000008 (EP=0x8)
+unknown message: 0x400006003168728 / 0x10bc0000000008 (EP=0x8)
+[mgmt] AP power state is now 0x20
+[mgmt] Startup complete
+Starting endpoint #0x20 (smcep)
+[smcep] Starting up
+[mgmt] Stopping via message
+[mgmt] AP power state is now 0x10
+[mgmt] IOP power state is now 0x10
+[pcie_up] [flush:smc-power] wrote partial log (435 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] CLKREQ -> periph func 2 on gpio0 pin 162...
+[pcie_up] [flush:clkreq-periph] wrote partial log (525 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] === replaying segment 'preamble' (20 steps) ===
+[pcie_up] [flush:preamble-start] wrote partial log (562 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-0] wrote partial log (696 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-1] wrote partial log (830 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-2] wrote partial log (933 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-3] wrote partial log (1079 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-4] wrote partial log (1226 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-5] wrote partial log (1369 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-6] wrote partial log (1518 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-7] wrote partial log (1666 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-8] wrote partial log (1809 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-9] wrote partial log (1958 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-10] wrote partial log (2107 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-11] wrote partial log (2251 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-12] wrote partial log (2401 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-13] wrote partial log (2517 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-14] wrote partial log (2659 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-15] wrote partial log (2806 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-16] wrote partial log (2948 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-17] wrote partial log (3095 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-18] wrote partial log (3238 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-19] wrote partial log (3366 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:preamble-done] wrote partial log (3483 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] PROBE: read32(0x497040038) [phy_ip+0x38] -- the RUN A..S wedge point...
+[pcie_up] [flush:probe-pre] wrote partial log (3540 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up]   PROBE PASS: 0x5c800800
+[pcie_up] [flush:probe-done] wrote partial log (3656 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] === replaying segment 'phyip' (183 steps) ===
+[pcie_up] [flush:phyip-start] wrote partial log (3691 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-9] wrote partial log (5058 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-19] wrote partial log (6385 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-29] wrote partial log (7701 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-39] wrote partial log (9010 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-49] wrote partial log (10433 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-59] wrote partial log (11800 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-69] wrote partial log (13114 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-79] wrote partial log (14537 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-89] wrote partial log (15904 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-99] wrote partial log (17218 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-109] wrote partial log (18651 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-119] wrote partial log (20020 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-129] wrote partial log (21373 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-139] wrote partial log (22757 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-149] wrote partial log (24149 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-159] wrote partial log (25506 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-169] wrote partial log (26900 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-179] wrote partial log (28307 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:phyip-done] wrote partial log (28764 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] PERSTN deassert on gpio0 pin 165 (pre-port2)...
+[pcie_up] PERSTN cold reset: drive gpio0[165] low
+[pcie_up] PERSTN: drive gpio0[165] high
+[pcie_up] [flush:perstn-pre-port2] wrote partial log (29029 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] === replaying segment 'port2' (391 steps) ===
+[pcie_up] [flush:port2-start] wrote partial log (29064 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-9] wrote partial log (30116 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-19] wrote partial log (31156 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-29] wrote partial log (32186 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-39] wrote partial log (33216 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-49] wrote partial log (34246 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-59] wrote partial log (35276 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-69] wrote partial log (36306 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-79] wrote partial log (37336 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-89] wrote partial log (38366 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-99] wrote partial log (39396 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-109] wrote partial log (40436 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-119] wrote partial log (41476 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-129] wrote partial log (42516 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-139] wrote partial log (43556 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-149] wrote partial log (44596 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-159] wrote partial log (45636 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-169] wrote partial log (46676 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-179] wrote partial log (47716 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-189] wrote partial log (48763 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-199] wrote partial log (49813 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-209] wrote partial log (50863 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-219] wrote partial log (51913 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-229] wrote partial log (52963 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-239] wrote partial log (54013 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-249] wrote partial log (55063 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-259] wrote partial log (56113 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-269] wrote partial log (57163 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-279] wrote partial log (58213 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-289] wrote partial log (59275 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-299] wrote partial log (60483 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-309] wrote partial log (61770 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-319] wrote partial log (63072 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-329] wrote partial log (64352 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-339] wrote partial log (65530 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-349] wrote partial log (66643 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-359] wrote partial log (67763 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-369] wrote partial log (68883 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-379] wrote partial log (70196 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-389] wrote partial log (71446 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:port2-done] wrote partial log (71680 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] post-replay LINKSTS watch (up to 2 s per port)...
+[pcie_up] [flush:linksts] wrote partial log (71956 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] ECAM walk @ 0x1cb0000000 ...
+[pcie_up] [flush:ecam] wrote partial log (72349 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] [flush:final] wrote partial log (72474 bytes) to /tmp/m4-recon/nic-runtime.txt
+[pcie_up] done: writes=337 rmws=217 read match/mismatch=31/1 polls ok/timeout=8/0 pre-mismatch=0 faults=0
+[pcie_up] phy_ip probe: PASS
+
+--- /tmp/m4-recon/nic-runtime.txt ---
+=== RUN T/U: macOS MMIO trace replay ===
+trace    = /home/ahmed/Projects/C/AppleSiliconM4/pcie.log
+segments = ['preamble', 'phyip', 'port2']
+
+parsed 2163 trace ops
+ADT map ok: phy_ip=0x497040000 axi=0x496000000 rc=0x494000000
+SMC smc_addr = 0x38c600000
+gP0d <- 0x800001  (apcie power)
+gP1a <- 1         (apcie-ge power)
+gP0d same-session readback = 0x0 (want 0x800001) [MISMATCH]
+gP1a same-session readback = 0x0 (want 0x1) [MISMATCH]
+gpio0[162] @ 0x39a000288: 0x00074a10 -> 0x00074a50 (read-back 0x00074a50) [periph func 2]
+
+=== segment preamble (20 steps) ===
+  L2    0x496000104 w4 RMW set=0x1 clr=0x0 pre=0x10000 -> 0x10001
+[guard] preamble[0] rmw L2: exc_count delta = 0 (before=0, after=0)
+  L4    0x496000108 w4 RMW set=0x1 clr=0x0 pre=0x41330 -> 0x41331
+[guard] preamble[1] rmw L4: exc_count delta = 0 (before=0, after=0)
+  L5    0x494000004 w4 WRITE 0x0
+[guard] preamble[2] write L5: exc_count delta = 0 (before=0, after=0)
+  L7    0x497008000 w4 RMW set=0x0 clr=0x4000000 pre=0xf7c03090 -> 0xf3c03090
+[guard] preamble[3] rmw L7: exc_count delta = 0 (before=0, after=0)
+  L9    0x497020000 w4 RMW set=0x0 clr=0x10000000 pre=0x33000070 -> 0x23000070
+[guard] preamble[4] rmw L9: exc_count delta = 0 (before=0, after=0)
+  L11   0x497020010 w4 RMW set=0x10000 clr=0xc00 pre=0x300c03 -> 0x310003
+[guard] preamble[5] rmw L11: exc_count delta = 0 (before=0, after=0)
+  L13   0x497020014 w4 RMW set=0x4000000 clr=0x300000 pre=0x300c03 -> 0x4000c03
+[guard] preamble[6] rmw L13: exc_count delta = 0 (before=0, after=0)
+  L15   0x497024000 w4 RMW set=0x0 clr=0x10000000 pre=0x33000070 -> 0x23000070
+[guard] preamble[7] rmw L15: exc_count delta = 0 (before=0, after=0)
+  L17   0x497024010 w4 RMW set=0x10000 clr=0xc00 pre=0x300c03 -> 0x310003
+[guard] preamble[8] rmw L17: exc_count delta = 0 (before=0, after=0)
+  L19   0x497024014 w4 RMW set=0x4000000 clr=0x300000 pre=0x300c03 -> 0x4000c03
+[guard] preamble[9] rmw L19: exc_count delta = 0 (before=0, after=0)
+  L21   0x497028000 w4 RMW set=0x0 clr=0x10000000 pre=0x33000070 -> 0x23000070
+[guard] preamble[10] rmw L21: exc_count delta = 0 (before=0, after=0)
+  L23   0x497028010 w4 RMW set=0x10000 clr=0xc00 pre=0x300c03 -> 0x310003
+[guard] preamble[11] rmw L23: exc_count delta = 0 (before=0, after=0)
+  L25   0x497028014 w4 RMW set=0x4000000 clr=0x300000 pre=0x300c03 -> 0x4000c03
+[guard] preamble[12] rmw L25: exc_count delta = 0 (before=0, after=0)
+  L26   0x497004000 w4 READ 0x80300000 MATCH
+[guard] preamble[13] read L26: exc_count delta = 0 (before=0, after=0)
+  L28   0x497008000 w4 RMW set=0x1 clr=0x0 pre=0xf3c03090 -> 0xf3c03091
+[guard] preamble[14] rmw L28: exc_count delta = 0 (before=0, after=0)
+  L29   0x497008000 w4 POLL (val & 0x4) == 0x4 CONVERGED val=0xf3c03095
+[guard] preamble[15] pollmask L29: exc_count delta = 0 (before=0, after=0)
+  L30   0x497008000 w4 RMW set=0x2 clr=0x0 pre=0xf3c03095 -> 0xf3c03097
+[guard] preamble[16] rmw L30: exc_count delta = 0 (before=0, after=0)
+  L31   0x497008000 w4 POLL (val & 0x8) == 0x8 CONVERGED val=0xf3c0309f
+[guard] preamble[17] pollmask L31: exc_count delta = 0 (before=0, after=0)
+  L32   0x497008000 w4 RMW set=0x0 clr=0x10 pre=0xf3c0309f -> 0xf3c0308f
+[guard] preamble[18] rmw L32: exc_count delta = 0 (before=0, after=0)
+  L34   0x497008004 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] preamble[19] rmw L34: exc_count delta = 0 (before=0, after=0)
+--- segment preamble done: writes=1 rmws=16 read match/mismatch=1/0 polls ok/timeout=2/0 pre-mismatch=0 faults=0 ---
+
+=== phy_ip probe ===
+read32(0x497040038) [phy_ip+0x38]:
+  PROBE PASS: 0x5c800800 (trace value was 0x5c800800)
+[guard] phy-ip-probe: exc_count delta = 0 (before=0, after=0)
+
+=== segment phyip (183 steps) ===
+  L36   0x497040038 w4 RMW set=0x0 clr=0x10000000 pre=0x5c800800 -> 0x4c800800
+[guard] phyip[0] rmw L36: exc_count delta = 0 (before=0, after=0)
+  L38   0x497040090 w4 RMW set=0x1 clr=0x0 pre=0x80010004 -> 0x80010005
+[guard] phyip[1] rmw L38: exc_count delta = 0 (before=0, after=0)
+  L40   0x4970400a4 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[2] rmw L40: exc_count delta = 0 (before=0, after=0)
+  L42   0x497041000 w4 RMW set=0x30000 clr=0x0 pre=0x2a2083c8 -> 0x2a2383c8
+[guard] phyip[3] rmw L42: exc_count delta = 0 (before=0, after=0)
+  L44   0x49704102c w4 RMW set=0x444444 clr=0x1123110 pre=0x5133113 -> 0x4454447
+[guard] phyip[4] rmw L44: exc_count delta = 0 (before=0, after=0)
+  L46   0x497041204 w4 RMW set=0x3c clr=0x40 pre=0x40 -> 0x3c
+[guard] phyip[5] rmw L46: exc_count delta = 0 (before=0, after=0)
+  L47   0x49704501c w4 READ 0x0 MATCH
+[guard] phyip[6] read L47: exc_count delta = 0 (before=0, after=0)
+  L49   0x497045080 w4 RMW set=0x400000 clr=0x800000 pre=0x298d8190 -> 0x294d8190
+[guard] phyip[7] rmw L49: exc_count delta = 0 (before=0, after=0)
+  L51   0x497045088 w4 RMW set=0x20000 clr=0x10000 pre=0x550800 -> 0x560800
+[guard] phyip[8] rmw L51: exc_count delta = 0 (before=0, after=0)
+  L53   0x49704508c w4 RMW set=0x400000 clr=0x800000 pre=0x298d8190 -> 0x294d8190
+[guard] phyip[9] rmw L53: exc_count delta = 0 (before=0, after=0)
+  L55   0x497045094 w4 RMW set=0x20000 clr=0x10000 pre=0x50800 -> 0x60800
+[guard] phyip[10] rmw L55: exc_count delta = 0 (before=0, after=0)
+  L57   0x4970450a0 w4 RMW set=0x10000 clr=0x0 pre=0x544800 -> 0x554800
+[guard] phyip[11] rmw L57: exc_count delta = 0 (before=0, after=0)
+  L59   0x4970450ac w4 RMW set=0x10000 clr=0x0 pre=0x544800 -> 0x554800
+[guard] phyip[12] rmw L59: exc_count delta = 0 (before=0, after=0)
+  L61   0x4970450b8 w4 RMW set=0x10000 clr=0x0 pre=0x544800 -> 0x554800
+[guard] phyip[13] rmw L61: exc_count delta = 0 (before=0, after=0)
+  L63   0x497045200 w4 RMW set=0xa clr=0x0 pre=0x81554 -> 0x8155e
+[guard] phyip[14] rmw L63: exc_count delta = 0 (before=0, after=0)
+  L65   0x497045224 w4 RMW set=0x800 clr=0x0 pre=0x18 -> 0x818
+[guard] phyip[15] rmw L65: exc_count delta = 0 (before=0, after=0)
+  L66   0x497045230 w4 READ 0x1d008 MATCH
+[guard] phyip[16] read L66: exc_count delta = 0 (before=0, after=0)
+  L68   0x497045240 w4 RMW set=0x49 clr=0x30 pre=0x4010f30 -> 0x4010f49
+[guard] phyip[17] rmw L68: exc_count delta = 0 (before=0, after=0)
+  L70   0x4970452b0 w4 RMW set=0x0 clr=0x8000000 pre=0x18300811 -> 0x10300811
+[guard] phyip[18] rmw L70: exc_count delta = 0 (before=0, after=0)
+  L71   0x4970452e8 w4 READ 0x1044201 MATCH
+[guard] phyip[19] read L71: exc_count delta = 0 (before=0, after=0)
+  L73   0x497045300 w4 RMW set=0x8008 clr=0x80080 pre=0x30f00f0 -> 0x3078078
+[guard] phyip[20] rmw L73: exc_count delta = 0 (before=0, after=0)
+  L75   0x497045320 w4 RMW set=0x2 clr=0x0 pre=0x0 -> 0x2
+[guard] phyip[21] rmw L75: exc_count delta = 0 (before=0, after=0)
+  L77   0x49704608c w4 RMW set=0x1818000 clr=0x2020000 pre=0x66120280 -> 0x65918280
+[guard] phyip[22] rmw L77: exc_count delta = 0 (before=0, after=0)
+  L79   0x497046224 w4 RMW set=0x800 clr=0x0 pre=0x18 -> 0x818
+[guard] phyip[23] rmw L79: exc_count delta = 0 (before=0, after=0)
+  L81   0x497046228 w4 RMW set=0xb00 clr=0x0 pre=0x18 -> 0xb18
+[guard] phyip[24] rmw L81: exc_count delta = 0 (before=0, after=0)
+  L83   0x497046230 w4 RMW set=0xb clr=0x10 pre=0x1e814 -> 0x1e80f
+[guard] phyip[25] rmw L83: exc_count delta = 0 (before=0, after=0)
+  L85   0x49704624c w4 RMW set=0x1c clr=0x0 pre=0x1f800080 -> 0x1f80009c
+[guard] phyip[26] rmw L85: exc_count delta = 0 (before=0, after=0)
+  L86   0x4970462b0 w4 READ 0x18300811 MATCH
+[guard] phyip[27] read L86: exc_count delta = 0 (before=0, after=0)
+  L87   0x4970462e8 w4 READ 0x1044201 MATCH
+[guard] phyip[28] read L87: exc_count delta = 0 (before=0, after=0)
+  L89   0x49704a000 w4 RMW set=0x2 clr=0x4 pre=0x80001ac -> 0x80001aa
+[guard] phyip[29] rmw L89: exc_count delta = 0 (before=0, after=0)
+  L91   0x49704a008 w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[30] rmw L91: exc_count delta = 0 (before=0, after=0)
+  L93   0x49704a00c w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[31] rmw L93: exc_count delta = 0 (before=0, after=0)
+  L95   0x49704a010 w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[32] rmw L95: exc_count delta = 0 (before=0, after=0)
+  L97   0x49704a014 w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[33] rmw L97: exc_count delta = 0 (before=0, after=0)
+  L99   0x49704a038 w4 RMW set=0x211 clr=0x482 pre=0x4e2 -> 0x271
+[guard] phyip[34] rmw L99: exc_count delta = 0 (before=0, after=0)
+  L101  0x49704a040 w4 RMW set=0x0 clr=0x800 pre=0x8c8 -> 0xc8
+[guard] phyip[35] rmw L101: exc_count delta = 0 (before=0, after=0)
+  L103  0x49704a04c w4 RMW set=0x337 clr=0x1000 pre=0x18c8 -> 0xbff
+[guard] phyip[36] rmw L103: exc_count delta = 0 (before=0, after=0)
+  L105  0x49704a050 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[37] rmw L105: exc_count delta = 0 (before=0, after=0)
+  L107  0x49704a068 w4 RMW set=0x1 clr=0x2 pre=0xc42 -> 0xc41
+[guard] phyip[38] rmw L107: exc_count delta = 0 (before=0, after=0)
+  L109  0x49704a070 w4 RMW set=0x14100820 clr=0x8401040 pre=0x49e01040 -> 0x55b00820
+[guard] phyip[39] rmw L109: exc_count delta = 0 (before=0, after=0)
+  L111  0x49704a084 w4 RMW set=0x3e8f4040 clr=0x1402510 pre=0x1402710 -> 0x3e8f4240
+[guard] phyip[40] rmw L111: exc_count delta = 0 (before=0, after=0)
+  L113  0x49704a088 w4 RMW set=0xffe clr=0x0 pre=0x1 -> 0xfff
+[guard] phyip[41] rmw L113: exc_count delta = 0 (before=0, after=0)
+  L115  0x49704a09c w4 RMW set=0x5400000 clr=0x0 pre=0x1a81a -> 0x541a81a
+[guard] phyip[42] rmw L115: exc_count delta = 0 (before=0, after=0)
+  L117  0x49704a0b8 w4 RMW set=0x0 clr=0x55000000 pre=0xff03f1f8 -> 0xaa03f1f8
+[guard] phyip[43] rmw L117: exc_count delta = 0 (before=0, after=0)
+  L119  0x49704a0bc w4 RMW set=0x40300 clr=0x20055 pre=0x52b1cff -> 0x52d1faa
+[guard] phyip[44] rmw L119: exc_count delta = 0 (before=0, after=0)
+  L121  0x49704a0c0 w4 RMW set=0x14100000 clr=0xaa00000 pre=0xae051f8 -> 0x145051f8
+[guard] phyip[45] rmw L121: exc_count delta = 0 (before=0, after=0)
+  L123  0x49704a0c4 w4 RMW set=0x7777 clr=0x0 pre=0x0 -> 0x7777
+[guard] phyip[46] rmw L123: exc_count delta = 0 (before=0, after=0)
+  L125  0x49704a0e0 w4 RMW set=0x8000000 clr=0x0 pre=0x5045000 -> 0xd045000
+[guard] phyip[47] rmw L125: exc_count delta = 0 (before=0, after=0)
+  L127  0x49704a0e8 w4 RMW set=0x2000 clr=0x8000 pre=0x8041 -> 0x2041
+[guard] phyip[48] rmw L127: exc_count delta = 0 (before=0, after=0)
+  L129  0x49704a10c w4 RMW set=0xf4040 clr=0x1188 pre=0x1388 -> 0xf4240
+[guard] phyip[49] rmw L129: exc_count delta = 0 (before=0, after=0)
+  L131  0x49704a11c w4 RMW set=0x40000 clr=0x0 pre=0xb30dc -> 0xf30dc
+[guard] phyip[50] rmw L131: exc_count delta = 0 (before=0, after=0)
+  L133  0x49704a178 w4 RMW set=0x100000 clr=0x800000 pre=0xa00000 -> 0x300000
+[guard] phyip[51] rmw L133: exc_count delta = 0 (before=0, after=0)
+  L135  0x49704a1b4 w4 RMW set=0x0 clr=0x800 pre=0x1d00 -> 0x1500
+[guard] phyip[52] rmw L135: exc_count delta = 0 (before=0, after=0)
+  L137  0x49704a1bc w4 RMW set=0x1000 clr=0x2800 pre=0x2d00 -> 0x1500
+[guard] phyip[53] rmw L137: exc_count delta = 0 (before=0, after=0)
+  L139  0x49704a1c4 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[54] rmw L139: exc_count delta = 0 (before=0, after=0)
+  L141  0x49704a1cc w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[55] rmw L141: exc_count delta = 0 (before=0, after=0)
+  L143  0x49704a1e8 w4 RMW set=0x0 clr=0x3 pre=0x100003 -> 0x100000
+[guard] phyip[56] rmw L143: exc_count delta = 0 (before=0, after=0)
+  L145  0x49704a1b0 w4 RMW set=0x18924 clr=0x2243 pre=0x82243 -> 0x98924
+[guard] phyip[57] rmw L145: exc_count delta = 0 (before=0, after=0)
+  L147  0x49704a1b8 w4 RMW set=0x18924 clr=0x502243 pre=0x582243 -> 0x98924
+[guard] phyip[58] rmw L147: exc_count delta = 0 (before=0, after=0)
+  L149  0x497052000 w4 RMW set=0x2 clr=0x4 pre=0x80001ac -> 0x80001aa
+[guard] phyip[59] rmw L149: exc_count delta = 0 (before=0, after=0)
+  L151  0x497052008 w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[60] rmw L151: exc_count delta = 0 (before=0, after=0)
+  L153  0x49705200c w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[61] rmw L153: exc_count delta = 0 (before=0, after=0)
+  L155  0x497052010 w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[62] rmw L155: exc_count delta = 0 (before=0, after=0)
+  L157  0x497052014 w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[63] rmw L157: exc_count delta = 0 (before=0, after=0)
+  L159  0x497052038 w4 RMW set=0x211 clr=0x482 pre=0x4e2 -> 0x271
+[guard] phyip[64] rmw L159: exc_count delta = 0 (before=0, after=0)
+  L161  0x497052040 w4 RMW set=0x0 clr=0x800 pre=0x8c8 -> 0xc8
+[guard] phyip[65] rmw L161: exc_count delta = 0 (before=0, after=0)
+  L163  0x49705204c w4 RMW set=0x337 clr=0x1000 pre=0x18c8 -> 0xbff
+[guard] phyip[66] rmw L163: exc_count delta = 0 (before=0, after=0)
+  L165  0x497052050 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[67] rmw L165: exc_count delta = 0 (before=0, after=0)
+  L167  0x497052068 w4 RMW set=0x1 clr=0x2 pre=0xc42 -> 0xc41
+[guard] phyip[68] rmw L167: exc_count delta = 0 (before=0, after=0)
+  L169  0x497052070 w4 RMW set=0x14100820 clr=0x8401040 pre=0x49e01040 -> 0x55b00820
+[guard] phyip[69] rmw L169: exc_count delta = 0 (before=0, after=0)
+  L171  0x497052084 w4 RMW set=0x3e8f4040 clr=0x1402510 pre=0x1402710 -> 0x3e8f4240
+[guard] phyip[70] rmw L171: exc_count delta = 0 (before=0, after=0)
+  L173  0x497052088 w4 RMW set=0xffe clr=0x0 pre=0x1 -> 0xfff
+[guard] phyip[71] rmw L173: exc_count delta = 0 (before=0, after=0)
+  L175  0x49705209c w4 RMW set=0x5400000 clr=0x0 pre=0x1a81a -> 0x541a81a
+[guard] phyip[72] rmw L175: exc_count delta = 0 (before=0, after=0)
+  L177  0x4970520b8 w4 RMW set=0x0 clr=0x55000000 pre=0xff03f1f8 -> 0xaa03f1f8
+[guard] phyip[73] rmw L177: exc_count delta = 0 (before=0, after=0)
+  L179  0x4970520bc w4 RMW set=0x40300 clr=0x20055 pre=0x52b1cff -> 0x52d1faa
+[guard] phyip[74] rmw L179: exc_count delta = 0 (before=0, after=0)
+  L181  0x4970520c0 w4 RMW set=0x14100000 clr=0xaa00000 pre=0xae051f8 -> 0x145051f8
+[guard] phyip[75] rmw L181: exc_count delta = 0 (before=0, after=0)
+  L183  0x4970520c4 w4 RMW set=0x7777 clr=0x0 pre=0x0 -> 0x7777
+[guard] phyip[76] rmw L183: exc_count delta = 0 (before=0, after=0)
+  L185  0x4970520e0 w4 RMW set=0x8000000 clr=0x0 pre=0x5045000 -> 0xd045000
+[guard] phyip[77] rmw L185: exc_count delta = 0 (before=0, after=0)
+  L187  0x4970520e8 w4 RMW set=0x2000 clr=0x8000 pre=0x8041 -> 0x2041
+[guard] phyip[78] rmw L187: exc_count delta = 0 (before=0, after=0)
+  L189  0x49705210c w4 RMW set=0xf4040 clr=0x1188 pre=0x1388 -> 0xf4240
+[guard] phyip[79] rmw L189: exc_count delta = 0 (before=0, after=0)
+  L191  0x49705211c w4 RMW set=0x40000 clr=0x0 pre=0xb30dc -> 0xf30dc
+[guard] phyip[80] rmw L191: exc_count delta = 0 (before=0, after=0)
+  L193  0x497052178 w4 RMW set=0x100000 clr=0x800000 pre=0xa00000 -> 0x300000
+[guard] phyip[81] rmw L193: exc_count delta = 0 (before=0, after=0)
+  L195  0x4970521b4 w4 RMW set=0x0 clr=0x800 pre=0x1d00 -> 0x1500
+[guard] phyip[82] rmw L195: exc_count delta = 0 (before=0, after=0)
+  L197  0x4970521bc w4 RMW set=0x1000 clr=0x2800 pre=0x2d00 -> 0x1500
+[guard] phyip[83] rmw L197: exc_count delta = 0 (before=0, after=0)
+  L199  0x4970521c4 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[84] rmw L199: exc_count delta = 0 (before=0, after=0)
+  L201  0x4970521cc w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[85] rmw L201: exc_count delta = 0 (before=0, after=0)
+  L203  0x4970521e8 w4 RMW set=0x0 clr=0x3 pre=0x100003 -> 0x100000
+[guard] phyip[86] rmw L203: exc_count delta = 0 (before=0, after=0)
+  L205  0x4970521b0 w4 RMW set=0x18924 clr=0x2243 pre=0x82243 -> 0x98924
+[guard] phyip[87] rmw L205: exc_count delta = 0 (before=0, after=0)
+  L207  0x4970521b8 w4 RMW set=0x18924 clr=0x502243 pre=0x582243 -> 0x98924
+[guard] phyip[88] rmw L207: exc_count delta = 0 (before=0, after=0)
+  L209  0x49705a000 w4 RMW set=0x2 clr=0x4 pre=0x80001ac -> 0x80001aa
+[guard] phyip[89] rmw L209: exc_count delta = 0 (before=0, after=0)
+  L211  0x49705a008 w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[90] rmw L211: exc_count delta = 0 (before=0, after=0)
+  L213  0x49705a00c w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[91] rmw L213: exc_count delta = 0 (before=0, after=0)
+  L215  0x49705a010 w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[92] rmw L215: exc_count delta = 0 (before=0, after=0)
+  L217  0x49705a014 w4 RMW set=0x2 clr=0x1 pre=0x9 -> 0xa
+[guard] phyip[93] rmw L217: exc_count delta = 0 (before=0, after=0)
+  L219  0x49705a038 w4 RMW set=0x211 clr=0x482 pre=0x4e2 -> 0x271
+[guard] phyip[94] rmw L219: exc_count delta = 0 (before=0, after=0)
+  L221  0x49705a040 w4 RMW set=0x0 clr=0x800 pre=0x8c8 -> 0xc8
+[guard] phyip[95] rmw L221: exc_count delta = 0 (before=0, after=0)
+  L223  0x49705a04c w4 RMW set=0x337 clr=0x1000 pre=0x18c8 -> 0xbff
+[guard] phyip[96] rmw L223: exc_count delta = 0 (before=0, after=0)
+  L225  0x49705a050 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[97] rmw L225: exc_count delta = 0 (before=0, after=0)
+  L227  0x49705a068 w4 RMW set=0x1 clr=0x2 pre=0xc42 -> 0xc41
+[guard] phyip[98] rmw L227: exc_count delta = 0 (before=0, after=0)
+  L229  0x49705a070 w4 RMW set=0x14100820 clr=0x8401040 pre=0x49e01040 -> 0x55b00820
+[guard] phyip[99] rmw L229: exc_count delta = 0 (before=0, after=0)
+  L231  0x49705a084 w4 RMW set=0x3e8f4040 clr=0x1402510 pre=0x1402710 -> 0x3e8f4240
+[guard] phyip[100] rmw L231: exc_count delta = 0 (before=0, after=0)
+  L233  0x49705a088 w4 RMW set=0xffe clr=0x0 pre=0x1 -> 0xfff
+[guard] phyip[101] rmw L233: exc_count delta = 0 (before=0, after=0)
+  L235  0x49705a09c w4 RMW set=0x5400000 clr=0x0 pre=0x1a81a -> 0x541a81a
+[guard] phyip[102] rmw L235: exc_count delta = 0 (before=0, after=0)
+  L237  0x49705a0b8 w4 RMW set=0x0 clr=0x55000000 pre=0xff03f1f8 -> 0xaa03f1f8
+[guard] phyip[103] rmw L237: exc_count delta = 0 (before=0, after=0)
+  L239  0x49705a0bc w4 RMW set=0x40300 clr=0x20055 pre=0x52b1cff -> 0x52d1faa
+[guard] phyip[104] rmw L239: exc_count delta = 0 (before=0, after=0)
+  L241  0x49705a0c0 w4 RMW set=0x14100000 clr=0xaa00000 pre=0xae051f8 -> 0x145051f8
+[guard] phyip[105] rmw L241: exc_count delta = 0 (before=0, after=0)
+  L243  0x49705a0c4 w4 RMW set=0x7777 clr=0x0 pre=0x0 -> 0x7777
+[guard] phyip[106] rmw L243: exc_count delta = 0 (before=0, after=0)
+  L245  0x49705a0e0 w4 RMW set=0x8000000 clr=0x0 pre=0x5045000 -> 0xd045000
+[guard] phyip[107] rmw L245: exc_count delta = 0 (before=0, after=0)
+  L247  0x49705a0e8 w4 RMW set=0x2000 clr=0x8000 pre=0x8041 -> 0x2041
+[guard] phyip[108] rmw L247: exc_count delta = 0 (before=0, after=0)
+  L249  0x49705a10c w4 RMW set=0xf4040 clr=0x1188 pre=0x1388 -> 0xf4240
+[guard] phyip[109] rmw L249: exc_count delta = 0 (before=0, after=0)
+  L251  0x49705a11c w4 RMW set=0x40000 clr=0x0 pre=0xb30dc -> 0xf30dc
+[guard] phyip[110] rmw L251: exc_count delta = 0 (before=0, after=0)
+  L253  0x49705a178 w4 RMW set=0x100000 clr=0x800000 pre=0xa00000 -> 0x300000
+[guard] phyip[111] rmw L253: exc_count delta = 0 (before=0, after=0)
+  L255  0x49705a1b4 w4 RMW set=0x0 clr=0x800 pre=0x1d00 -> 0x1500
+[guard] phyip[112] rmw L255: exc_count delta = 0 (before=0, after=0)
+  L257  0x49705a1bc w4 RMW set=0x1000 clr=0x2800 pre=0x2d00 -> 0x1500
+[guard] phyip[113] rmw L257: exc_count delta = 0 (before=0, after=0)
+  L259  0x49705a1c4 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[114] rmw L259: exc_count delta = 0 (before=0, after=0)
+  L261  0x49705a1cc w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[115] rmw L261: exc_count delta = 0 (before=0, after=0)
+  L263  0x49705a1e8 w4 RMW set=0x0 clr=0x3 pre=0x100003 -> 0x100000
+[guard] phyip[116] rmw L263: exc_count delta = 0 (before=0, after=0)
+  L265  0x49705a1b0 w4 RMW set=0x18924 clr=0x2243 pre=0x82243 -> 0x98924
+[guard] phyip[117] rmw L265: exc_count delta = 0 (before=0, after=0)
+  L267  0x49705a1b8 w4 RMW set=0x18924 clr=0x502243 pre=0x582243 -> 0x98924
+[guard] phyip[118] rmw L267: exc_count delta = 0 (before=0, after=0)
+  L269  0x49705a1a4 w4 RMW set=0x1 clr=0x0 pre=0x900 -> 0x901
+[guard] phyip[119] rmw L269: exc_count delta = 0 (before=0, after=0)
+  L271  0x49705a1b0 w4 RMW set=0x0 clr=0x98924 pre=0x98924 -> 0x0
+[guard] phyip[120] rmw L271: exc_count delta = 0 (before=0, after=0)
+  L273  0x49705a1b8 w4 RMW set=0x0 clr=0x98924 pre=0x98924 -> 0x0
+[guard] phyip[121] rmw L273: exc_count delta = 0 (before=0, after=0)
+  L275  0x49704b02c w4 RMW set=0x100000 clr=0x0 pre=0x1880062 -> 0x1980062
+[guard] phyip[122] rmw L275: exc_count delta = 0 (before=0, after=0)
+  L277  0x49704b070 w4 RMW set=0x20 clr=0x0 pre=0x85 -> 0xa5
+[guard] phyip[123] rmw L277: exc_count delta = 0 (before=0, after=0)
+  L279  0x49705302c w4 RMW set=0x100000 clr=0x0 pre=0x1880062 -> 0x1980062
+[guard] phyip[124] rmw L279: exc_count delta = 0 (before=0, after=0)
+  L281  0x497053070 w4 RMW set=0x20 clr=0x0 pre=0x85 -> 0xa5
+[guard] phyip[125] rmw L281: exc_count delta = 0 (before=0, after=0)
+  L283  0x49705b02c w4 RMW set=0x100000 clr=0x0 pre=0x1880062 -> 0x1980062
+[guard] phyip[126] rmw L283: exc_count delta = 0 (before=0, after=0)
+  L285  0x49705b070 w4 RMW set=0x20 clr=0x0 pre=0x85 -> 0xa5
+[guard] phyip[127] rmw L285: exc_count delta = 0 (before=0, after=0)
+  L287  0x497049000 w4 RMW set=0x0 clr=0x40000000 pre=0x5e000000 -> 0x1e000000
+[guard] phyip[128] rmw L287: exc_count delta = 0 (before=0, after=0)
+  L288  0x497049008 w4 READ 0x100000 MATCH
+[guard] phyip[129] read L288: exc_count delta = 0 (before=0, after=0)
+  L290  0x49704903c w4 RMW set=0x1800000 clr=0x0 pre=0xc3509 -> 0x18c3509
+[guard] phyip[130] rmw L290: exc_count delta = 0 (before=0, after=0)
+  L292  0x4970490d8 w4 RMW set=0x285 clr=0x1830 pre=0x1021c38 -> 0x102068d
+[guard] phyip[131] rmw L292: exc_count delta = 0 (before=0, after=0)
+  L294  0x4970490dc w4 RMW set=0x0 clr=0x810 pre=0x12004c18 -> 0x12004408
+[guard] phyip[132] rmw L294: exc_count delta = 0 (before=0, after=0)
+  L296  0x4970491e0 w4 RMW set=0x8 clr=0x0 pre=0x2000 -> 0x2008
+[guard] phyip[133] rmw L296: exc_count delta = 0 (before=0, after=0)
+  L298  0x497049280 w4 RMW set=0x400000 clr=0x0 pre=0xcc8ccccc -> 0xcccccccc
+[guard] phyip[134] rmw L298: exc_count delta = 0 (before=0, after=0)
+  L300  0x49704928c w4 RMW set=0x3 clr=0x0 pre=0x0 -> 0x3
+[guard] phyip[135] rmw L300: exc_count delta = 0 (before=0, after=0)
+  L302  0x497051000 w4 RMW set=0x0 clr=0x40000000 pre=0x5e000000 -> 0x1e000000
+[guard] phyip[136] rmw L302: exc_count delta = 0 (before=0, after=0)
+  L303  0x497051008 w4 READ 0x100000 MATCH
+[guard] phyip[137] read L303: exc_count delta = 0 (before=0, after=0)
+  L305  0x49705103c w4 RMW set=0x1800000 clr=0x0 pre=0xc3509 -> 0x18c3509
+[guard] phyip[138] rmw L305: exc_count delta = 0 (before=0, after=0)
+  L307  0x4970510d8 w4 RMW set=0x285 clr=0x1830 pre=0x1021c38 -> 0x102068d
+[guard] phyip[139] rmw L307: exc_count delta = 0 (before=0, after=0)
+  L309  0x4970510dc w4 RMW set=0x0 clr=0x810 pre=0x12004c18 -> 0x12004408
+[guard] phyip[140] rmw L309: exc_count delta = 0 (before=0, after=0)
+  L311  0x4970511e0 w4 RMW set=0x8 clr=0x0 pre=0x2000 -> 0x2008
+[guard] phyip[141] rmw L311: exc_count delta = 0 (before=0, after=0)
+  L313  0x497051280 w4 RMW set=0x400000 clr=0x0 pre=0xcc8ccccc -> 0xcccccccc
+[guard] phyip[142] rmw L313: exc_count delta = 0 (before=0, after=0)
+  L315  0x497059000 w4 RMW set=0x0 clr=0x40000000 pre=0x5e000000 -> 0x1e000000
+[guard] phyip[143] rmw L315: exc_count delta = 0 (before=0, after=0)
+  L316  0x497059008 w4 READ 0x100000 MATCH
+[guard] phyip[144] read L316: exc_count delta = 0 (before=0, after=0)
+  L318  0x49705903c w4 RMW set=0x1800000 clr=0x0 pre=0xc3509 -> 0x18c3509
+[guard] phyip[145] rmw L318: exc_count delta = 0 (before=0, after=0)
+  L320  0x4970590d8 w4 RMW set=0x285 clr=0x1830 pre=0x1021c38 -> 0x102068d
+[guard] phyip[146] rmw L320: exc_count delta = 0 (before=0, after=0)
+  L322  0x4970590dc w4 RMW set=0x0 clr=0x810 pre=0x12004c18 -> 0x12004408
+[guard] phyip[147] rmw L322: exc_count delta = 0 (before=0, after=0)
+  L324  0x4970591e0 w4 RMW set=0x8 clr=0x0 pre=0x2000 -> 0x2008
+[guard] phyip[148] rmw L324: exc_count delta = 0 (before=0, after=0)
+  L326  0x497059280 w4 RMW set=0x400000 clr=0x0 pre=0xcc8ccccc -> 0xcccccccc
+[guard] phyip[149] rmw L326: exc_count delta = 0 (before=0, after=0)
+  L328  0x49705928c w4 RMW set=0x3 clr=0x0 pre=0x0 -> 0x3
+[guard] phyip[150] rmw L328: exc_count delta = 0 (before=0, after=0)
+  L330  0x49704d008 w4 RMW set=0xc clr=0x0 pre=0x0 -> 0xc
+[guard] phyip[151] rmw L330: exc_count delta = 0 (before=0, after=0)
+  L332  0x49704d014 w4 RMW set=0x408 clr=0x0 pre=0x4840000 -> 0x4840408
+[guard] phyip[152] rmw L332: exc_count delta = 0 (before=0, after=0)
+  L334  0x497055008 w4 RMW set=0xc clr=0x0 pre=0x0 -> 0xc
+[guard] phyip[153] rmw L334: exc_count delta = 0 (before=0, after=0)
+  L336  0x497055014 w4 RMW set=0x408 clr=0x0 pre=0x4840000 -> 0x4840408
+[guard] phyip[154] rmw L336: exc_count delta = 0 (before=0, after=0)
+  L338  0x49705d008 w4 RMW set=0xc clr=0x0 pre=0x0 -> 0xc
+[guard] phyip[155] rmw L338: exc_count delta = 0 (before=0, after=0)
+  L340  0x49705d014 w4 RMW set=0x408 clr=0x0 pre=0x4840000 -> 0x4840408
+[guard] phyip[156] rmw L340: exc_count delta = 0 (before=0, after=0)
+  L342  0x49704c01c w4 RMW set=0xa0 clr=0x40 pre=0x641 -> 0x6a1
+[guard] phyip[157] rmw L342: exc_count delta = 0 (before=0, after=0)
+  L344  0x49704c080 w4 RMW set=0x40000000 clr=0x0 pre=0x140c6831 -> 0x540c6831
+[guard] phyip[158] rmw L344: exc_count delta = 0 (before=0, after=0)
+  L346  0x49704c08c w4 RMW set=0x20000 clr=0x0 pre=0x10bc0c1f -> 0x10be0c1f
+[guard] phyip[159] rmw L346: exc_count delta = 0 (before=0, after=0)
+  L348  0x49704c0a0 w4 RMW set=0x380000 clr=0x0 pre=0x2021780 -> 0x23a1780
+[guard] phyip[160] rmw L348: exc_count delta = 0 (before=0, after=0)
+  L350  0x49704c0ec w4 RMW set=0x0 clr=0x1 pre=0x1 -> 0x0
+[guard] phyip[161] rmw L350: exc_count delta = 0 (before=0, after=0)
+  L352  0x49705401c w4 RMW set=0xa0 clr=0x40 pre=0x641 -> 0x6a1
+[guard] phyip[162] rmw L352: exc_count delta = 0 (before=0, after=0)
+  L354  0x497054080 w4 RMW set=0x40000000 clr=0x0 pre=0x140c6831 -> 0x540c6831
+[guard] phyip[163] rmw L354: exc_count delta = 0 (before=0, after=0)
+  L356  0x49705408c w4 RMW set=0x20000 clr=0x0 pre=0x10bc0c1f -> 0x10be0c1f
+[guard] phyip[164] rmw L356: exc_count delta = 0 (before=0, after=0)
+  L358  0x4970540a0 w4 RMW set=0x380000 clr=0x0 pre=0x2021780 -> 0x23a1780
+[guard] phyip[165] rmw L358: exc_count delta = 0 (before=0, after=0)
+  L360  0x4970540ec w4 RMW set=0x0 clr=0x1 pre=0x1 -> 0x0
+[guard] phyip[166] rmw L360: exc_count delta = 0 (before=0, after=0)
+  L362  0x49705c01c w4 RMW set=0xa0 clr=0x40 pre=0x641 -> 0x6a1
+[guard] phyip[167] rmw L362: exc_count delta = 0 (before=0, after=0)
+  L364  0x49705c080 w4 RMW set=0x40000000 clr=0x0 pre=0x140c6831 -> 0x540c6831
+[guard] phyip[168] rmw L364: exc_count delta = 0 (before=0, after=0)
+  L366  0x49705c08c w4 RMW set=0x20000 clr=0x0 pre=0x10bc0c1f -> 0x10be0c1f
+[guard] phyip[169] rmw L366: exc_count delta = 0 (before=0, after=0)
+  L368  0x49705c0a0 w4 RMW set=0x380000 clr=0x0 pre=0x2021780 -> 0x23a1780
+[guard] phyip[170] rmw L368: exc_count delta = 0 (before=0, after=0)
+  L370  0x49705c0ec w4 RMW set=0x0 clr=0x1 pre=0x1 -> 0x0
+[guard] phyip[171] rmw L370: exc_count delta = 0 (before=0, after=0)
+  L372  0x49704e404 w4 RMW set=0x40000000 clr=0x0 pre=0x30021810 -> 0x70021810
+[guard] phyip[172] rmw L372: exc_count delta = 0 (before=0, after=0)
+  L374  0x497056404 w4 RMW set=0x40000000 clr=0x0 pre=0x30021810 -> 0x70021810
+[guard] phyip[173] rmw L374: exc_count delta = 0 (before=0, after=0)
+  L376  0x49705e404 w4 RMW set=0x40000000 clr=0x0 pre=0x30021810 -> 0x70021810
+[guard] phyip[174] rmw L376: exc_count delta = 0 (before=0, after=0)
+  L378  0x497040090 w4 RMW set=0x0 clr=0x10000 pre=0x80010005 -> 0x80000005
+[guard] phyip[175] rmw L378: exc_count delta = 0 (before=0, after=0)
+  L380  0x497008004 w4 RMW set=0x10 clr=0x0 pre=0x1 -> 0x11
+[guard] phyip[176] rmw L380: exc_count delta = 0 (before=0, after=0)
+  L382  0x497008008 w4 POLL val == 0x1 CONVERGED val=0x1
+[guard] phyip[177] pollval L382: exc_count delta = 0 (before=0, after=0)
+  L384  0x497004000 w4 RMW set=0x1 clr=0x0 pre=0x80300000 -> 0x80300001
+[guard] phyip[178] rmw L384: exc_count delta = 0 (before=0, after=0)
+  L386  0x497008000 w4 RMW set=0x8000000 clr=0x0 pre=0xf3c0308f -> 0xfbc0308f
+[guard] phyip[179] rmw L386: exc_count delta = 0 (before=0, after=0)
+  L387  0x494000054 w4 WRITE 0x140
+[guard] phyip[180] write L387: exc_count delta = 0 (before=0, after=0)
+  L389  0x494000050 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] phyip[181] rmw L389: exc_count delta = 0 (before=0, after=0)
+  L390  0x494000058 w4 READ 0x1 MATCH
+[guard] phyip[182] read L390: exc_count delta = 0 (before=0, after=0)
+--- segment phyip done: writes=2 rmws=188 read match/mismatch=10/0 polls ok/timeout=3/0 pre-mismatch=0 faults=0 ---
+=== PERSTN deassert (gpio0 pin 165) ===
+gpio0 probe: read32(0x39a000000) = 0x008742c0
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a02 (read-back 0x00074a02)
+gpio0[165] @ 0x39a000294: 0x00074a02 -> 0x00074a03 (read-back 0x00074a03)
+settled 100 ms after deassert
+
+
+=== segment port2 (391 steps) ===
+  L817  0x492028088 w4 WRITE 0x110
+[guard] port2[0] write L817: exc_count delta = 0 (before=0, after=0)
+  L818  0x492028100 w4 WRITE 0xffffffff
+[guard] port2[1] write L818: exc_count delta = 0 (before=0, after=0)
+  L819  0x492028148 w4 WRITE 0xffffffff
+[guard] port2[2] write L819: exc_count delta = 0 (before=0, after=0)
+  L820  0x492028210 w4 WRITE 0xffffffff
+[guard] port2[3] write L820: exc_count delta = 0 (before=0, after=0)
+  L821  0x492028080 w4 WRITE 0x0
+[guard] port2[4] write L821: exc_count delta = 0 (before=0, after=0)
+  L822  0x492028084 w4 WRITE 0x0
+[guard] port2[5] write L822: exc_count delta = 0 (before=0, after=0)
+  L823  0x492028104 w4 WRITE 0xfffffff0
+[guard] port2[6] write L823: exc_count delta = 0 (before=0, after=0)
+  L824  0x492028124 w4 WRITE 0x100
+[guard] port2[7] write L824: exc_count delta = 0 (before=0, after=0)
+  L825  0x49202816c w4 WRITE 0x0
+[guard] port2[8] write L825: exc_count delta = 0 (before=0, after=0)
+  L826  0x49202813c w4 WRITE 0x0
+[guard] port2[9] write L826: exc_count delta = 0 (before=0, after=0)
+  L827  0x492028800 w4 WRITE 0x100100
+[guard] port2[10] write L827: exc_count delta = 0 (before=0, after=0)
+  L828  0x492028808 w4 WRITE 0x1000ff
+[guard] port2[11] write L828: exc_count delta = 0 (before=0, after=0)
+  L829  0x49202882c w4 WRITE 0x0
+[guard] port2[12] write L829: exc_count delta = 0 (before=0, after=0)
+  L830  0x49202b000 w4 WRITE 0x0
+[guard] port2[13] write L830: exc_count delta = 0 (before=0, after=0)
+  L831  0x49202b004 w4 WRITE 0x0
+[guard] port2[14] write L831: exc_count delta = 0 (before=0, after=0)
+  L832  0x49202b008 w4 WRITE 0x0
+[guard] port2[15] write L832: exc_count delta = 0 (before=0, after=0)
+  L833  0x49202b00c w4 WRITE 0x0
+[guard] port2[16] write L833: exc_count delta = 0 (before=0, after=0)
+  L834  0x49202b010 w4 WRITE 0x0
+[guard] port2[17] write L834: exc_count delta = 0 (before=0, after=0)
+  L835  0x49202b014 w4 WRITE 0x0
+[guard] port2[18] write L835: exc_count delta = 0 (before=0, after=0)
+  L836  0x49202b018 w4 WRITE 0x0
+[guard] port2[19] write L836: exc_count delta = 0 (before=0, after=0)
+  L837  0x49202b01c w4 WRITE 0x0
+[guard] port2[20] write L837: exc_count delta = 0 (before=0, after=0)
+  L838  0x49202b020 w4 WRITE 0x0
+[guard] port2[21] write L838: exc_count delta = 0 (before=0, after=0)
+  L839  0x49202b024 w4 WRITE 0x0
+[guard] port2[22] write L839: exc_count delta = 0 (before=0, after=0)
+  L840  0x49202b028 w4 WRITE 0x0
+[guard] port2[23] write L840: exc_count delta = 0 (before=0, after=0)
+  L841  0x49202b02c w4 WRITE 0x0
+[guard] port2[24] write L841: exc_count delta = 0 (before=0, after=0)
+  L842  0x49202b030 w4 WRITE 0x0
+[guard] port2[25] write L842: exc_count delta = 0 (before=0, after=0)
+  L843  0x49202b034 w4 WRITE 0x0
+[guard] port2[26] write L843: exc_count delta = 0 (before=0, after=0)
+  L844  0x49202b038 w4 WRITE 0x0
+[guard] port2[27] write L844: exc_count delta = 0 (before=0, after=0)
+  L845  0x49202b03c w4 WRITE 0x0
+[guard] port2[28] write L845: exc_count delta = 0 (before=0, after=0)
+  L846  0x49202b800 w4 WRITE 0x0
+[guard] port2[29] write L846: exc_count delta = 0 (before=0, after=0)
+  L847  0x49202b804 w4 WRITE 0x0
+[guard] port2[30] write L847: exc_count delta = 0 (before=0, after=0)
+  L848  0x49202b808 w4 WRITE 0x0
+[guard] port2[31] write L848: exc_count delta = 0 (before=0, after=0)
+  L849  0x49202b80c w4 WRITE 0x0
+[guard] port2[32] write L849: exc_count delta = 0 (before=0, after=0)
+  L850  0x49202b810 w4 WRITE 0x0
+[guard] port2[33] write L850: exc_count delta = 0 (before=0, after=0)
+  L851  0x49202b814 w4 WRITE 0x0
+[guard] port2[34] write L851: exc_count delta = 0 (before=0, after=0)
+  L852  0x49202b818 w4 WRITE 0x0
+[guard] port2[35] write L852: exc_count delta = 0 (before=0, after=0)
+  L853  0x49202b81c w4 WRITE 0x0
+[guard] port2[36] write L853: exc_count delta = 0 (before=0, after=0)
+  L854  0x49202b820 w4 WRITE 0x0
+[guard] port2[37] write L854: exc_count delta = 0 (before=0, after=0)
+  L855  0x49202b824 w4 WRITE 0x0
+[guard] port2[38] write L855: exc_count delta = 0 (before=0, after=0)
+  L856  0x49202b828 w4 WRITE 0x0
+[guard] port2[39] write L856: exc_count delta = 0 (before=0, after=0)
+  L857  0x49202b82c w4 WRITE 0x0
+[guard] port2[40] write L857: exc_count delta = 0 (before=0, after=0)
+  L858  0x49202b830 w4 WRITE 0x0
+[guard] port2[41] write L858: exc_count delta = 0 (before=0, after=0)
+  L859  0x49202b834 w4 WRITE 0x0
+[guard] port2[42] write L859: exc_count delta = 0 (before=0, after=0)
+  L860  0x49202b838 w4 WRITE 0x0
+[guard] port2[43] write L860: exc_count delta = 0 (before=0, after=0)
+  L861  0x49202b83c w4 WRITE 0x0
+[guard] port2[44] write L861: exc_count delta = 0 (before=0, after=0)
+  L862  0x49202b840 w4 WRITE 0x0
+[guard] port2[45] write L862: exc_count delta = 0 (before=0, after=0)
+  L863  0x49202b844 w4 WRITE 0x0
+[guard] port2[46] write L863: exc_count delta = 0 (before=0, after=0)
+  L864  0x49202b848 w4 WRITE 0x0
+[guard] port2[47] write L864: exc_count delta = 0 (before=0, after=0)
+  L865  0x49202b84c w4 WRITE 0x0
+[guard] port2[48] write L865: exc_count delta = 0 (before=0, after=0)
+  L866  0x49202b850 w4 WRITE 0x0
+[guard] port2[49] write L866: exc_count delta = 0 (before=0, after=0)
+  L867  0x49202b854 w4 WRITE 0x0
+[guard] port2[50] write L867: exc_count delta = 0 (before=0, after=0)
+  L868  0x49202b858 w4 WRITE 0x0
+[guard] port2[51] write L868: exc_count delta = 0 (before=0, after=0)
+  L869  0x49202b85c w4 WRITE 0x0
+[guard] port2[52] write L869: exc_count delta = 0 (before=0, after=0)
+  L870  0x49202b860 w4 WRITE 0x0
+[guard] port2[53] write L870: exc_count delta = 0 (before=0, after=0)
+  L871  0x49202b864 w4 WRITE 0x0
+[guard] port2[54] write L871: exc_count delta = 0 (before=0, after=0)
+  L872  0x49202b868 w4 WRITE 0x0
+[guard] port2[55] write L872: exc_count delta = 0 (before=0, after=0)
+  L873  0x49202b86c w4 WRITE 0x0
+[guard] port2[56] write L873: exc_count delta = 0 (before=0, after=0)
+  L874  0x49202b870 w4 WRITE 0x0
+[guard] port2[57] write L874: exc_count delta = 0 (before=0, after=0)
+  L875  0x49202b874 w4 WRITE 0x0
+[guard] port2[58] write L875: exc_count delta = 0 (before=0, after=0)
+  L876  0x49202b878 w4 WRITE 0x0
+[guard] port2[59] write L876: exc_count delta = 0 (before=0, after=0)
+  L877  0x49202b87c w4 WRITE 0x0
+[guard] port2[60] write L877: exc_count delta = 0 (before=0, after=0)
+  L878  0x49202b880 w4 WRITE 0x0
+[guard] port2[61] write L878: exc_count delta = 0 (before=0, after=0)
+  L879  0x49202b884 w4 WRITE 0x0
+[guard] port2[62] write L879: exc_count delta = 0 (before=0, after=0)
+  L880  0x49202b888 w4 WRITE 0x0
+[guard] port2[63] write L880: exc_count delta = 0 (before=0, after=0)
+  L881  0x49202b88c w4 WRITE 0x0
+[guard] port2[64] write L881: exc_count delta = 0 (before=0, after=0)
+  L882  0x49202b890 w4 WRITE 0x0
+[guard] port2[65] write L882: exc_count delta = 0 (before=0, after=0)
+  L883  0x49202b894 w4 WRITE 0x0
+[guard] port2[66] write L883: exc_count delta = 0 (before=0, after=0)
+  L884  0x49202b898 w4 WRITE 0x0
+[guard] port2[67] write L884: exc_count delta = 0 (before=0, after=0)
+  L885  0x49202b89c w4 WRITE 0x0
+[guard] port2[68] write L885: exc_count delta = 0 (before=0, after=0)
+  L886  0x49202b8a0 w4 WRITE 0x0
+[guard] port2[69] write L886: exc_count delta = 0 (before=0, after=0)
+  L887  0x49202b8a4 w4 WRITE 0x0
+[guard] port2[70] write L887: exc_count delta = 0 (before=0, after=0)
+  L888  0x49202b8a8 w4 WRITE 0x0
+[guard] port2[71] write L888: exc_count delta = 0 (before=0, after=0)
+  L889  0x49202b8ac w4 WRITE 0x0
+[guard] port2[72] write L889: exc_count delta = 0 (before=0, after=0)
+  L890  0x49202b8b0 w4 WRITE 0x0
+[guard] port2[73] write L890: exc_count delta = 0 (before=0, after=0)
+  L891  0x49202b8b4 w4 WRITE 0x0
+[guard] port2[74] write L891: exc_count delta = 0 (before=0, after=0)
+  L892  0x49202b8b8 w4 WRITE 0x0
+[guard] port2[75] write L892: exc_count delta = 0 (before=0, after=0)
+  L893  0x49202b8bc w4 WRITE 0x0
+[guard] port2[76] write L893: exc_count delta = 0 (before=0, after=0)
+  L894  0x49202b8c0 w4 WRITE 0x0
+[guard] port2[77] write L894: exc_count delta = 0 (before=0, after=0)
+  L895  0x49202b8c4 w4 WRITE 0x0
+[guard] port2[78] write L895: exc_count delta = 0 (before=0, after=0)
+  L896  0x49202b8c8 w4 WRITE 0x0
+[guard] port2[79] write L896: exc_count delta = 0 (before=0, after=0)
+  L897  0x49202b8cc w4 WRITE 0x0
+[guard] port2[80] write L897: exc_count delta = 0 (before=0, after=0)
+  L898  0x49202b8d0 w4 WRITE 0x0
+[guard] port2[81] write L898: exc_count delta = 0 (before=0, after=0)
+  L899  0x49202b8d4 w4 WRITE 0x0
+[guard] port2[82] write L899: exc_count delta = 0 (before=0, after=0)
+  L900  0x49202b8d8 w4 WRITE 0x0
+[guard] port2[83] write L900: exc_count delta = 0 (before=0, after=0)
+  L901  0x49202b8dc w4 WRITE 0x0
+[guard] port2[84] write L901: exc_count delta = 0 (before=0, after=0)
+  L902  0x49202b8e0 w4 WRITE 0x0
+[guard] port2[85] write L902: exc_count delta = 0 (before=0, after=0)
+  L903  0x49202b8e4 w4 WRITE 0x0
+[guard] port2[86] write L903: exc_count delta = 0 (before=0, after=0)
+  L904  0x49202b8e8 w4 WRITE 0x0
+[guard] port2[87] write L904: exc_count delta = 0 (before=0, after=0)
+  L905  0x49202b8ec w4 WRITE 0x0
+[guard] port2[88] write L905: exc_count delta = 0 (before=0, after=0)
+  L906  0x49202b8f0 w4 WRITE 0x0
+[guard] port2[89] write L906: exc_count delta = 0 (before=0, after=0)
+  L907  0x49202b8f4 w4 WRITE 0x0
+[guard] port2[90] write L907: exc_count delta = 0 (before=0, after=0)
+  L908  0x49202b8f8 w4 WRITE 0x0
+[guard] port2[91] write L908: exc_count delta = 0 (before=0, after=0)
+  L909  0x49202b8fc w4 WRITE 0x0
+[guard] port2[92] write L909: exc_count delta = 0 (before=0, after=0)
+  L910  0x49202b900 w4 WRITE 0x0
+[guard] port2[93] write L910: exc_count delta = 0 (before=0, after=0)
+  L911  0x49202b904 w4 WRITE 0x0
+[guard] port2[94] write L911: exc_count delta = 0 (before=0, after=0)
+  L912  0x49202b908 w4 WRITE 0x0
+[guard] port2[95] write L912: exc_count delta = 0 (before=0, after=0)
+  L913  0x49202b90c w4 WRITE 0x0
+[guard] port2[96] write L913: exc_count delta = 0 (before=0, after=0)
+  L914  0x49202b910 w4 WRITE 0x0
+[guard] port2[97] write L914: exc_count delta = 0 (before=0, after=0)
+  L915  0x49202b914 w4 WRITE 0x0
+[guard] port2[98] write L915: exc_count delta = 0 (before=0, after=0)
+  L916  0x49202b918 w4 WRITE 0x0
+[guard] port2[99] write L916: exc_count delta = 0 (before=0, after=0)
+  L917  0x49202b91c w4 WRITE 0x0
+[guard] port2[100] write L917: exc_count delta = 0 (before=0, after=0)
+  L918  0x49202b920 w4 WRITE 0x0
+[guard] port2[101] write L918: exc_count delta = 0 (before=0, after=0)
+  L919  0x49202b924 w4 WRITE 0x0
+[guard] port2[102] write L919: exc_count delta = 0 (before=0, after=0)
+  L920  0x49202b928 w4 WRITE 0x0
+[guard] port2[103] write L920: exc_count delta = 0 (before=0, after=0)
+  L921  0x49202b92c w4 WRITE 0x0
+[guard] port2[104] write L921: exc_count delta = 0 (before=0, after=0)
+  L922  0x49202b930 w4 WRITE 0x0
+[guard] port2[105] write L922: exc_count delta = 0 (before=0, after=0)
+  L923  0x49202b934 w4 WRITE 0x0
+[guard] port2[106] write L923: exc_count delta = 0 (before=0, after=0)
+  L924  0x49202b938 w4 WRITE 0x0
+[guard] port2[107] write L924: exc_count delta = 0 (before=0, after=0)
+  L925  0x49202b93c w4 WRITE 0x0
+[guard] port2[108] write L925: exc_count delta = 0 (before=0, after=0)
+  L926  0x49202b940 w4 WRITE 0x0
+[guard] port2[109] write L926: exc_count delta = 0 (before=0, after=0)
+  L927  0x49202b944 w4 WRITE 0x0
+[guard] port2[110] write L927: exc_count delta = 0 (before=0, after=0)
+  L928  0x49202b948 w4 WRITE 0x0
+[guard] port2[111] write L928: exc_count delta = 0 (before=0, after=0)
+  L929  0x49202b94c w4 WRITE 0x0
+[guard] port2[112] write L929: exc_count delta = 0 (before=0, after=0)
+  L930  0x49202b950 w4 WRITE 0x0
+[guard] port2[113] write L930: exc_count delta = 0 (before=0, after=0)
+  L931  0x49202b954 w4 WRITE 0x0
+[guard] port2[114] write L931: exc_count delta = 0 (before=0, after=0)
+  L932  0x49202b958 w4 WRITE 0x0
+[guard] port2[115] write L932: exc_count delta = 0 (before=0, after=0)
+  L933  0x49202b95c w4 WRITE 0x0
+[guard] port2[116] write L933: exc_count delta = 0 (before=0, after=0)
+  L934  0x49202b960 w4 WRITE 0x0
+[guard] port2[117] write L934: exc_count delta = 0 (before=0, after=0)
+  L935  0x49202b964 w4 WRITE 0x0
+[guard] port2[118] write L935: exc_count delta = 0 (before=0, after=0)
+  L936  0x49202b968 w4 WRITE 0x0
+[guard] port2[119] write L936: exc_count delta = 0 (before=0, after=0)
+  L937  0x49202b96c w4 WRITE 0x0
+[guard] port2[120] write L937: exc_count delta = 0 (before=0, after=0)
+  L938  0x49202b970 w4 WRITE 0x0
+[guard] port2[121] write L938: exc_count delta = 0 (before=0, after=0)
+  L939  0x49202b974 w4 WRITE 0x0
+[guard] port2[122] write L939: exc_count delta = 0 (before=0, after=0)
+  L940  0x49202b978 w4 WRITE 0x0
+[guard] port2[123] write L940: exc_count delta = 0 (before=0, after=0)
+  L941  0x49202b97c w4 WRITE 0x0
+[guard] port2[124] write L941: exc_count delta = 0 (before=0, after=0)
+  L942  0x49202b980 w4 WRITE 0x0
+[guard] port2[125] write L942: exc_count delta = 0 (before=0, after=0)
+  L943  0x49202b984 w4 WRITE 0x0
+[guard] port2[126] write L943: exc_count delta = 0 (before=0, after=0)
+  L944  0x49202b988 w4 WRITE 0x0
+[guard] port2[127] write L944: exc_count delta = 0 (before=0, after=0)
+  L945  0x49202b98c w4 WRITE 0x0
+[guard] port2[128] write L945: exc_count delta = 0 (before=0, after=0)
+  L946  0x49202b990 w4 WRITE 0x0
+[guard] port2[129] write L946: exc_count delta = 0 (before=0, after=0)
+  L947  0x49202b994 w4 WRITE 0x0
+[guard] port2[130] write L947: exc_count delta = 0 (before=0, after=0)
+  L948  0x49202b998 w4 WRITE 0x0
+[guard] port2[131] write L948: exc_count delta = 0 (before=0, after=0)
+  L949  0x49202b99c w4 WRITE 0x0
+[guard] port2[132] write L949: exc_count delta = 0 (before=0, after=0)
+  L950  0x49202b9a0 w4 WRITE 0x0
+[guard] port2[133] write L950: exc_count delta = 0 (before=0, after=0)
+  L951  0x49202b9a4 w4 WRITE 0x0
+[guard] port2[134] write L951: exc_count delta = 0 (before=0, after=0)
+  L952  0x49202b9a8 w4 WRITE 0x0
+[guard] port2[135] write L952: exc_count delta = 0 (before=0, after=0)
+  L953  0x49202b9ac w4 WRITE 0x0
+[guard] port2[136] write L953: exc_count delta = 0 (before=0, after=0)
+  L954  0x49202b9b0 w4 WRITE 0x0
+[guard] port2[137] write L954: exc_count delta = 0 (before=0, after=0)
+  L955  0x49202b9b4 w4 WRITE 0x0
+[guard] port2[138] write L955: exc_count delta = 0 (before=0, after=0)
+  L956  0x49202b9b8 w4 WRITE 0x0
+[guard] port2[139] write L956: exc_count delta = 0 (before=0, after=0)
+  L957  0x49202b9bc w4 WRITE 0x0
+[guard] port2[140] write L957: exc_count delta = 0 (before=0, after=0)
+  L958  0x49202b9c0 w4 WRITE 0x0
+[guard] port2[141] write L958: exc_count delta = 0 (before=0, after=0)
+  L959  0x49202b9c4 w4 WRITE 0x0
+[guard] port2[142] write L959: exc_count delta = 0 (before=0, after=0)
+  L960  0x49202b9c8 w4 WRITE 0x0
+[guard] port2[143] write L960: exc_count delta = 0 (before=0, after=0)
+  L961  0x49202b9cc w4 WRITE 0x0
+[guard] port2[144] write L961: exc_count delta = 0 (before=0, after=0)
+  L962  0x49202b9d0 w4 WRITE 0x0
+[guard] port2[145] write L962: exc_count delta = 0 (before=0, after=0)
+  L963  0x49202b9d4 w4 WRITE 0x0
+[guard] port2[146] write L963: exc_count delta = 0 (before=0, after=0)
+  L964  0x49202b9d8 w4 WRITE 0x0
+[guard] port2[147] write L964: exc_count delta = 0 (before=0, after=0)
+  L965  0x49202b9dc w4 WRITE 0x0
+[guard] port2[148] write L965: exc_count delta = 0 (before=0, after=0)
+  L966  0x49202b9e0 w4 WRITE 0x0
+[guard] port2[149] write L966: exc_count delta = 0 (before=0, after=0)
+  L967  0x49202b9e4 w4 WRITE 0x0
+[guard] port2[150] write L967: exc_count delta = 0 (before=0, after=0)
+  L968  0x49202b9e8 w4 WRITE 0x0
+[guard] port2[151] write L968: exc_count delta = 0 (before=0, after=0)
+  L969  0x49202b9ec w4 WRITE 0x0
+[guard] port2[152] write L969: exc_count delta = 0 (before=0, after=0)
+  L970  0x49202b9f0 w4 WRITE 0x0
+[guard] port2[153] write L970: exc_count delta = 0 (before=0, after=0)
+  L971  0x49202b9f4 w4 WRITE 0x0
+[guard] port2[154] write L971: exc_count delta = 0 (before=0, after=0)
+  L972  0x49202b9f8 w4 WRITE 0x0
+[guard] port2[155] write L972: exc_count delta = 0 (before=0, after=0)
+  L973  0x49202b9fc w4 WRITE 0x0
+[guard] port2[156] write L973: exc_count delta = 0 (before=0, after=0)
+  L974  0x49202ba00 w4 WRITE 0x0
+[guard] port2[157] write L974: exc_count delta = 0 (before=0, after=0)
+  L975  0x49202ba04 w4 WRITE 0x0
+[guard] port2[158] write L975: exc_count delta = 0 (before=0, after=0)
+  L976  0x49202ba08 w4 WRITE 0x0
+[guard] port2[159] write L976: exc_count delta = 0 (before=0, after=0)
+  L977  0x49202ba0c w4 WRITE 0x0
+[guard] port2[160] write L977: exc_count delta = 0 (before=0, after=0)
+  L978  0x49202ba10 w4 WRITE 0x0
+[guard] port2[161] write L978: exc_count delta = 0 (before=0, after=0)
+  L979  0x49202ba14 w4 WRITE 0x0
+[guard] port2[162] write L979: exc_count delta = 0 (before=0, after=0)
+  L980  0x49202ba18 w4 WRITE 0x0
+[guard] port2[163] write L980: exc_count delta = 0 (before=0, after=0)
+  L981  0x49202ba1c w4 WRITE 0x0
+[guard] port2[164] write L981: exc_count delta = 0 (before=0, after=0)
+  L982  0x49202ba20 w4 WRITE 0x0
+[guard] port2[165] write L982: exc_count delta = 0 (before=0, after=0)
+  L983  0x49202ba24 w4 WRITE 0x0
+[guard] port2[166] write L983: exc_count delta = 0 (before=0, after=0)
+  L984  0x49202ba28 w4 WRITE 0x0
+[guard] port2[167] write L984: exc_count delta = 0 (before=0, after=0)
+  L985  0x49202ba2c w4 WRITE 0x0
+[guard] port2[168] write L985: exc_count delta = 0 (before=0, after=0)
+  L986  0x49202ba30 w4 WRITE 0x0
+[guard] port2[169] write L986: exc_count delta = 0 (before=0, after=0)
+  L987  0x49202ba34 w4 WRITE 0x0
+[guard] port2[170] write L987: exc_count delta = 0 (before=0, after=0)
+  L988  0x49202ba38 w4 WRITE 0x0
+[guard] port2[171] write L988: exc_count delta = 0 (before=0, after=0)
+  L989  0x49202ba3c w4 WRITE 0x0
+[guard] port2[172] write L989: exc_count delta = 0 (before=0, after=0)
+  L990  0x49202ba40 w4 WRITE 0x0
+[guard] port2[173] write L990: exc_count delta = 0 (before=0, after=0)
+  L991  0x49202ba44 w4 WRITE 0x0
+[guard] port2[174] write L991: exc_count delta = 0 (before=0, after=0)
+  L992  0x49202ba48 w4 WRITE 0x0
+[guard] port2[175] write L992: exc_count delta = 0 (before=0, after=0)
+  L993  0x49202ba4c w4 WRITE 0x0
+[guard] port2[176] write L993: exc_count delta = 0 (before=0, after=0)
+  L994  0x49202ba50 w4 WRITE 0x0
+[guard] port2[177] write L994: exc_count delta = 0 (before=0, after=0)
+  L995  0x49202ba54 w4 WRITE 0x0
+[guard] port2[178] write L995: exc_count delta = 0 (before=0, after=0)
+  L996  0x49202ba58 w4 WRITE 0x0
+[guard] port2[179] write L996: exc_count delta = 0 (before=0, after=0)
+  L997  0x49202ba5c w4 WRITE 0x0
+[guard] port2[180] write L997: exc_count delta = 0 (before=0, after=0)
+  L998  0x49202ba60 w4 WRITE 0x0
+[guard] port2[181] write L998: exc_count delta = 0 (before=0, after=0)
+  L999  0x49202ba64 w4 WRITE 0x0
+[guard] port2[182] write L999: exc_count delta = 0 (before=0, after=0)
+  L1000 0x49202ba68 w4 WRITE 0x0
+[guard] port2[183] write L1000: exc_count delta = 0 (before=0, after=0)
+  L1001 0x49202ba6c w4 WRITE 0x0
+[guard] port2[184] write L1001: exc_count delta = 0 (before=0, after=0)
+  L1002 0x49202ba70 w4 WRITE 0x0
+[guard] port2[185] write L1002: exc_count delta = 0 (before=0, after=0)
+  L1003 0x49202ba74 w4 WRITE 0x0
+[guard] port2[186] write L1003: exc_count delta = 0 (before=0, after=0)
+  L1004 0x49202ba78 w4 WRITE 0x0
+[guard] port2[187] write L1004: exc_count delta = 0 (before=0, after=0)
+  L1005 0x49202ba7c w4 WRITE 0x0
+[guard] port2[188] write L1005: exc_count delta = 0 (before=0, after=0)
+  L1006 0x49202ba80 w4 WRITE 0x0
+[guard] port2[189] write L1006: exc_count delta = 0 (before=0, after=0)
+  L1007 0x49202ba84 w4 WRITE 0x0
+[guard] port2[190] write L1007: exc_count delta = 0 (before=0, after=0)
+  L1008 0x49202ba88 w4 WRITE 0x0
+[guard] port2[191] write L1008: exc_count delta = 0 (before=0, after=0)
+  L1009 0x49202ba8c w4 WRITE 0x0
+[guard] port2[192] write L1009: exc_count delta = 0 (before=0, after=0)
+  L1010 0x49202ba90 w4 WRITE 0x0
+[guard] port2[193] write L1010: exc_count delta = 0 (before=0, after=0)
+  L1011 0x49202ba94 w4 WRITE 0x0
+[guard] port2[194] write L1011: exc_count delta = 0 (before=0, after=0)
+  L1012 0x49202ba98 w4 WRITE 0x0
+[guard] port2[195] write L1012: exc_count delta = 0 (before=0, after=0)
+  L1013 0x49202ba9c w4 WRITE 0x0
+[guard] port2[196] write L1013: exc_count delta = 0 (before=0, after=0)
+  L1014 0x49202baa0 w4 WRITE 0x0
+[guard] port2[197] write L1014: exc_count delta = 0 (before=0, after=0)
+  L1015 0x49202baa4 w4 WRITE 0x0
+[guard] port2[198] write L1015: exc_count delta = 0 (before=0, after=0)
+  L1016 0x49202baa8 w4 WRITE 0x0
+[guard] port2[199] write L1016: exc_count delta = 0 (before=0, after=0)
+  L1017 0x49202baac w4 WRITE 0x0
+[guard] port2[200] write L1017: exc_count delta = 0 (before=0, after=0)
+  L1018 0x49202bab0 w4 WRITE 0x0
+[guard] port2[201] write L1018: exc_count delta = 0 (before=0, after=0)
+  L1019 0x49202bab4 w4 WRITE 0x0
+[guard] port2[202] write L1019: exc_count delta = 0 (before=0, after=0)
+  L1020 0x49202bab8 w4 WRITE 0x0
+[guard] port2[203] write L1020: exc_count delta = 0 (before=0, after=0)
+  L1021 0x49202babc w4 WRITE 0x0
+[guard] port2[204] write L1021: exc_count delta = 0 (before=0, after=0)
+  L1022 0x49202bac0 w4 WRITE 0x0
+[guard] port2[205] write L1022: exc_count delta = 0 (before=0, after=0)
+  L1023 0x49202bac4 w4 WRITE 0x0
+[guard] port2[206] write L1023: exc_count delta = 0 (before=0, after=0)
+  L1024 0x49202bac8 w4 WRITE 0x0
+[guard] port2[207] write L1024: exc_count delta = 0 (before=0, after=0)
+  L1025 0x49202bacc w4 WRITE 0x0
+[guard] port2[208] write L1025: exc_count delta = 0 (before=0, after=0)
+  L1026 0x49202bad0 w4 WRITE 0x0
+[guard] port2[209] write L1026: exc_count delta = 0 (before=0, after=0)
+  L1027 0x49202bad4 w4 WRITE 0x0
+[guard] port2[210] write L1027: exc_count delta = 0 (before=0, after=0)
+  L1028 0x49202bad8 w4 WRITE 0x0
+[guard] port2[211] write L1028: exc_count delta = 0 (before=0, after=0)
+  L1029 0x49202badc w4 WRITE 0x0
+[guard] port2[212] write L1029: exc_count delta = 0 (before=0, after=0)
+  L1030 0x49202bae0 w4 WRITE 0x0
+[guard] port2[213] write L1030: exc_count delta = 0 (before=0, after=0)
+  L1031 0x49202bae4 w4 WRITE 0x0
+[guard] port2[214] write L1031: exc_count delta = 0 (before=0, after=0)
+  L1032 0x49202bae8 w4 WRITE 0x0
+[guard] port2[215] write L1032: exc_count delta = 0 (before=0, after=0)
+  L1033 0x49202baec w4 WRITE 0x0
+[guard] port2[216] write L1033: exc_count delta = 0 (before=0, after=0)
+  L1034 0x49202baf0 w4 WRITE 0x0
+[guard] port2[217] write L1034: exc_count delta = 0 (before=0, after=0)
+  L1035 0x49202baf4 w4 WRITE 0x0
+[guard] port2[218] write L1035: exc_count delta = 0 (before=0, after=0)
+  L1036 0x49202baf8 w4 WRITE 0x0
+[guard] port2[219] write L1036: exc_count delta = 0 (before=0, after=0)
+  L1037 0x49202bafc w4 WRITE 0x0
+[guard] port2[220] write L1037: exc_count delta = 0 (before=0, after=0)
+  L1038 0x49202bb00 w4 WRITE 0x0
+[guard] port2[221] write L1038: exc_count delta = 0 (before=0, after=0)
+  L1039 0x49202bb04 w4 WRITE 0x0
+[guard] port2[222] write L1039: exc_count delta = 0 (before=0, after=0)
+  L1040 0x49202bb08 w4 WRITE 0x0
+[guard] port2[223] write L1040: exc_count delta = 0 (before=0, after=0)
+  L1041 0x49202bb0c w4 WRITE 0x0
+[guard] port2[224] write L1041: exc_count delta = 0 (before=0, after=0)
+  L1042 0x49202bb10 w4 WRITE 0x0
+[guard] port2[225] write L1042: exc_count delta = 0 (before=0, after=0)
+  L1043 0x49202bb14 w4 WRITE 0x0
+[guard] port2[226] write L1043: exc_count delta = 0 (before=0, after=0)
+  L1044 0x49202bb18 w4 WRITE 0x0
+[guard] port2[227] write L1044: exc_count delta = 0 (before=0, after=0)
+  L1045 0x49202bb1c w4 WRITE 0x0
+[guard] port2[228] write L1045: exc_count delta = 0 (before=0, after=0)
+  L1046 0x49202bb20 w4 WRITE 0x0
+[guard] port2[229] write L1046: exc_count delta = 0 (before=0, after=0)
+  L1047 0x49202bb24 w4 WRITE 0x0
+[guard] port2[230] write L1047: exc_count delta = 0 (before=0, after=0)
+  L1048 0x49202bb28 w4 WRITE 0x0
+[guard] port2[231] write L1048: exc_count delta = 0 (before=0, after=0)
+  L1049 0x49202bb2c w4 WRITE 0x0
+[guard] port2[232] write L1049: exc_count delta = 0 (before=0, after=0)
+  L1050 0x49202bb30 w4 WRITE 0x0
+[guard] port2[233] write L1050: exc_count delta = 0 (before=0, after=0)
+  L1051 0x49202bb34 w4 WRITE 0x0
+[guard] port2[234] write L1051: exc_count delta = 0 (before=0, after=0)
+  L1052 0x49202bb38 w4 WRITE 0x0
+[guard] port2[235] write L1052: exc_count delta = 0 (before=0, after=0)
+  L1053 0x49202bb3c w4 WRITE 0x0
+[guard] port2[236] write L1053: exc_count delta = 0 (before=0, after=0)
+  L1054 0x49202bb40 w4 WRITE 0x0
+[guard] port2[237] write L1054: exc_count delta = 0 (before=0, after=0)
+  L1055 0x49202bb44 w4 WRITE 0x0
+[guard] port2[238] write L1055: exc_count delta = 0 (before=0, after=0)
+  L1056 0x49202bb48 w4 WRITE 0x0
+[guard] port2[239] write L1056: exc_count delta = 0 (before=0, after=0)
+  L1057 0x49202bb4c w4 WRITE 0x0
+[guard] port2[240] write L1057: exc_count delta = 0 (before=0, after=0)
+  L1058 0x49202bb50 w4 WRITE 0x0
+[guard] port2[241] write L1058: exc_count delta = 0 (before=0, after=0)
+  L1059 0x49202bb54 w4 WRITE 0x0
+[guard] port2[242] write L1059: exc_count delta = 0 (before=0, after=0)
+  L1060 0x49202bb58 w4 WRITE 0x0
+[guard] port2[243] write L1060: exc_count delta = 0 (before=0, after=0)
+  L1061 0x49202bb5c w4 WRITE 0x0
+[guard] port2[244] write L1061: exc_count delta = 0 (before=0, after=0)
+  L1062 0x49202bb60 w4 WRITE 0x0
+[guard] port2[245] write L1062: exc_count delta = 0 (before=0, after=0)
+  L1063 0x49202bb64 w4 WRITE 0x0
+[guard] port2[246] write L1063: exc_count delta = 0 (before=0, after=0)
+  L1064 0x49202bb68 w4 WRITE 0x0
+[guard] port2[247] write L1064: exc_count delta = 0 (before=0, after=0)
+  L1065 0x49202bb6c w4 WRITE 0x0
+[guard] port2[248] write L1065: exc_count delta = 0 (before=0, after=0)
+  L1066 0x49202bb70 w4 WRITE 0x0
+[guard] port2[249] write L1066: exc_count delta = 0 (before=0, after=0)
+  L1067 0x49202bb74 w4 WRITE 0x0
+[guard] port2[250] write L1067: exc_count delta = 0 (before=0, after=0)
+  L1068 0x49202bb78 w4 WRITE 0x0
+[guard] port2[251] write L1068: exc_count delta = 0 (before=0, after=0)
+  L1069 0x49202bb7c w4 WRITE 0x0
+[guard] port2[252] write L1069: exc_count delta = 0 (before=0, after=0)
+  L1070 0x49202bb80 w4 WRITE 0x0
+[guard] port2[253] write L1070: exc_count delta = 0 (before=0, after=0)
+  L1071 0x49202bb84 w4 WRITE 0x0
+[guard] port2[254] write L1071: exc_count delta = 0 (before=0, after=0)
+  L1072 0x49202bb88 w4 WRITE 0x0
+[guard] port2[255] write L1072: exc_count delta = 0 (before=0, after=0)
+  L1073 0x49202bb8c w4 WRITE 0x0
+[guard] port2[256] write L1073: exc_count delta = 0 (before=0, after=0)
+  L1074 0x49202bb90 w4 WRITE 0x0
+[guard] port2[257] write L1074: exc_count delta = 0 (before=0, after=0)
+  L1075 0x49202bb94 w4 WRITE 0x0
+[guard] port2[258] write L1075: exc_count delta = 0 (before=0, after=0)
+  L1076 0x49202bb98 w4 WRITE 0x0
+[guard] port2[259] write L1076: exc_count delta = 0 (before=0, after=0)
+  L1077 0x49202bb9c w4 WRITE 0x0
+[guard] port2[260] write L1077: exc_count delta = 0 (before=0, after=0)
+  L1078 0x49202bba0 w4 WRITE 0x0
+[guard] port2[261] write L1078: exc_count delta = 0 (before=0, after=0)
+  L1079 0x49202bba4 w4 WRITE 0x0
+[guard] port2[262] write L1079: exc_count delta = 0 (before=0, after=0)
+  L1080 0x49202bba8 w4 WRITE 0x0
+[guard] port2[263] write L1080: exc_count delta = 0 (before=0, after=0)
+  L1081 0x49202bbac w4 WRITE 0x0
+[guard] port2[264] write L1081: exc_count delta = 0 (before=0, after=0)
+  L1082 0x49202bbb0 w4 WRITE 0x0
+[guard] port2[265] write L1082: exc_count delta = 0 (before=0, after=0)
+  L1083 0x49202bbb4 w4 WRITE 0x0
+[guard] port2[266] write L1083: exc_count delta = 0 (before=0, after=0)
+  L1084 0x49202bbb8 w4 WRITE 0x0
+[guard] port2[267] write L1084: exc_count delta = 0 (before=0, after=0)
+  L1085 0x49202bbbc w4 WRITE 0x0
+[guard] port2[268] write L1085: exc_count delta = 0 (before=0, after=0)
+  L1086 0x49202bbc0 w4 WRITE 0x0
+[guard] port2[269] write L1086: exc_count delta = 0 (before=0, after=0)
+  L1087 0x49202bbc4 w4 WRITE 0x0
+[guard] port2[270] write L1087: exc_count delta = 0 (before=0, after=0)
+  L1088 0x49202bbc8 w4 WRITE 0x0
+[guard] port2[271] write L1088: exc_count delta = 0 (before=0, after=0)
+  L1089 0x49202bbcc w4 WRITE 0x0
+[guard] port2[272] write L1089: exc_count delta = 0 (before=0, after=0)
+  L1090 0x49202bbd0 w4 WRITE 0x0
+[guard] port2[273] write L1090: exc_count delta = 0 (before=0, after=0)
+  L1091 0x49202bbd4 w4 WRITE 0x0
+[guard] port2[274] write L1091: exc_count delta = 0 (before=0, after=0)
+  L1092 0x49202bbd8 w4 WRITE 0x0
+[guard] port2[275] write L1092: exc_count delta = 0 (before=0, after=0)
+  L1093 0x49202bbdc w4 WRITE 0x0
+[guard] port2[276] write L1093: exc_count delta = 0 (before=0, after=0)
+  L1094 0x49202bbe0 w4 WRITE 0x0
+[guard] port2[277] write L1094: exc_count delta = 0 (before=0, after=0)
+  L1095 0x49202bbe4 w4 WRITE 0x0
+[guard] port2[278] write L1095: exc_count delta = 0 (before=0, after=0)
+  L1096 0x49202bbe8 w4 WRITE 0x0
+[guard] port2[279] write L1096: exc_count delta = 0 (before=0, after=0)
+  L1097 0x49202bbec w4 WRITE 0x0
+[guard] port2[280] write L1097: exc_count delta = 0 (before=0, after=0)
+  L1098 0x49202bbf0 w4 WRITE 0x0
+[guard] port2[281] write L1098: exc_count delta = 0 (before=0, after=0)
+  L1099 0x49202bbf4 w4 WRITE 0x0
+[guard] port2[282] write L1099: exc_count delta = 0 (before=0, after=0)
+  L1100 0x49202bbf8 w4 WRITE 0x0
+[guard] port2[283] write L1100: exc_count delta = 0 (before=0, after=0)
+  L1101 0x49202bbfc w4 WRITE 0x0
+[guard] port2[284] write L1101: exc_count delta = 0 (before=0, after=0)
+  L1102 0x492028130 w4 WRITE 0x3020000
+[guard] port2[285] write L1102: exc_count delta = 0 (before=0, after=0)
+  L1103 0x492028140 w4 WRITE 0x10
+[guard] port2[286] write L1103: exc_count delta = 0 (before=0, after=0)
+  L1104 0x492028144 w4 WRITE 0x253770
+[guard] port2[287] write L1104: exc_count delta = 0 (before=0, after=0)
+  L1105 0x49202821c w4 WRITE 0x0
+[guard] port2[288] write L1105: exc_count delta = 0 (before=0, after=0)
+  L1106 0x492028834 w4 WRITE 0x0
+[guard] port2[289] write L1106: exc_count delta = 0 (before=0, after=0)
+  L1107 0x49202883c w4 WRITE 0x0
+[guard] port2[290] write L1107: exc_count delta = 0 (before=0, after=0)
+  L1109 0x492028140 w4 RMW set=0x1 clr=0x0 pre=0x10 -> 0x11
+[guard] port2[291] rmw L1109: exc_count delta = 0 (before=0, after=0)
+  L1111 0x492028800 w4 RMW set=0x1 clr=0x0 pre=0x100100 -> 0x100101
+[guard] port2[292] rmw L1111: exc_count delta = 0 (before=0, after=0)
+  L1113 0x49202882c w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] port2[293] rmw L1113: exc_count delta = 0 (before=0, after=0)
+  L1114 0x492028804 w4 READ 0xd MISMATCH (trace 0x5)
+[guard] port2[294] read L1114: exc_count delta = 0 (before=0, after=0)
+  L1115 0x49203c010 w4 WRITE 0x2
+[guard] port2[295] write L1115: exc_count delta = 0 (before=0, after=0)
+  L1116 0x49203c01c w4 WRITE 0x4
+[guard] port2[296] write L1116: exc_count delta = 0 (before=0, after=0)
+  L1118 0x49203c020 w4 RMW set=0x2 clr=0x0 pre=0x0 -> 0x2
+[guard] port2[297] rmw L1118: exc_count delta = 0 (before=0, after=0)
+  L1119 0x49203c014 w4 WRITE 0x1
+[guard] port2[298] write L1119: exc_count delta = 0 (before=0, after=0)
+  L1121 0x492028800 w4 RMW set=0x0 clr=0x100 pre=0x100101 -> 0x100001
+[guard] port2[299] rmw L1121: exc_count delta = 0 (before=0, after=0)
+  L1138 0x492028208 w4 POLL val == 0xab000200 CONVERGED val=0xab000200
+[guard] port2[300] pollval L1138: exc_count delta = 0 (before=0, after=0)
+  L1137 0x497028000 w4 POLL val == 0x23000070 CONVERGED val=0x23000070
+[guard] port2[301] pollval L1137: exc_count delta = 0 (before=0, after=0)
+  L1139 0x1cb0010004 w4 READ 0x100000 MATCH
+[guard] port2[302] read L1139: exc_count delta = 0 (before=0, after=0)
+  L1140 0x1cb0010034 w4 READ 0x40 MATCH
+[guard] port2[303] read L1140: exc_count delta = 0 (before=0, after=0)
+  L1141 0x1cb0010040 w4 READ 0xc9c35001 MATCH
+[guard] port2[304] read L1141: exc_count delta = 0 (before=0, after=0)
+  L1142 0x1cb0010050 w4 READ 0x807005 MATCH
+[guard] port2[305] read L1142: exc_count delta = 0 (before=0, after=0)
+  L1143 0x1cb0010070 w4 READ 0x420010 MATCH
+[guard] port2[306] read L1143: exc_count delta = 0 (before=0, after=0)
+  L1145 0x1cb00108bc w4 RMW set=0x1 clr=0x0 pre=0xbff48 -> 0xbff49
+[guard] port2[307] rmw L1145: exc_count delta = 0 (before=0, after=0)
+  L1147 0x1cb0010078 w4 RMW set=0x0 clr=0x2000 pre=0x102810 -> 0x100810
+[guard] port2[308] rmw L1147: exc_count delta = 0 (before=0, after=0)
+  L1149 0x1cb00108c4 w4 RMW set=0x3000000 clr=0x0 pre=0x1e244 -> 0x301e244
+[guard] port2[309] rmw L1149: exc_count delta = 0 (before=0, after=0)
+  L1151 0x1cb0010b80 w4 RMW set=0x1f0000 clr=0x200000 pre=0x1d203220 -> 0x1d1f3220
+[guard] port2[310] rmw L1151: exc_count delta = 0 (before=0, after=0)
+  L1153 0x1cb0010890 w4 RMW set=0x0 clr=0x0 pre=0x2000 -> 0x2000 (same)
+[guard] port2[311] rmw L1153: exc_count delta = 0 (before=0, after=0)
+  L1154 0x1cb0010154 w4 READ 0x74747474 MATCH
+[guard] port2[312] read L1154: exc_count delta = 0 (before=0, after=0)
+  L1155 0x1cb0010890 w4 READ 0x2000 MATCH
+[guard] port2[313] read L1155: exc_count delta = 0 (before=0, after=0)
+  L1157 0x1cb00108a8 w4 RMW set=0x0 clr=0x1000 pre=0xc001061 -> 0xc000061
+[guard] port2[314] rmw L1157: exc_count delta = 0 (before=0, after=0)
+  L1159 0x1cb0010890 w4 RMW set=0x1000000 clr=0x0 pre=0x2000 -> 0x1002000
+[guard] port2[315] rmw L1159: exc_count delta = 0 (before=0, after=0)
+  L1160 0x1cb0010178 w4 READ 0x4444 MATCH
+[guard] port2[316] read L1160: exc_count delta = 0 (before=0, after=0)
+  L1161 0x1cb0010890 w4 READ 0x1402000 MATCH
+[guard] port2[317] read L1161: exc_count delta = 0 (before=0, after=0)
+  L1163 0x1cb00108a8 w4 RMW set=0x0 clr=0x1000 pre=0x4001021 -> 0x4000021
+[guard] port2[318] rmw L1163: exc_count delta = 0 (before=0, after=0)
+  L1164 0x1cb001009c w4 READ 0x180001e MATCH
+[guard] port2[319] read L1164: exc_count delta = 0 (before=0, after=0)
+  L1166 0x1cb00100a0 w2 RMW set=0x1 clr=0x4 pre=0x44 -> 0x41
+[guard] port2[320] rmw L1166: exc_count delta = 0 (before=0, after=0)
+  L1167 0x1cb00100a0 w4 READ 0x2010041 MATCH
+[guard] port2[321] read L1167: exc_count delta = 0 (before=0, after=0)
+  L1169 0x1cb0010710 w4 RMW set=0x0 clr=0x20000 pre=0x30120 -> 0x10120
+[guard] port2[322] rmw L1169: exc_count delta = 0 (before=0, after=0)
+  L1171 0x1cb001080c w4 RMW set=0x100 clr=0x200 pre=0x1302ff -> 0x1301ff
+[guard] port2[323] rmw L1171: exc_count delta = 0 (before=0, after=0)
+  L1173 0x1cb001007c w4 RMW set=0x10 clr=0x20 pre=0x737824 -> 0x737814
+[guard] port2[324] rmw L1173: exc_count delta = 0 (before=0, after=0)
+  L1175 0x1cb00108bc w4 RMW set=0x0 clr=0x1 pre=0xbff49 -> 0xbff48
+[guard] port2[325] rmw L1175: exc_count delta = 0 (before=0, after=0)
+  L1177 0x1cb0010080 w4 RMW set=0x400 clr=0x0 pre=0x10110000 -> 0x10110400
+[guard] port2[326] rmw L1177: exc_count delta = 0 (before=0, after=0)
+  L1178 0x49202c020 w4 WRITE 0x3
+[guard] port2[327] write L1178: exc_count delta = 0 (before=0, after=0)
+  L1179 0x492024080 w4 WRITE 0x1
+[guard] port2[328] write L1179: exc_count delta = 0 (before=0, after=0)
+  L1180 0x492000000 w4 READ 0x9e313020 MATCH
+[guard] port2[329] read L1180: exc_count delta = 0 (before=0, after=0)
+  L1181 0x492000004 w4 READ 0x341100a3 MATCH
+[guard] port2[330] read L1181: exc_count delta = 0 (before=0, after=0)
+  L1182 0x492000008 w4 READ 0x2a2a0202 MATCH
+[guard] port2[331] read L1182: exc_count delta = 0 (before=0, after=0)
+  L1183 0x49200000c w4 READ 0x10013 MATCH
+[guard] port2[332] read L1183: exc_count delta = 0 (before=0, after=0)
+  L1184 0x49200000c w4 READ 0x10013 MATCH
+[guard] port2[333] read L1184: exc_count delta = 0 (before=0, after=0)
+  L1186 0x492048000 w4 RMW set=0xef01 clr=0x10000 pre=0x11000 -> 0xff01
+[guard] port2[334] rmw L1186: exc_count delta = 0 (before=0, after=0)
+  L1188 0x492048000 w4 RMW set=0x80000000 clr=0x0 pre=0xff01 -> 0x8000ff01
+[guard] port2[335] rmw L1188: exc_count delta = 0 (before=0, after=0)
+  L1189 0x492044000 w4 WRITE 0x10
+[guard] port2[336] write L1189: exc_count delta = 0 (before=0, after=0)
+  L1190 0x492028104 w4 WRITE 0xff5527ff
+[guard] port2[337] write L1190: exc_count delta = 0 (before=0, after=0)
+  L1191 0x492028100 w4 WRITE 0xaad800
+[guard] port2[338] write L1191: exc_count delta = 0 (before=0, after=0)
+  L1192 0x492028124 w4 WRITE 0x1
+[guard] port2[339] write L1192: exc_count delta = 0 (before=0, after=0)
+  L1193 0x49202816c w4 WRITE 0xfffff000
+[guard] port2[340] write L1193: exc_count delta = 0 (before=0, after=0)
+  L1194 0x492028170 w4 WRITE 0x0
+[guard] port2[341] write L1194: exc_count delta = 0 (before=0, after=0)
+  L1195 0x49202b900 w4 WRITE 0x80000040
+[guard] port2[342] write L1195: exc_count delta = 0 (before=0, after=0)
+  L1196 0x49202b904 w4 WRITE 0x80000041
+[guard] port2[343] write L1196: exc_count delta = 0 (before=0, after=0)
+  L1197 0x49202b908 w4 WRITE 0x80000042
+[guard] port2[344] write L1197: exc_count delta = 0 (before=0, after=0)
+  L1198 0x49202b90c w4 WRITE 0x80000043
+[guard] port2[345] write L1198: exc_count delta = 0 (before=0, after=0)
+  L1199 0x49202b910 w4 WRITE 0x80000044
+[guard] port2[346] write L1199: exc_count delta = 0 (before=0, after=0)
+  L1200 0x49202b914 w4 WRITE 0x80000045
+[guard] port2[347] write L1200: exc_count delta = 0 (before=0, after=0)
+  L1201 0x49202b918 w4 WRITE 0x80000046
+[guard] port2[348] write L1201: exc_count delta = 0 (before=0, after=0)
+  L1202 0x49202b91c w4 WRITE 0x80000047
+[guard] port2[349] write L1202: exc_count delta = 0 (before=0, after=0)
+  L1203 0x49202b920 w4 WRITE 0x80000048
+[guard] port2[350] write L1203: exc_count delta = 0 (before=0, after=0)
+  L1204 0x49202b924 w4 WRITE 0x80000049
+[guard] port2[351] write L1204: exc_count delta = 0 (before=0, after=0)
+  L1205 0x49202b928 w4 WRITE 0x8000004a
+[guard] port2[352] write L1205: exc_count delta = 0 (before=0, after=0)
+  L1206 0x49202b92c w4 WRITE 0x8000004b
+[guard] port2[353] write L1206: exc_count delta = 0 (before=0, after=0)
+  L1207 0x49202b930 w4 WRITE 0x8000004c
+[guard] port2[354] write L1207: exc_count delta = 0 (before=0, after=0)
+  L1208 0x49202b934 w4 WRITE 0x8000004d
+[guard] port2[355] write L1208: exc_count delta = 0 (before=0, after=0)
+  L1209 0x49202b938 w4 WRITE 0x8000004e
+[guard] port2[356] write L1209: exc_count delta = 0 (before=0, after=0)
+  L1210 0x49202b93c w4 WRITE 0x8000004f
+[guard] port2[357] write L1210: exc_count delta = 0 (before=0, after=0)
+  L1211 0x49202b940 w4 WRITE 0x80000050
+[guard] port2[358] write L1211: exc_count delta = 0 (before=0, after=0)
+  L1212 0x49202b944 w4 WRITE 0x80000051
+[guard] port2[359] write L1212: exc_count delta = 0 (before=0, after=0)
+  L1213 0x49202b948 w4 WRITE 0x80000052
+[guard] port2[360] write L1213: exc_count delta = 0 (before=0, after=0)
+  L1214 0x49202b94c w4 WRITE 0x80000053
+[guard] port2[361] write L1214: exc_count delta = 0 (before=0, after=0)
+  L1215 0x49202b950 w4 WRITE 0x80000054
+[guard] port2[362] write L1215: exc_count delta = 0 (before=0, after=0)
+  L1216 0x49202b954 w4 WRITE 0x80000055
+[guard] port2[363] write L1216: exc_count delta = 0 (before=0, after=0)
+  L1217 0x49202b958 w4 WRITE 0x80000056
+[guard] port2[364] write L1217: exc_count delta = 0 (before=0, after=0)
+  L1218 0x49202b95c w4 WRITE 0x80000057
+[guard] port2[365] write L1218: exc_count delta = 0 (before=0, after=0)
+  L1219 0x49202b960 w4 WRITE 0x80000058
+[guard] port2[366] write L1219: exc_count delta = 0 (before=0, after=0)
+  L1220 0x49202b964 w4 WRITE 0x80000059
+[guard] port2[367] write L1220: exc_count delta = 0 (before=0, after=0)
+  L1221 0x49202b968 w4 WRITE 0x8000005a
+[guard] port2[368] write L1221: exc_count delta = 0 (before=0, after=0)
+  L1222 0x49202b96c w4 WRITE 0x8000005b
+[guard] port2[369] write L1222: exc_count delta = 0 (before=0, after=0)
+  L1223 0x49202b970 w4 WRITE 0x8000005c
+[guard] port2[370] write L1223: exc_count delta = 0 (before=0, after=0)
+  L1224 0x49202b974 w4 WRITE 0x8000005d
+[guard] port2[371] write L1224: exc_count delta = 0 (before=0, after=0)
+  L1225 0x49202b978 w4 WRITE 0x8000005e
+[guard] port2[372] write L1225: exc_count delta = 0 (before=0, after=0)
+  L1226 0x49202b97c w4 WRITE 0x8000005f
+[guard] port2[373] write L1226: exc_count delta = 0 (before=0, after=0)
+  L1228 0x497028000 w4 RMW set=0x1 clr=0x0 pre=0x23000070 -> 0x23000071
+[guard] port2[374] rmw L1228: exc_count delta = 0 (before=0, after=0)
+  L1229 0x497028000 w4 POLL (val & 0x4) == 0x4 CONVERGED val=0x23000075
+[guard] port2[375] pollmask L1229: exc_count delta = 0 (before=0, after=0)
+  L1231 0x497028000 w4 RMW set=0x2 clr=0x0 pre=0x23000075 -> 0x23000077
+[guard] port2[376] rmw L1231: exc_count delta = 0 (before=0, after=0)
+  L1232 0x497028000 w4 POLL (val & 0x8) == 0x8 CONVERGED val=0x2300007f
+[guard] port2[377] pollmask L1232: exc_count delta = 0 (before=0, after=0)
+  L1234 0x497028000 w4 RMW set=0x0 clr=0x10 pre=0x2300007f -> 0x2300006f
+[guard] port2[378] rmw L1234: exc_count delta = 0 (before=0, after=0)
+  L1236 0x497028000 w4 RMW set=0x200 clr=0x0 pre=0x2300006f -> 0x2300026f
+[guard] port2[379] rmw L1236: exc_count delta = 0 (before=0, after=0)
+  L1238 0x497028000 w4 RMW set=0x400 clr=0x0 pre=0x2300026f -> 0x2300066f
+[guard] port2[380] rmw L1238: exc_count delta = 0 (before=0, after=0)
+  L1240 0x492028080 w4 RMW set=0x1 clr=0x0 pre=0x0 -> 0x1
+[guard] port2[381] rmw L1240: exc_count delta = 0 (before=0, after=0)
+  L1243 0x492028100 w4 POLL val == 0x1000 CONVERGED val=0x1000
+[guard] port2[382] pollval L1243: exc_count delta = 0 (before=0, after=0)
+  L1244 0x1cb0010082 w2 READ 0x3011 MATCH
+[guard] port2[383] read L1244: exc_count delta = 0 (before=0, after=0)
+  L1245 0x1cb0010082 w2 READ 0x3011 MATCH
+[guard] port2[384] read L1245: exc_count delta = 0 (before=0, after=0)
+  L1247 0x497028000 w4 RMW set=0x80000000 clr=0x0 pre=0x2300066f -> 0xa300066f
+[guard] port2[385] rmw L1247: exc_count delta = 0 (before=0, after=0)
+  L1249 0x1cb0010098 w2 RMW set=0x400 clr=0x0 pre=0x0 -> 0x400
+[guard] port2[386] rmw L1249: exc_count delta = 0 (before=0, after=0)
+  L1250 0x492028100 w4 WRITE 0x1000
+[guard] port2[387] write L1250: exc_count delta = 0 (before=0, after=0)
+  L1251 0x492028100 w4 READ 0x0 MATCH
+[guard] port2[388] read L1251: exc_count delta = 0 (before=0, after=0)
+  L1252 0x492028208 w4 READ 0x9b000001 MATCH
+[guard] port2[389] read L1252: exc_count delta = 0 (before=0, after=0)
+  L1253 0x492028208 w4 READ 0x9b000001 MATCH
+[guard] port2[390] read L1253: exc_count delta = 0 (before=0, after=0)
+--- segment port2 done: writes=337 rmws=217 read match/mismatch=31/1 polls ok/timeout=8/0 pre-mismatch=0 faults=0 ---
+=== post-replay LINKSTS watch (2 s per active port) ===
+  port0: LINKSTS=0x8300020c [BUSY|bit3|bit9|bit24|bit25|bit31] at +0.00s
+  port0: still BUSY after 2 s (LINKSTS=0x8300020c)
+  port2: LINKSTS=0x9b000001 [UP|bit24|bit25|bit31] at +0.00s
+  port2: BUSY CLEARED after 0.00s!
+=== ECAM walk ===
+ecam_base = 0x1cb0000000
+
+active ports: [0, 2]
+
+--- root bus 0 ---
+  00:00.0: vacant (VID:DID = 0xffffffff)
+  00:01.0: skipped (port 1 inactive)
+  00:02.0: VID:DID = 106b:100c  rev=1  class=06.04.00  (PCI bridge)
+          cmd=0x0000 status=0x0010 hdr=0x01 BAR0=0x00000000
+          bridge: primary=0 secondary=0 subordinate=0
+
+=== enable NIC ===
+No class-0x02 device found.
+
+=== FINAL: writes=337 rmws=217 read match/mismatch=31/1 polls ok/timeout=8/0 pre-mismatch=0 faults=0 ===
+phy_ip probe: PASS

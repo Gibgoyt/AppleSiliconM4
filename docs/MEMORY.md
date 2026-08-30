@@ -1,3 +1,4 @@
 - [PCIe bring-up on Apple M4 mini](project-m4-pcie-bringup.md) — long-term Phase 3.3 bring-up via patched m1n1, currently stuck at Phase F 6.g phy_ip write
 - [M4 PCIe repo paths + tooling](ref-m4-repos.md) — where the Python bring-up scripts and m1n1 fork live, and where the runtime log gets written
 - [Asahi t8132 PCIe source-of-truth](ref-asahi-t8132-pcie.md) — what upstream Linux + Asahi + m1n1 do/don't do for t8132 PCIe, with per-SoC delta table, atc.c CIO3PLL pattern, and ranked RUN 3 hypothesis list
+- [macOS MMIO trace analysis](pcie-trace-analysis.md) — Yureka's pcie.log decoded AND CONFIRMED: RUN T/U/V (trace_replay.sh) unlocked phy_ip, trained port-2 link (0xab000200/UP), enumerated the NIC = 14e4:1682 Broadcom BCM57762; next: BAR/window assignment + DART + tg3 (see Scripts/m1n1/logs/V/findings.md)
